@@ -1,0 +1,215 @@
+diff --git a/applications/browser/package.json b/applications/browser/package.json
+index 334f2af..0d4d380 100644
+--- a/applications/browser/package.json
++++ b/applications/browser/package.json
+@@ -1,8 +1,8 @@
+ {
+   "private": true,
+   "name": "theia-ide-browser-app",
+-  "description": "Eclipse Theia IDE browser product",
+-  "productName": "Theia IDE",
++  "description": "Soriku IDE browser product",
++  "productName": "Soriku IDE",
+   "version": "1.72.100",
+   "license": "MIT",
+   "author": "Eclipse Theia <theia-dev@eclipse.org>",
+@@ -21,7 +21,7 @@
+   "theia": {
+     "frontend": {
+       "config": {
+-        "applicationName": "Theia IDE",
++        "applicationName": "Soriku IDE",
+         "warnOnPotentiallyInsecureHostPattern": false,
+         "preferences": {
+           "toolbar.showToolbar": true,
+@@ -36,7 +36,7 @@
+         "warnOnPotentiallyInsecureHostPattern": false,
+         "startupTimeout": -1,
+         "resolveSystemPlugins": false,
+-        "configurationFolder": ".theia-ide",
++        "configurationFolder": ".soriku-ide",
+         "frontendConnectionTimeout": 3000
+       }
+     },
+@@ -119,7 +119,8 @@
+     "@theia/vsx-registry": "1.73.0-next.2",
+     "@theia/workspace": "1.73.0-next.2",
+     "fs-extra": "^9.1.0",
+-    "theia-ide-product-ext": "1.72.100"
++    "theia-ide-product-ext": "1.72.100",
++    "soriku-engine-client-ext": "0.1.0"
+   },
+   "devDependencies": {
+     "@theia/bundle-plugin": "1.73.0-next.2",
+diff --git a/applications/electron/package.json b/applications/electron/package.json
+index 9f6eead..373657e 100644
+--- a/applications/electron/package.json
++++ b/applications/electron/package.json
+@@ -1,8 +1,8 @@
+ {
+   "private": true,
+   "name": "theia-ide-electron-app",
+-  "description": "Eclipse Theia IDE product",
+-  "productName": "Theia IDE",
++  "description": "Soriku IDE desktop product",
++  "productName": "Soriku IDE",
+   "version": "1.72.100",
+   "main": "scripts/theia-electron-main.js",
+   "license": "MIT",
+@@ -23,7 +23,7 @@
+     "target": "electron",
+     "frontend": {
+       "config": {
+-        "applicationName": "Theia IDE",
++        "applicationName": "Soriku IDE",
+         "reloadOnReconnect": true,
+         "preferences": {
+           "toolbar.showToolbar": true
+@@ -43,7 +43,7 @@
+         "frontendConnectionTimeout": -1,
+         "startupTimeout": -1,
+         "resolveSystemPlugins": false,
+-        "configurationFolder": ".theia-ide"
++        "configurationFolder": ".soriku-ide"
+       }
+     },
+     "generator": {
+@@ -129,6 +129,7 @@
+     "fs-extra": "^9.1.0",
+     "theia-ide-launcher-ext": "1.72.100",
+     "theia-ide-product-ext": "1.72.100",
++    "soriku-engine-client-ext": "0.1.0",
+     "theia-ide-updater-ext": "1.72.100"
+   },
+   "devDependencies": {
+diff --git a/package.json b/package.json
+index 6278338..71726f3 100644
+--- a/package.json
++++ b/package.json
+@@ -43,7 +43,7 @@
+     "build:applications:dev": "lerna run --scope=\"theia-ide*app\" --ignore=\"theia-ide-next*\" build --concurrency 1",
+     "build:applications:next": "lerna run --scope=\"theia-ide-next*\" build:prod --concurrency 1",
+     "build:applications:next:dev": "lerna run --scope=\"theia-ide-next*\" build --concurrency 1",
+-    "build:extensions": "lerna run --scope=\"theia-ide*ext\" build",
++    "build:extensions": "lerna run --scope=\"theia-ide*ext\" --scope=\"soriku-*\" build",
+     "download:plugins": "theia download:plugins --rate-limit=15 --parallel=false && yarn permissions:writeable",
+     "package:applications": "lerna run --scope=\"theia-ide*app\" --ignore=\"theia-ide-next*\" package --concurrency 1",
+     "package:applications:preview": "lerna run --scope=\"theia-ide*app\" --ignore=\"theia-ide-next*\" package:preview --concurrency 1",
+diff --git a/theia-extensions/product/package.json b/theia-extensions/product/package.json
+index 3675ca7..8162e05 100644
+--- a/theia-extensions/product/package.json
++++ b/theia-extensions/product/package.json
+@@ -2,7 +2,7 @@
+   "private": true,
+   "name": "theia-ide-product-ext",
+   "version": "1.72.100",
+-  "description": "Eclipse Theia IDE Product Branding",
++  "description": "Soriku IDE Product Branding",
+   "dependencies": {
+     "@theia/ai-registry": "1.73.0-next.2",
+     "@theia/core": "1.73.0-next.2",
+diff --git a/theia-extensions/product/src/browser/branding-util.tsx b/theia-extensions/product/src/browser/branding-util.tsx
+index c61a5ad..6367805 100644
+--- a/theia-extensions/product/src/browser/branding-util.tsx
++++ b/theia-extensions/product/src/browser/branding-util.tsx
+@@ -20,7 +20,13 @@ export interface ExternalBrowserLinkProps {
+ export function renderProductName(): React.ReactNode {
+     const variant = getBrandingVariant();
+     const suffix = variant !== 'stable' ? ` ${variant.charAt(0).toUpperCase() + variant.slice(1)}` : '';
+-    return <h1>Eclipse Theia <span className="gs-blue-header">IDE</span>{suffix}</h1>;
++    return <h1>Soriku <span className="gs-blue-header">IDE</span>{suffix}</h1>;
++}
++
++export function renderAboutTagline(): React.ReactNode {
++    return <p className='gs-sub-header'>
++        Soriku IDE — built on Eclipse Theia. Powered by the Soriku engine.
++    </p>;
+ }
+ 
+ function BrowserLink(props: ExternalBrowserLinkProps): JSX.Element {
+@@ -40,14 +46,12 @@ export function renderWhatIs(windowService: WindowService): React.ReactNode {
+             What is this?
+         </h3>
+         <div>
+-            The Eclipse Theia IDE is a modern and open IDE for cloud and desktop. The Theia IDE is based on the <BrowserLink text="Theia platform"
+-                url="https://theia-ide.org" windowService={windowService} ></BrowserLink>.
++            Soriku IDE is an AI-native coding environment built on the <BrowserLink text="Eclipse Theia"
++                url="https://theia-ide.org" windowService={windowService} ></BrowserLink> platform.
++            It connects to the Soriku engine for agents, chat, and tool execution — locally or hosted.
+         </div>
+         <div>
+-            The IDE is available as a <BrowserLink text="downloadable desktop application" url="https://theia-ide.org//#theiaidedownload"
+-                windowService={windowService} ></BrowserLink>. You can also <BrowserLink text="try the latest version of the Theia IDE online"
+-                    url="https://try.theia-cloud.io/" windowService={windowService} ></BrowserLink>. The online test version is limited to 30 minutes per session and hosted
+-            via <BrowserLink text="Theia Cloud" url="https://theia-cloud.io/" windowService={windowService} ></BrowserLink>.
++            {renderAboutTagline()}
+         </div>
+     </div>;
+ }
+@@ -55,17 +59,11 @@ export function renderWhatIs(windowService: WindowService): React.ReactNode {
+ export function renderExtendingCustomizing(windowService: WindowService): React.ReactNode {
+     return <div className='gs-section'>
+         <h3 className='gs-section-header'>
+-            Extending/Customizing the Theia IDE
++            Extending Soriku IDE
+         </h3>
+         <div >
+-            You can extend the Theia IDE at runtime by installing VS Code extensions, e.g. from the <BrowserLink text="OpenVSX registry" url="https://open-vsx.org/"
+-                windowService={windowService} ></BrowserLink>, an open marketplace for VS Code extensions. Just open the extension view or browse <BrowserLink
+-                    text="OpenVSX online" url="https://open-vsx.org/" windowService={windowService} ></BrowserLink>.
+-        </div>
+-        <div>
+-            Furthermore, the Theia IDE is based on the flexible Theia platform. Therefore, the Theia IDE can serve as a <span className='gs-text-bold'>template</span> for building
+-            custom tools and IDEs. Browse <BrowserLink text="the documentation" url="https://theia-ide.org/docs/composing_applications/"
+-                windowService={windowService} ></BrowserLink> to help you customize and build your own Eclipse Theia-based product.
++            Install VS Code extensions from the <BrowserLink text="OpenVSX registry" url="https://open-vsx.org/"
++                windowService={windowService} ></BrowserLink> to extend the editor. Soriku-specific features (agents, chat, tools) ship as dedicated Soriku extensions.
+         </div>
+     </div>;
+ }
+diff --git a/theia-extensions/product/src/browser/theia-ide-about-dialog.tsx b/theia-extensions/product/src/browser/theia-ide-about-dialog.tsx
+index 388697a..01d93fc 100644
+--- a/theia-extensions/product/src/browser/theia-ide-about-dialog.tsx
++++ b/theia-extensions/product/src/browser/theia-ide-about-dialog.tsx
+@@ -10,7 +10,7 @@
+ import * as React from 'react';
+ import { AboutDialog, AboutDialogProps, ABOUT_CONTENT_CLASS } from '@theia/core/lib/browser/about-dialog';
+ import { injectable, inject } from '@theia/core/shared/inversify';
+-import { renderDocumentation, renderDownloads, renderProductName, renderSourceCode, renderSupport, renderTickets, renderWhatIs } from './branding-util';
++import { renderAboutTagline, renderDocumentation, renderDownloads, renderProductName, renderSourceCode, renderSupport, renderTickets, renderWhatIs } from './branding-util';
+ import { VSXEnvironment } from '@theia/vsx-registry/lib/common/vsx-environment';
+ import { WindowService } from '@theia/core/lib/browser/window/window-service';
+ @injectable()
+@@ -87,6 +87,7 @@ export class TheiaIDEAboutDialog extends AboutDialog {
+     protected renderTitle(): React.ReactNode {
+         return <div className='gs-header'>
+             {renderProductName()}
++            {renderAboutTagline()}
+             {this.renderVersion()}
+         </div>;
+     }
+diff --git a/theia-extensions/product/src/browser/theia-ide-ai-registry-configuration.ts b/theia-extensions/product/src/browser/theia-ide-ai-registry-configuration.ts
+index b5a0595..0af2c94 100644
+--- a/theia-extensions/product/src/browser/theia-ide-ai-registry-configuration.ts
++++ b/theia-extensions/product/src/browser/theia-ide-ai-registry-configuration.ts
+@@ -14,6 +14,6 @@ import { getBrandingVariant } from './theia-ide-config';
+ @injectable()
+ export class TheiaIDEAIRegistryConfiguration extends AIRegistryConfiguration {
+     override getToolName(): string {
+-        return getBrandingVariant() === 'next' ? 'theia-ide-next' : 'theia-ide';
++        return getBrandingVariant() === 'next' ? 'soriku-ide-next' : 'soriku-ide';
+     }
+ }
+diff --git a/theia-extensions/product/src/browser/theia-ide-contribution.tsx b/theia-extensions/product/src/browser/theia-ide-contribution.tsx
+index 2678040..f9c118b 100644
+--- a/theia-extensions/product/src/browser/theia-ide-contribution.tsx
++++ b/theia-extensions/product/src/browser/theia-ide-contribution.tsx
+@@ -17,7 +17,7 @@ export namespace TheiaIDEMenus {
+     export const THEIA_IDE_HELP: MenuPath = [...CommonMenus.HELP, 'theia-ide'];
+ }
+ export namespace TheiaIDECommands {
+-    export const CATEGORY = 'TheiaIDE';
++    export const CATEGORY = 'Soriku IDE';
+     export const REPORT_ISSUE: Command = {
+         id: 'theia-ide:report-issue',
+         category: CATEGORY,
