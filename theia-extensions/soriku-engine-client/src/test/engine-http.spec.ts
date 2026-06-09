@@ -1,5 +1,7 @@
 /********************************************************************************
  * Soriku IDE — EngineHttpTransport unit tests
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
 import { describe, it } from 'node:test';
@@ -53,11 +55,11 @@ function neverResolvingFetch(): FetchFn {
     });
 }
 
-function sseResponse(body: BodyInit | null): Response {
+function sseResponse(body?: BodyInit): Response {
     return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
 }
 
-async function collect(stream: AsyncGenerator<{ type: string;[k: string]: unknown }>): Promise<{ type: string;[k: string]: unknown }[]> {
+async function collect(stream: AsyncGenerator<{ type: string; [k: string]: unknown }>): Promise<{ type: string; [k: string]: unknown }[]> {
     const events = [];
     for await (const event of stream) {
         events.push(event);
@@ -152,7 +154,7 @@ describe('EngineHttpTransport — JSON requests', () => {
     });
 
     it('returns undefined for 204 No Content', async () => {
-        const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => new Response(null, { status: 204 })));
+        const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => new Response(undefined, { status: 204 })));
         const result = await transport.deleteJson('/api/routing/overrides/x');
         assert.equal(result, undefined);
     });
@@ -251,7 +253,7 @@ describe('EngineHttpTransport — SSE streaming', () => {
     });
 
     it('throws StreamInterruptedError when the response has no body', async () => {
-        const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => sseResponse(null)));
+        const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => sseResponse()));
         await assert.rejects(() => transport.postSse('/api/worker', {}).next(),
             (e: EngineError) => e instanceof StreamInterruptedError);
     });
@@ -259,7 +261,7 @@ describe('EngineHttpTransport — SSE streaming', () => {
     it('throws StreamInterruptedError when the stream errors mid-flight', async () => {
         const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => {
             const stream = new ReadableStream<Uint8Array>({
-                start(controller) {
+                start(controller): void {
                     controller.enqueue(new TextEncoder().encode('data: {"type":"chunk","content":"a"}\n\n'));
                     controller.error(new Error('connection dropped'));
                 },

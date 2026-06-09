@@ -1,10 +1,12 @@
 /********************************************************************************
  * Soriku IDE — EngineClient implementation
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { inject, injectable } from '@theia/core/shared/inversify';
+import { inject, injectable, optional } from '@theia/core/shared/inversify';
 import { PreferenceService } from '@theia/core/lib/common';
-import { EngineClient } from '../common/engine-client';
+import { EngineAuthProvider, EngineClient } from '../common/engine-client';
 import { EngineHttpTransport } from '../common/engine-http';
 import {
     AgentCreateRequest,
@@ -30,6 +32,7 @@ import {
     SetRoutingOverrideResponse,
     SorikuSseEvent,
     V1ModelsResponse,
+    WhoamiResponse,
 } from '../common/engine-types';
 import {
     DEFAULT_ENGINE_BASE_URL,
@@ -45,14 +48,18 @@ export class EngineClientImpl implements EngineClient {
     @inject(PreferenceService)
     protected readonly preferenceService: PreferenceService;
 
+    @inject(EngineAuthProvider) @optional()
+    protected readonly authProvider?: EngineAuthProvider;
+
     protected createTransport(): EngineHttpTransport {
         return new EngineHttpTransport(this.getConfig());
     }
 
     getConfig(): EngineClientConfig {
+        const preferenceToken = this.preferenceService.get<string>(SORIKU_ENGINE_AUTH_TOKEN, '') || undefined;
         return {
             baseUrl: this.preferenceService.get<string>(SORIKU_ENGINE_BASE_URL, DEFAULT_ENGINE_BASE_URL),
-            authToken: this.preferenceService.get<string>(SORIKU_ENGINE_AUTH_TOKEN, '') || undefined,
+            authToken: this.authProvider?.getToken() ?? preferenceToken,
             timeoutMs: this.preferenceService.get<number>(SORIKU_ENGINE_TIMEOUT, DEFAULT_ENGINE_TIMEOUT_MS),
         };
     }
@@ -67,6 +74,10 @@ export class EngineClientImpl implements EngineClient {
 
     async getAuthMode(): Promise<AuthModeResponse> {
         return this.createTransport().getJson<AuthModeResponse>('/api/auth/mode');
+    }
+
+    async whoami(): Promise<WhoamiResponse> {
+        return this.createTransport().getJson<WhoamiResponse>('/api/v1/auth/whoami');
     }
 
     async listAgents(): Promise<AgentListResponse> {
@@ -93,9 +104,9 @@ export class EngineClientImpl implements EngineClient {
         const body: ChatRequest = {
             prompt: params.prompt,
             persona_id: params.personaId,
-            conversation_id: params.conversationId ?? null,
-            project_id: params.projectId ?? null,
-            mode: params.mode ?? null,
+            conversation_id: params.conversationId,
+            project_id: params.projectId,
+            mode: params.mode,
             stream: true,
         };
         const path = params.useWorker === false ? '/api/chat' : '/api/worker';

@@ -1,5 +1,7 @@
 /********************************************************************************
  * Soriku IDE — engine connection preferences
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
 import { PreferenceSchema, PreferenceScope } from '@theia/core';

@@ -1,5 +1,7 @@
 /********************************************************************************
  * Soriku IDE — EngineClient service contract
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
 import {
@@ -24,9 +26,21 @@ import {
     SetRoutingOverrideResponse,
     SorikuSseEvent,
     V1ModelsResponse,
+    WhoamiResponse,
 } from './engine-types';
 
 export const EngineClient = Symbol('EngineClient');
+
+/**
+ * Optional provider of the engine auth token. When bound (e.g. by soriku-auth, backed by the
+ * OS keychain), the EngineClient prefers its token over the `soriku.engine.authToken` preference.
+ */
+export const EngineAuthProvider = Symbol('EngineAuthProvider');
+
+export interface EngineAuthProvider {
+    /** Current bearer token, or undefined in local/unauthenticated mode. */
+    getToken(): string | undefined;
+}
 
 export interface EngineClient {
     /** Current resolved base URL (from preferences). */
@@ -34,6 +48,7 @@ export interface EngineClient {
 
     ping(): Promise<HealthResponse>;
     getAuthMode(): Promise<AuthModeResponse>;
+    whoami(): Promise<WhoamiResponse>;
 
     listAgents(): Promise<AgentListResponse>;
     getAgent(agentId: string): Promise<AgentResponse>;

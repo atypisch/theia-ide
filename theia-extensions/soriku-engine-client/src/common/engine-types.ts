@@ -1,6 +1,8 @@
 /********************************************************************************
  * Soriku IDE — Engine API types (Phase 2.1)
  * Derived from docs/PHASE_2_ENGINE_CONTRACT.md — do not invent fields.
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
 export interface AgentPersona {
@@ -123,6 +125,19 @@ export interface ConfirmResponse {
 export interface AuthModeResponse {
     auth_mode: string;
     simezu_base_url?: string | null;
+}
+
+/**
+ * Response of `GET /api/v1/auth/whoami`. The engine contract does not fix the exact shape,
+ * so fields are optional; the index signature preserves whatever the engine returns.
+ */
+export interface WhoamiResponse {
+    user_id?: string;
+    email?: string;
+    name?: string;
+    display_name?: string;
+    tenant_id?: string;
+    [key: string]: unknown;
 }
 
 export interface HealthResponse {

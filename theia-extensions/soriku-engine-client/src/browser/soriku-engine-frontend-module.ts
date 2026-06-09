@@ -1,5 +1,7 @@
 /********************************************************************************
  * Soriku IDE — engine client frontend DI module
+ *
+ * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
 import { ContainerModule } from '@theia/core/shared/inversify';
