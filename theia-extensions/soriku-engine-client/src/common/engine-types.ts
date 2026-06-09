@@ -244,4 +244,6 @@ export interface ChatStreamParams {
 export interface EngineClientConfig {
     baseUrl: string;
     authToken?: string;
+    /** Timeout in milliseconds applied to non-streaming requests. SSE streams are never timed out. */
+    timeoutMs?: number;
 }

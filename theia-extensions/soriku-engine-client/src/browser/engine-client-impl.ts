@@ -33,8 +33,10 @@ import {
 } from '../common/engine-types';
 import {
     DEFAULT_ENGINE_BASE_URL,
+    DEFAULT_ENGINE_TIMEOUT_MS,
     SORIKU_ENGINE_AUTH_TOKEN,
     SORIKU_ENGINE_BASE_URL,
+    SORIKU_ENGINE_TIMEOUT,
 } from './soriku-engine-preferences';
 
 @injectable()
@@ -51,6 +53,7 @@ export class EngineClientImpl implements EngineClient {
         return {
             baseUrl: this.preferenceService.get<string>(SORIKU_ENGINE_BASE_URL, DEFAULT_ENGINE_BASE_URL),
             authToken: this.preferenceService.get<string>(SORIKU_ENGINE_AUTH_TOKEN, '') || undefined,
+            timeoutMs: this.preferenceService.get<number>(SORIKU_ENGINE_TIMEOUT, DEFAULT_ENGINE_TIMEOUT_MS),
         };
     }
 

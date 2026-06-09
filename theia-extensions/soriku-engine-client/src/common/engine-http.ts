@@ -2,7 +2,12 @@
  * Soriku IDE — HTTP + SSE transport (testable, no Theia deps)
  ********************************************************************************/
 
-import { EngineError } from './engine-errors';
+import {
+    EngineError,
+    EngineUnavailableError,
+    StreamInterruptedError,
+    engineErrorFromStatus,
+} from './engine-errors';
 import { EngineClientConfig, SorikuSseEvent } from './engine-types';
 
 export type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -73,14 +78,23 @@ export class EngineHttpTransport {
     async *postSse(path: string, body: unknown, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent> {
         const response = await this.rawRequest('POST', path, body, true, signal);
         if (!response.body) {
-            throw new EngineError('network', `SSE response has no body for ${path}`);
+            throw new StreamInterruptedError(`SSE response has no body for ${path}`);
         }
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         try {
             while (true) {
-                const { done, value } = await reader.read();
+                let chunk: Awaited<ReturnType<typeof reader.read>>;
+                try {
+                    chunk = await reader.read();
+                } catch (error) {
+                    if ((error as Error).name === 'AbortError') {
+                        throw new EngineError('aborted', `SSE stream aborted: ${path}`);
+                    }
+                    throw new StreamInterruptedError(`SSE stream interrupted for ${path}: ${(error as Error).message}`, { cause: error as Error });
+                }
+                const { done, value } = chunk;
                 if (done) {
                     break;
                 }
@@ -89,7 +103,7 @@ export class EngineHttpTransport {
                 while (boundary >= 0) {
                     const rawEvent = buffer.slice(0, boundary);
                     buffer = buffer.slice(boundary + 2);
-                    const parsed = parseSseChunk(rawEvent);
+                    const parsed = this.safeParseSse(rawEvent);
                     if (parsed) {
                         yield parsed;
                     }
@@ -97,7 +111,7 @@ export class EngineHttpTransport {
                 }
             }
             if (buffer.trim()) {
-                const parsed = parseSseChunk(buffer);
+                const parsed = this.safeParseSse(buffer);
                 if (parsed) {
                     yield parsed;
                 }
@@ -107,24 +121,62 @@ export class EngineHttpTransport {
         }
     }
 
+    /**
+     * Parse one SSE frame without letting a single malformed frame abort the whole stream.
+     * Invalid JSON is surfaced as an `error` event so the UI can decide, and the stream continues.
+     */
+    private safeParseSse(rawEvent: string): SorikuSseEvent | undefined {
+        try {
+            return parseSseChunk(rawEvent);
+        } catch (error) {
+            return { type: 'error', code: 'malformed_sse', message: (error as Error).message, raw: rawEvent };
+        }
+    }
+
     private async rawRequest(method: string, path: string, body: unknown | undefined, stream: boolean, signal?: AbortSignal): Promise<Response> {
         const headers = buildAuthHeaders(this.config);
         if (stream) {
             headers['Accept'] = 'text/event-stream';
         }
+
+        // SSE streams are never timed out; non-streaming requests honor config.timeoutMs.
+        const timeoutMs = stream ? undefined : this.config.timeoutMs;
+        let requestSignal = signal;
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+        let timedOut = false;
+        if (timeoutMs && timeoutMs > 0) {
+            const controller = new AbortController();
+            requestSignal = controller.signal;
+            if (signal) {
+                if (signal.aborted) {
+                    controller.abort();
+                } else {
+                    signal.addEventListener('abort', () => controller.abort(), { once: true });
+                }
+            }
+            timeoutHandle = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+        }
+
         let response: Response;
         try {
             response = await this.fetchFn(joinUrl(this.config.baseUrl, path), {
                 method,
                 headers,
                 body: body === undefined ? undefined : JSON.stringify(body),
-                signal,
+                signal: requestSignal,
             });
         } catch (error) {
             if ((error as Error).name === 'AbortError') {
+                if (timedOut) {
+                    throw new EngineUnavailableError(`Request to ${path} timed out after ${timeoutMs}ms`, { timedOut: true, cause: error as Error });
+                }
                 throw new EngineError('aborted', `Request aborted: ${path}`);
             }
-            throw new EngineError('network', `Network error for ${path}: ${(error as Error).message}`, { cause: error as Error });
+            throw new EngineUnavailableError(`Network error for ${path}: ${(error as Error).message}`, { cause: error as Error });
+        } finally {
+            if (timeoutHandle) {
+                clearTimeout(timeoutHandle);
+            }
         }
         if (!response.ok) {
             let errorBody: unknown = undefined;
@@ -137,7 +189,11 @@ export class EngineHttpTransport {
                     errorBody = undefined;
                 }
             }
-            throw new EngineError('http', `HTTP ${response.status} for ${path}`, { status: response.status, body: errorBody });
+            const retryAfter = Number(response.headers.get('Retry-After'));
+            throw engineErrorFromStatus(response.status, `HTTP ${response.status} for ${path}`, {
+                body: errorBody,
+                ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterSeconds: retryAfter } : {}),
+            });
         }
         return response;
     }
