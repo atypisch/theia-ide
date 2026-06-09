@@ -4,7 +4,6 @@
   "version": "1.72.100",
   "description": "Soriku IDE Product Branding",
   "dependencies": {
-    "@theia/ai-registry": "1.73.0-next.2",
     "@theia/core": "1.73.0-next.2",
     "@theia/getting-started": "1.73.0-next.2",
     "@theia/vsx-registry": "1.73.0-next.2",
