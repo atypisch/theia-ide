@@ -1,8 +1,8 @@
 {
   "private": true,
   "name": "theia-ide-browser-app",
-  "description": "Eclipse Theia IDE browser product",
-  "productName": "Theia IDE",
+  "description": "Soriku IDE browser product",
+  "productName": "Soriku IDE",
   "version": "1.72.100",
   "license": "MIT",
   "author": "Eclipse Theia <theia-dev@eclipse.org>",
@@ -21,7 +21,7 @@
   "theia": {
     "frontend": {
       "config": {
-        "applicationName": "Theia IDE",
+        "applicationName": "Soriku IDE",
         "warnOnPotentiallyInsecureHostPattern": false,
         "preferences": {
           "toolbar.showToolbar": true,
@@ -36,7 +36,7 @@
         "warnOnPotentiallyInsecureHostPattern": false,
         "startupTimeout": -1,
         "resolveSystemPlugins": false,
-        "configurationFolder": ".theia-ide",
+        "configurationFolder": ".soriku-ide",
         "frontendConnectionTimeout": 3000
       }
     },
@@ -119,7 +119,8 @@
     "@theia/vsx-registry": "1.73.0-next.2",
     "@theia/workspace": "1.73.0-next.2",
     "fs-extra": "^9.1.0",
-    "theia-ide-product-ext": "1.72.100"
+    "theia-ide-product-ext": "1.72.100",
+    "soriku-engine-client-ext": "0.1.0"
   },
   "devDependencies": {
     "@theia/bundle-plugin": "1.73.0-next.2",

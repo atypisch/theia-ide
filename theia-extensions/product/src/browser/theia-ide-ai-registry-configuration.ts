@@ -14,6 +14,6 @@ import { getBrandingVariant } from './theia-ide-config';
 @injectable()
 export class TheiaIDEAIRegistryConfiguration extends AIRegistryConfiguration {
     override getToolName(): string {
-        return getBrandingVariant() === 'next' ? 'theia-ide-next' : 'theia-ide';
+        return getBrandingVariant() === 'next' ? 'soriku-ide-next' : 'soriku-ide';
     }
 }

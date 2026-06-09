@@ -17,7 +17,7 @@ export namespace TheiaIDEMenus {
     export const THEIA_IDE_HELP: MenuPath = [...CommonMenus.HELP, 'theia-ide'];
 }
 export namespace TheiaIDECommands {
-    export const CATEGORY = 'TheiaIDE';
+    export const CATEGORY = 'Soriku IDE';
     export const REPORT_ISSUE: Command = {
         id: 'theia-ide:report-issue',
         category: CATEGORY,

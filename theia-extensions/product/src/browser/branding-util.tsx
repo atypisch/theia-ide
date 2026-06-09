@@ -20,7 +20,13 @@ export interface ExternalBrowserLinkProps {
 export function renderProductName(): React.ReactNode {
     const variant = getBrandingVariant();
     const suffix = variant !== 'stable' ? ` ${variant.charAt(0).toUpperCase() + variant.slice(1)}` : '';
-    return <h1>Eclipse Theia <span className="gs-blue-header">IDE</span>{suffix}</h1>;
+    return <h1>Soriku <span className="gs-blue-header">IDE</span>{suffix}</h1>;
+}
+
+export function renderAboutTagline(): React.ReactNode {
+    return <p className='gs-sub-header'>
+        Soriku IDE — built on Eclipse Theia. Powered by the Soriku engine.
+    </p>;
 }
 
 function BrowserLink(props: ExternalBrowserLinkProps): JSX.Element {
@@ -40,14 +46,12 @@ export function renderWhatIs(windowService: WindowService): React.ReactNode {
             What is this?
         </h3>
         <div>
-            The Eclipse Theia IDE is a modern and open IDE for cloud and desktop. The Theia IDE is based on the <BrowserLink text="Theia platform"
-                url="https://theia-ide.org" windowService={windowService} ></BrowserLink>.
+            Soriku IDE is an AI-native coding environment built on the <BrowserLink text="Eclipse Theia"
+                url="https://theia-ide.org" windowService={windowService} ></BrowserLink> platform.
+            It connects to the Soriku engine for agents, chat, and tool execution — locally or hosted.
         </div>
         <div>
-            The IDE is available as a <BrowserLink text="downloadable desktop application" url="https://theia-ide.org//#theiaidedownload"
-                windowService={windowService} ></BrowserLink>. You can also <BrowserLink text="try the latest version of the Theia IDE online"
-                    url="https://try.theia-cloud.io/" windowService={windowService} ></BrowserLink>. The online test version is limited to 30 minutes per session and hosted
-            via <BrowserLink text="Theia Cloud" url="https://theia-cloud.io/" windowService={windowService} ></BrowserLink>.
+            {renderAboutTagline()}
         </div>
     </div>;
 }
@@ -55,17 +59,11 @@ export function renderWhatIs(windowService: WindowService): React.ReactNode {
 export function renderExtendingCustomizing(windowService: WindowService): React.ReactNode {
     return <div className='gs-section'>
         <h3 className='gs-section-header'>
-            Extending/Customizing the Theia IDE
+            Extending Soriku IDE
         </h3>
         <div >
-            You can extend the Theia IDE at runtime by installing VS Code extensions, e.g. from the <BrowserLink text="OpenVSX registry" url="https://open-vsx.org/"
-                windowService={windowService} ></BrowserLink>, an open marketplace for VS Code extensions. Just open the extension view or browse <BrowserLink
-                    text="OpenVSX online" url="https://open-vsx.org/" windowService={windowService} ></BrowserLink>.
-        </div>
-        <div>
-            Furthermore, the Theia IDE is based on the flexible Theia platform. Therefore, the Theia IDE can serve as a <span className='gs-text-bold'>template</span> for building
-            custom tools and IDEs. Browse <BrowserLink text="the documentation" url="https://theia-ide.org/docs/composing_applications/"
-                windowService={windowService} ></BrowserLink> to help you customize and build your own Eclipse Theia-based product.
+            Install VS Code extensions from the <BrowserLink text="OpenVSX registry" url="https://open-vsx.org/"
+                windowService={windowService} ></BrowserLink> to extend the editor. Soriku-specific features (agents, chat, tools) ship as dedicated Soriku extensions.
         </div>
     </div>;
 }
