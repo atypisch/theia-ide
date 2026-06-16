@@ -98,6 +98,7 @@
     "theia-ide-product-ext": "1.72.100",
     "soriku-agents-ext": "0.1.0",
     "soriku-auth-ext": "0.1.0",
+    "soriku-chat-ext": "0.1.0",
     "soriku-engine-client-ext": "0.1.0"
   },
   "devDependencies": {

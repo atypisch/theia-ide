@@ -1,0 +1,88 @@
+/********************************************************************************
+ * Soriku IDE — chat model unit tests
+ *
+ * SPDX-License-Identifier: MIT
+ ********************************************************************************/
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { AssistantTurn, createAssistantTurn, reduceSseEvent } from '../common/chat-model';
+
+function fold(events: SorikuSseEvent[]): AssistantTurn {
+    return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
+}
+
+describe('reduceSseEvent', () => {
+    it('captures the model and responder from meta (transparency)', () => {
+        const turn = fold([
+            { type: 'meta', model: 'model-x', responded_by: 'Pilot', conversation_id: 'c1' },
+        ]);
+        assert.equal(turn.model, 'model-x');
+        assert.equal(turn.respondedBy, 'Pilot');
+        assert.equal(turn.conversationId, 'c1');
+    });
+
+    it('accumulates chunk content in order', () => {
+        const turn = fold([
+            { type: 'chunk', content: 'Hello' },
+            { type: 'chunk', content: ', world' },
+        ]);
+        assert.equal(turn.text, 'Hello, world');
+    });
+
+    it('updates the model on model_switch and routing', () => {
+        const turn = fold([
+            { type: 'meta', model: 'first' },
+            { type: 'model_switch', to: 'second' },
+        ]);
+        assert.equal(turn.model, 'second');
+    });
+
+    it('records a tool call and resolves it on tool_result', () => {
+        const turn = fold([
+            { type: 'tool_call', tool: 'file_read', call_id: 'k1', args: { path: 'a.ts' } },
+            { type: 'tool_result', call_id: 'k1', result: { ok: true } },
+        ]);
+        assert.equal(turn.toolCalls.length, 1);
+        assert.equal(turn.toolCalls[0].tool, 'file_read');
+        assert.equal(turn.toolCalls[0].status, 'done');
+        assert.deepEqual(turn.toolCalls[0].result, { ok: true });
+    });
+
+    it('marks confirm_tool calls as requested', () => {
+        const turn = fold([
+            { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c9', args: { path: 'b.ts' } },
+        ]);
+        assert.equal(turn.toolCalls[0].status, 'requested');
+        assert.equal(turn.toolCalls[0].callId, 'c9');
+    });
+
+    it('finishes on done', () => {
+        const turn = fold([{ type: 'chunk', content: 'hi' }, { type: 'done' }]);
+        assert.equal(turn.status, 'done');
+    });
+
+    it('captures an error event', () => {
+        const turn = fold([{ type: 'error', content: 'boom' }]);
+        assert.equal(turn.status, 'error');
+        assert.equal(turn.error, 'boom');
+        assert.notEqual(turn.status, 'done');
+    });
+
+    it('does not mutate the input turn (immutability)', () => {
+        const start = createAssistantTurn('t');
+        const after = reduceSseEvent(start, { type: 'chunk', content: 'x' });
+        assert.equal(start.text, '');
+        assert.equal(after.text, 'x');
+        assert.notEqual(start, after);
+    });
+
+    it('prefers a final answer block when provided', () => {
+        const turn = fold([
+            { type: 'chunk', content: 'partial' },
+            { type: 'answer', content: 'final answer' },
+        ]);
+        assert.equal(turn.text, 'final answer');
+    });
+});
