@@ -10,6 +10,7 @@ import { QuickInputService } from '@theia/core/lib/browser';
 import { CredentialsService } from '@theia/core/lib/browser/credentials-service';
 import { WindowService } from '@theia/core/lib/browser/window/window-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { EngineAuthTokenHolder } from 'soriku-engine-client-ext/lib/browser/engine-auth-token-holder';
 import {
     AuthState,
     computeStatusView,
@@ -39,6 +40,9 @@ export class SorikuAuthService {
     @inject(MessageService)
     protected readonly messages: MessageService;
 
+    @inject(EngineAuthTokenHolder)
+    protected readonly tokenHolder: EngineAuthTokenHolder;
+
     protected token: string | undefined;
     protected state: AuthState = { mode: 'unknown', hasToken: false };
 
@@ -57,9 +61,9 @@ export class SorikuAuthService {
     /** Load any stored token and compute the initial state. Safe to call once at startup. */
     async initialize(): Promise<void> {
         try {
-            this.token = (await this.credentials.getPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT)) ?? undefined;
+            this.setTokenInternal((await this.credentials.getPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT)) ?? undefined);
         } catch {
-            this.token = undefined;
+            this.setTokenInternal(undefined);
         }
         await this.refresh();
     }
@@ -113,9 +117,9 @@ export class SorikuAuthService {
         if (!key || !key.trim()) {
             return;
         }
-        this.token = key.trim();
+        this.setTokenInternal(key.trim());
         try {
-            await this.credentials.setPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT, this.token);
+            await this.credentials.setPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT, key.trim());
         } catch (e) {
             this.messages.warn(`Token saved for this session only (keychain unavailable): ${(e as Error).message}`);
         }
@@ -129,7 +133,7 @@ export class SorikuAuthService {
 
     /** Remove the stored token and drop back to unauthenticated mode. */
     async disconnect(): Promise<void> {
-        this.token = undefined;
+        this.setTokenInternal(undefined);
         try {
             await this.credentials.deletePassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT);
         } catch {
@@ -142,5 +146,11 @@ export class SorikuAuthService {
     protected setState(state: AuthState): void {
         this.state = state;
         this.onDidChangeStateEmitter.fire(state);
+    }
+
+    /** Update the in-memory token and mirror it into the holder the EngineClient reads. */
+    protected setTokenInternal(token: string | undefined): void {
+        this.token = token;
+        this.tokenHolder.setToken(token);
     }
 }

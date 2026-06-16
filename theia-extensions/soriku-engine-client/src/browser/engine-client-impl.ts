@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { inject, injectable, optional } from '@theia/core/shared/inversify';
+import { inject, injectable } from '@theia/core/shared/inversify';
 import { PreferenceService } from '@theia/core/lib/common';
-import { EngineAuthProvider, EngineClient } from '../common/engine-client';
+import { EngineClient } from '../common/engine-client';
 import { EngineHttpTransport } from '../common/engine-http';
+import { EngineAuthTokenHolder } from './engine-auth-token-holder';
 import {
     AgentCreateRequest,
     AgentDeleteResponse,
@@ -48,8 +49,8 @@ export class EngineClientImpl implements EngineClient {
     @inject(PreferenceService)
     protected readonly preferenceService: PreferenceService;
 
-    @inject(EngineAuthProvider) @optional()
-    protected readonly authProvider?: EngineAuthProvider;
+    @inject(EngineAuthTokenHolder)
+    protected readonly tokenHolder: EngineAuthTokenHolder;
 
     protected createTransport(): EngineHttpTransport {
         return new EngineHttpTransport(this.getConfig());
@@ -59,7 +60,7 @@ export class EngineClientImpl implements EngineClient {
         const preferenceToken = this.preferenceService.get<string>(SORIKU_ENGINE_AUTH_TOKEN, '') || undefined;
         return {
             baseUrl: this.preferenceService.get<string>(SORIKU_ENGINE_BASE_URL, DEFAULT_ENGINE_BASE_URL),
-            authToken: this.authProvider?.getToken() ?? preferenceToken,
+            authToken: this.tokenHolder.getToken() ?? preferenceToken,
             timeoutMs: this.preferenceService.get<number>(SORIKU_ENGINE_TIMEOUT, DEFAULT_ENGINE_TIMEOUT_MS),
         };
     }

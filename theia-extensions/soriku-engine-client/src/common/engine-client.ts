@@ -31,17 +31,6 @@ import {
 
 export const EngineClient = Symbol('EngineClient');
 
-/**
- * Optional provider of the engine auth token. When bound (e.g. by soriku-auth, backed by the
- * OS keychain), the EngineClient prefers its token over the `soriku.engine.authToken` preference.
- */
-export const EngineAuthProvider = Symbol('EngineAuthProvider');
-
-export interface EngineAuthProvider {
-    /** Current bearer token, or undefined in local/unauthenticated mode. */
-    getToken(): string | undefined;
-}
-
 export interface EngineClient {
     /** Current resolved base URL (from preferences). */
     getBaseUrl(): string;
