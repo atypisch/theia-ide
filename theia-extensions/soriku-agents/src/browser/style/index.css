@@ -1,0 +1,86 @@
+/* Soriku IDE — agents panel (functional foundation styling only). */
+
+.soriku-agents {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.soriku-agents-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--theia-sideBarSectionHeader-border);
+}
+
+.soriku-agents-title {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-agents-message {
+    padding: 12px;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-agents-error-detail {
+    margin: 6px 0;
+    font-family: var(--theia-code-font-family);
+    font-size: var(--theia-ui-font-size0);
+    opacity: 0.8;
+    word-break: break-word;
+}
+
+.soriku-agents-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+}
+
+.soriku-agent-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--theia-editorGroup-border);
+}
+
+.soriku-agent-item.active {
+    background-color: var(--theia-list-activeSelectionBackground);
+}
+
+.soriku-agent-avatar {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-button-foreground);
+    background-color: var(--theia-button-background);
+}
+
+.soriku-agent-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.soriku-agent-name {
+    font-weight: 600;
+}
+
+.soriku-agent-role {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-agent-description {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    margin-top: 2px;
+}
