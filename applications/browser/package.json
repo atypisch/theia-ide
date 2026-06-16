@@ -26,7 +26,18 @@
         "preferences": {
           "toolbar.showToolbar": true,
           "files.enableTrash": false,
-          "security.workspace.trust.enabled": false
+          "security.workspace.trust.enabled": false,
+          "workbench.colorTheme": "dark",
+          "editor.fontSize": 13,
+          "editor.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
+          "editor.minimap.enabled": true,
+          "editor.wordWrap": "off",
+          "files.autoSave": "afterDelay",
+          "files.autoSaveDelay": 1000,
+          "terminal.integrated.fontSize": 13,
+          "workbench.startupEditor": "welcomePage",
+          "ai-features.AiEnable.enableAI": false,
+          "telemetry.telemetryLevel": "off"
         },
         "reloadOnReconnect": true
       }
@@ -103,7 +114,8 @@
     "soriku-chat-ext": "0.1.0",
     "soriku-engine-client-ext": "0.1.0",
     "soriku-routing-overrides-ext": "0.1.0",
-    "soriku-tools-bridge-ext": "0.1.0"
+    "soriku-tools-bridge-ext": "0.1.0",
+    "soriku-workbench-ext": "0.1.0"
   },
   "devDependencies": {
     "@theia/bundle-plugin": "1.73.0-next.2",

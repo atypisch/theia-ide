@@ -26,7 +26,18 @@
         "applicationName": "Soriku IDE",
         "reloadOnReconnect": true,
         "preferences": {
-          "toolbar.showToolbar": true
+          "toolbar.showToolbar": true,
+          "workbench.colorTheme": "dark",
+          "editor.fontSize": 13,
+          "editor.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
+          "editor.minimap.enabled": true,
+          "editor.wordWrap": "off",
+          "files.autoSave": "afterDelay",
+          "files.autoSaveDelay": 1000,
+          "terminal.integrated.fontSize": 13,
+          "workbench.startupEditor": "welcomePage",
+          "ai-features.AiEnable.enableAI": false,
+          "telemetry.telemetryLevel": "off"
         },
         "electron": {
           "showWindowEarly": false,
@@ -113,6 +124,7 @@
     "soriku-engine-client-ext": "0.1.0",
     "soriku-routing-overrides-ext": "0.1.0",
     "soriku-tools-bridge-ext": "0.1.0",
+    "soriku-workbench-ext": "0.1.0",
     "theia-ide-updater-ext": "1.72.100"
   },
   "devDependencies": {
