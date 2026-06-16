@@ -8,6 +8,7 @@ import '../../src/browser/style/index.css';
 
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { WidgetFactory } from '@theia/core/lib/browser';
+import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { bindViewContribution } from '@theia/core/lib/browser/shell/view-contribution';
 import { SorikuChatWidget } from './soriku-chat-widget';
 import { SorikuChatViewContribution } from './soriku-chat-view-contribution';
@@ -20,4 +21,5 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
 
     bindViewContribution(bind, SorikuChatViewContribution);
+    bind(FrontendApplicationContribution).toService(SorikuChatViewContribution);
 });

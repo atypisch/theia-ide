@@ -7,6 +7,8 @@
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { Command, CommandRegistry } from '@theia/core/lib/common';
 import { AbstractViewContribution } from '@theia/core/lib/browser/shell/view-contribution';
+import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
+import { FrontendApplication } from '@theia/core/lib/browser/frontend-application';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuChatWidget } from './soriku-chat-widget';
 
@@ -18,7 +20,9 @@ export namespace SorikuChatCommands {
 }
 
 @injectable()
-export class SorikuChatViewContribution extends AbstractViewContribution<SorikuChatWidget> {
+export class SorikuChatViewContribution
+    extends AbstractViewContribution<SorikuChatWidget>
+    implements FrontendApplicationContribution {
 
     @inject(SorikuAgentSelectionService)
     protected readonly selection: SorikuAgentSelectionService;
@@ -30,6 +34,11 @@ export class SorikuChatViewContribution extends AbstractViewContribution<SorikuC
             defaultWidgetOptions: { area: 'right', rank: 200 },
             toggleCommandId: SorikuChatCommands.TOGGLE,
         });
+    }
+
+    /** Open the chat panel on first start (next to Agents). Phase 3 owns the final default layout. */
+    async initializeLayout(_app: FrontendApplication): Promise<void> {
+        await this.openView({ activate: false, reveal: true });
     }
 
     override registerCommands(commands: CommandRegistry): void {
