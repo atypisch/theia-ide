@@ -1,0 +1,75 @@
+/* Soriku IDE — capability map (functional foundation styling only). */
+
+.soriku-capmap {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: auto;
+}
+
+.soriku-capmap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--theia-editorGroup-border);
+}
+
+.soriku-capmap-title {
+    font-weight: 600;
+}
+
+.soriku-capmap-message {
+    padding: 16px;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-capmap-error-detail {
+    margin: 6px 0;
+    font-family: var(--theia-code-font-family);
+    opacity: 0.8;
+}
+
+.soriku-capmap-body {
+    padding: 8px 12px;
+}
+
+.soriku-capmap-meta {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-capmap-stale {
+    color: var(--theia-editorWarning-foreground);
+}
+
+.soriku-capmap-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.soriku-capmap-table th,
+.soriku-capmap-table td {
+    border: 1px solid var(--theia-editorGroup-border);
+    padding: 4px 8px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.soriku-capmap-th {
+    cursor: pointer;
+    user-select: none;
+    background-color: var(--theia-editorWidget-background);
+}
+
+.soriku-capmap-th.active {
+    color: var(--theia-textLink-foreground);
+}
+
+.soriku-capmap-model {
+    text-align: left;
+    font-family: var(--theia-code-font-family);
+}
