@@ -5,14 +5,17 @@
  ********************************************************************************/
 
 import { inject, injectable } from '@theia/core/shared/inversify';
-import { Command, CommandContribution, CommandRegistry, MessageService, PreferenceScope, PreferenceService } from '@theia/core/lib/common';
+import { Command, CommandContribution, CommandRegistry, CommandService, MessageService, PreferenceScope, PreferenceService } from '@theia/core/lib/common';
 import { QuickInputService } from '@theia/core/lib/browser';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { StatusBar, StatusBarAlignment } from '@theia/core/lib/browser/status-bar/status-bar';
-import { SORIKU_ENGINE_BASE_URL } from 'soriku-engine-client-ext/lib/browser/soriku-engine-preferences';
-import { EngineConnectionState, computeEngineStatusView } from '../common/engine-status';
+import { DEFAULT_ENGINE_BASE_URL, SORIKU_ENGINE_BASE_URL } from 'soriku-engine-client-ext/lib/browser/soriku-engine-preferences';
+import { EngineConnectionState, FirstRunChoice, computeEngineStatusView, firstRunAction } from '../common/engine-status';
 import { SorikuEngineStatusService } from './soriku-engine-status-service';
-import { SORIKU_ENGINE_AUTOCONNECT } from './soriku-workbench-preferences';
+import { SORIKU_ENGINE_AUTOCONNECT, SORIKU_ENGINE_FIRST_RUN_COMPLETE } from './soriku-workbench-preferences';
+
+/** Command id of the hosted (Simezu) sign-in flow, contributed by soriku-auth. */
+const SORIKU_AUTH_CONNECT = 'soriku.auth.connect';
 
 export const SORIKU_ENGINE_STATUS_ID = 'soriku-engine-status';
 
@@ -41,11 +44,49 @@ export class SorikuEngineStatusContribution implements FrontendApplicationContri
     @inject(MessageService)
     protected readonly messages: MessageService;
 
+    @inject(CommandService)
+    protected readonly commands: CommandService;
+
     async onStart(): Promise<void> {
         this.status.onDidChangeState(state => this.updateStatusBar(state));
         this.updateStatusBar(this.status.getState());
-        const autoConnect = this.preferences.get<boolean>(SORIKU_ENGINE_AUTOCONNECT, true);
-        if (autoConnect) {
+        if (!this.preferences.get<boolean>(SORIKU_ENGINE_FIRST_RUN_COMPLETE, false)) {
+            await this.promptFirstRun();
+            return;
+        }
+        await this.autoConnect();
+    }
+
+    protected async autoConnect(): Promise<void> {
+        if (this.preferences.get<boolean>(SORIKU_ENGINE_AUTOCONNECT, true)) {
+            await this.status.connect();
+        }
+    }
+
+    /** Ask the user how to connect on the very first launch (connect-local / use-hosted / skip). */
+    protected async promptFirstRun(): Promise<void> {
+        const pick = await this.quickInput.showQuickPick(
+            [
+                { label: '$(plug) Connect to the local engine', description: DEFAULT_ENGINE_BASE_URL, id: 'local' },
+                { label: '$(cloud) Use a hosted engine', description: 'Sign in with Simezu', id: 'hosted' },
+                { label: '$(circle-slash) Skip for now', description: 'Connect later from the status bar', id: 'skip' },
+            ],
+            { title: 'Welcome to Soriku IDE — connect to the engine' },
+        );
+        if (!pick) {
+            // Dismissed: connect this session as usual, prompt again next launch.
+            await this.autoConnect();
+            return;
+        }
+        await this.preferences.set(SORIKU_ENGINE_FIRST_RUN_COMPLETE, true, PreferenceScope.User);
+        const action = firstRunAction(pick.id as FirstRunChoice, DEFAULT_ENGINE_BASE_URL);
+        if (action.setBaseUrl) {
+            await this.preferences.set(SORIKU_ENGINE_BASE_URL, action.setBaseUrl, PreferenceScope.User);
+        }
+        if (action.startHostedAuth) {
+            await this.commands.executeCommand(SORIKU_AUTH_CONNECT);
+        }
+        if (action.connect) {
             await this.status.connect();
         }
     }

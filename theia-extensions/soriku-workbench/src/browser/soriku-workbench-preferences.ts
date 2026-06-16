@@ -8,6 +8,7 @@ import { PreferenceSchema, PreferenceScope } from '@theia/core';
 
 export const SORIKU_TELEMETRY_ENABLED = 'soriku.telemetry.enabled';
 export const SORIKU_ENGINE_AUTOCONNECT = 'soriku.engine.autoConnect';
+export const SORIKU_ENGINE_FIRST_RUN_COMPLETE = 'soriku.engine.firstRunComplete';
 
 export const sorikuWorkbenchPreferenceSchema: PreferenceSchema = {
     properties: {
@@ -21,6 +22,12 @@ export const sorikuWorkbenchPreferenceSchema: PreferenceSchema = {
             type: 'boolean',
             description: 'Automatically connect to the Soriku engine on startup.',
             default: true,
+            scope: PreferenceScope.User,
+        },
+        [SORIKU_ENGINE_FIRST_RUN_COMPLETE]: {
+            type: 'boolean',
+            description: 'Internal: set once the first-run engine connection prompt has been answered.',
+            default: false,
             scope: PreferenceScope.User,
         },
     },

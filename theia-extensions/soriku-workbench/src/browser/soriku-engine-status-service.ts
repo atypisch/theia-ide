@@ -15,7 +15,7 @@ export class SorikuEngineStatusService {
     @inject(EngineClient)
     protected readonly engineClient: EngineClient;
 
-    protected state: EngineConnectionState = { status: 'connecting', baseUrl: '' };
+    protected state: EngineConnectionState = { status: 'idle', baseUrl: '' };
 
     protected readonly onDidChangeStateEmitter = new Emitter<EngineConnectionState>();
     readonly onDidChangeState: Event<EngineConnectionState> = this.onDidChangeStateEmitter.event;
