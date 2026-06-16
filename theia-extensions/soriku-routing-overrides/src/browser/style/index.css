@@ -1,0 +1,64 @@
+/* Soriku IDE — routing overrides (functional foundation styling only). */
+
+.soriku-routing {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 12px 16px;
+    overflow: auto;
+}
+
+.soriku-routing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.soriku-routing-title {
+    font-weight: 600;
+}
+
+.soriku-routing-note {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    margin-bottom: 12px;
+}
+
+.soriku-routing-add {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.soriku-routing-add .theia-input {
+    flex: 1 1 180px;
+}
+
+.soriku-routing-message {
+    padding: 12px 0;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-routing-error {
+    color: var(--theia-errorForeground);
+}
+
+.soriku-routing-error-detail {
+    font-family: var(--theia-code-font-family);
+    opacity: 0.8;
+    margin: 4px 0;
+}
+
+.soriku-routing-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.soriku-routing-table th,
+.soriku-routing-table td {
+    border: 1px solid var(--theia-editorGroup-border);
+    padding: 4px 8px;
+    text-align: left;
+}

@@ -111,6 +111,7 @@
     "soriku-capability-map-ext": "0.1.0",
     "soriku-chat-ext": "0.1.0",
     "soriku-engine-client-ext": "0.1.0",
+    "soriku-routing-overrides-ext": "0.1.0",
     "soriku-tools-bridge-ext": "0.1.0",
     "theia-ide-updater-ext": "1.72.100"
   },
