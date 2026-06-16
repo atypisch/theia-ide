@@ -1,0 +1,55 @@
+/* Soriku IDE — agent edit form (functional foundation styling only). */
+
+.soriku-agent-edit {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 12px 16px;
+    overflow: auto;
+}
+
+.soriku-agent-edit-message {
+    padding: 16px;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-agent-edit-error {
+    color: var(--theia-errorForeground);
+}
+
+.soriku-agent-edit-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.soriku-agent-edit-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.soriku-agent-edit-label {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-agent-edit-prompt {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    font-family: var(--theia-code-font-family);
+    margin-bottom: 8px;
+}
+
+.soriku-agent-edit-note {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-editorWarning-foreground);
+    margin-bottom: 12px;
+}
+
+.soriku-agent-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+}

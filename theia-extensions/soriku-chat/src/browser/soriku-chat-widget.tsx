@@ -38,6 +38,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
     protected conversation: ChatMessage[] = [];
+    protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
     protected conversationId: string | undefined;
     protected streaming = false;
     protected idSeq = 0;
@@ -61,6 +62,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected onAgentChanged(): void {
         this.abortController?.abort();
         this.conversation = [];
+        this.feedbackByTurn.clear();
         this.conversationId = undefined;
         this.streaming = false;
         this.update();
@@ -133,6 +135,26 @@ export class SorikuChatWidget extends ReactWidget {
         this.abortController?.abort();
     }
 
+    /** Send thumbs feedback for an assistant turn to the engine (positive/negative). */
+    protected async submitFeedback(turn: AssistantTurn, rating: 'positive' | 'negative'): Promise<void> {
+        const agentId = this.selection.getActiveId();
+        if (!agentId) {
+            return;
+        }
+        const index = this.conversation.findIndex(m => m === turn);
+        const prior = index > 0 ? this.conversation[index - 1] : undefined;
+        const input = prior && prior.role === 'user' ? prior.text : '';
+        this.feedbackByTurn.set(turn.id, rating);
+        this.update();
+        try {
+            await this.engineClient.sendAgentFeedback(agentId, { rating, input, output: turn.text });
+        } catch (e) {
+            this.feedbackByTurn.delete(turn.id);
+            this.messages.error(`Could not send feedback: ${(e as Error).message}`);
+            this.update();
+        }
+    }
+
     protected render(): React.ReactNode {
         const agentId = this.selection.getActiveId();
         return <div className='soriku-chat'>
@@ -188,6 +210,23 @@ export class SorikuChatWidget extends ReactWidget {
             {turn.text && <div className='soriku-msg-text'>{turn.text}</div>}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
+            {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
+        </div>;
+    }
+
+    protected renderFeedback(turn: AssistantTurn): React.ReactNode {
+        const current = this.feedbackByTurn.get(turn.id);
+        return <div className='soriku-msg-feedback'>
+            <button
+                className={`soriku-feedback-btn${current === 'positive' ? ' active' : ''}`}
+                title='Good response'
+                onClick={() => this.submitFeedback(turn, 'positive')}
+            ><span className='codicon codicon-thumbsup' /></button>
+            <button
+                className={`soriku-feedback-btn${current === 'negative' ? ' active' : ''}`}
+                title='Bad response'
+                onClick={() => this.submitFeedback(turn, 'negative')}
+            ><span className='codicon codicon-thumbsdown' /></button>
         </div>;
     }
 

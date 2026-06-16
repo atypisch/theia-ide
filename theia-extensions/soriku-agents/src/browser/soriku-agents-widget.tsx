@@ -15,6 +15,9 @@ import { SorikuAgentSelectionService } from './soriku-agent-selection';
 /** Command the chat extension (Phase 2.4) registers to open a chat for an agent id. */
 export const SORIKU_CHAT_OPEN_COMMAND = 'soriku.chat.open';
 
+/** Command the agent-customization extension (Phase 2.7) registers to edit an agent. */
+export const SORIKU_AGENT_EDIT_COMMAND = 'soriku.agents.edit';
+
 interface AgentsState {
     status: 'loading' | 'error' | 'ready';
     items: AgentItem[];
@@ -76,6 +79,12 @@ export class SorikuAgentsWidget extends ReactWidget {
         }
     }
 
+    protected editAgent(item: AgentItem): void {
+        if (this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND)) {
+            this.commands.executeCommand(SORIKU_AGENT_EDIT_COMMAND, item.id);
+        }
+    }
+
     protected render(): React.ReactNode {
         return <div className='soriku-agents'>
             <div className='soriku-agents-header'>
@@ -127,11 +136,18 @@ export class SorikuAgentsWidget extends ReactWidget {
                 {item.role && <div className='soriku-agent-role'>{item.role}</div>}
                 {item.description && <div className='soriku-agent-description'>{item.description}</div>}
             </div>
-            <button
-                className='theia-button'
-                title='Open chat'
-                onClick={() => this.openChat(item)}
-            >Open chat</button>
+            <div className='soriku-agent-actions'>
+                <button
+                    className='theia-button'
+                    title='Open chat'
+                    onClick={() => this.openChat(item)}
+                >Open chat</button>
+                {this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND) && <button
+                    className='theia-button secondary'
+                    title='Edit agent'
+                    onClick={() => this.editAgent(item)}
+                >Edit</button>}
+            </div>
         </li>;
     }
 }

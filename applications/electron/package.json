@@ -105,6 +105,7 @@
     "fs-extra": "^9.1.0",
     "theia-ide-launcher-ext": "1.72.100",
     "theia-ide-product-ext": "1.72.100",
+    "soriku-agent-customization-ext": "0.1.0",
     "soriku-agents-ext": "0.1.0",
     "soriku-auth-ext": "0.1.0",
     "soriku-capability-map-ext": "0.1.0",

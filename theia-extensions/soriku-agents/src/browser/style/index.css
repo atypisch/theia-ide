@@ -84,3 +84,10 @@
     color: var(--theia-descriptionForeground);
     margin-top: 2px;
 }
+
+.soriku-agent-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 0 auto;
+}
