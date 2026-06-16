@@ -10,11 +10,9 @@
 import * as React from 'react';
 
 import { Message } from '@theia/core/lib/browser';
-import { PreferenceService } from '@theia/core/lib/common';
+import { CommandService, PreferenceService } from '@theia/core/lib/common';
 import { inject, injectable } from '@theia/core/shared/inversify';
-import {
-    renderDocumentation, renderDownloads, renderExtendingCustomizing, renderProductName, renderSourceCode, renderSupport, renderTickets, renderWhatIs, renderCollaboration
-} from './branding-util';
+import { renderProductName, renderCollaboration } from './branding-util';
 
 import { GettingStartedWidget } from '@theia/getting-started/lib/browser/getting-started-widget';
 import { VSXEnvironment } from '@theia/vsx-registry/lib/common/vsx-environment';
@@ -31,6 +29,9 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
 
     @inject(PreferenceService)
     protected readonly preferenceService: PreferenceService;
+
+    @inject(CommandService)
+    protected readonly commandService: CommandService;
 
     protected vscodeApiVersion: string;
 
@@ -61,42 +62,12 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
                 <hr className='gs-hr' />
                 <div className='flex-grid'>
                     <div className='col'>
-                        {this.renderNews()}
+                        {this.renderSorikuIntro()}
                     </div>
                 </div>
                 <div className='flex-grid'>
                     <div className='col'>
-                        {renderWhatIs(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {renderExtendingCustomizing(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {renderSupport(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {renderTickets(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {renderSourceCode(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {renderDocumentation(this.windowService)}
-                    </div>
-                </div>
-                <div className='flex-grid'>
-                    <div className='col'>
-                        {this.renderAIBanner()}
+                        {this.renderSorikuStart()}
                     </div>
                 </div>
                 <div className='flex-grid'>
@@ -106,7 +77,7 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
                 </div>
                 <div className='flex-grid'>
                     <div className='col'>
-                        {renderDownloads()}
+                        {this.renderSorikuFooter()}
                     </div>
                 </div>
             </div>
@@ -160,11 +131,37 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
         </div>;
     }
 
-    protected renderAIBanner(): React.ReactNode {
-        const framework = super.renderAIBanner();
-        if (React.isValidElement<React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>>(framework)) {
-            return React.cloneElement(framework, { className: 'gs-section' });
-        }
-        return framework;
+    protected renderSorikuIntro(): React.ReactNode {
+        return <div className='gs-section'>
+            <h3 className='gs-section-header'>Agent-first AI coding</h3>
+            <div className='gs-action-container'>
+                Soriku IDE connects to the Soriku engine for agents, chat and tool execution —
+                locally or hosted. Work with agents, not raw models; every answer shows which model
+                replied.
+            </div>
+        </div>;
+    }
+
+    protected renderSorikuStart(): React.ReactNode {
+        return <div className='gs-section'>
+            <h3 className='gs-section-header'>Get started</h3>
+            <div className='gs-action-container'>
+                <button className='theia-button' onClick={() => this.commandService.executeCommand('soriku.agents.toggle')}>
+                    View Agents
+                </button>
+                {' '}
+                <button className='theia-button secondary' onClick={() => this.commandService.executeCommand('soriku.auth.connect')}>
+                    Connect to Simezu (optional)
+                </button>
+            </div>
+        </div>;
+    }
+
+    protected renderSorikuFooter(): React.ReactNode {
+        return <div className='gs-section'>
+            <div className='gs-action-container'>
+                Local-first AI coding. EU-hosted. No telemetry.
+            </div>
+        </div>;
     }
 }
