@@ -10,6 +10,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
+import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import {
     AssistantTurn,
     ChatMessage,
@@ -32,6 +33,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(MessageService)
     protected readonly messages: MessageService;
+
+    @inject(SorikuToolConfirmationService)
+    protected readonly toolConfirmation: SorikuToolConfirmationService;
 
     protected conversation: ChatMessage[] = [];
     protected conversationId: string | undefined;
@@ -103,6 +107,11 @@ export class SorikuChatWidget extends ReactWidget {
                 this.conversation[turnIndex] = turn;
                 if (turn.conversationId) {
                     this.conversationId = turn.conversationId;
+                }
+                if (event.type === 'confirm_tool') {
+                    // Fire-and-forget: the engine blocks until /api/worker/confirm, then the stream
+                    // resumes. Awaiting here would deadlock the loop waiting for the next event.
+                    this.toolConfirmation.confirm(event).catch(() => { /* default-deny already posted */ });
                 }
                 this.update();
             }
