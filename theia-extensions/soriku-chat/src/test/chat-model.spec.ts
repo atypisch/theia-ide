@@ -133,6 +133,31 @@ describe('reduceSseEvent', () => {
         assert.equal(turn.status, 'error');
         assert.equal(turn.error, 'no_model');
     });
+
+    it('captures a plan for approval and clears it once execution starts', () => {
+        const awaiting = fold([
+            { type: 'plan_generated', plan_id: 'pl_1', tasks: [{ id: 't1', role: 'researcher', goal: 'gather', preferred_model: 'qwen3:8b' }] },
+            { type: 'plan_cost_estimated', estimated_cost_eur: 0.02 },
+            { type: 'plan_awaiting_execution', plan_id: 'pl_1' },
+        ]);
+        assert.equal(awaiting.pendingPlan?.planId, 'pl_1');
+        assert.equal(awaiting.pendingPlan?.tasks[0].model, 'qwen3:8b');
+        assert.equal(awaiting.pendingPlan?.costEur, 0.02);
+        assert.equal(awaiting.awaitingApproval, true);
+
+        const running = reduceSseEvent(awaiting, { type: 'worker_start', model: 'qwen3:8b' });
+        assert.equal(running.awaitingApproval, false);
+    });
+
+    it('treats a cancelled plan as a finished (non-error) turn', () => {
+        const turn = fold([
+            { type: 'plan_generated', plan_id: 'pl_2', tasks: [] },
+            { type: 'plan_awaiting_execution', plan_id: 'pl_2' },
+            { type: 'plan_cancelled', plan_id: 'pl_2' },
+        ]);
+        assert.equal(turn.awaitingApproval, false);
+        assert.equal(turn.status, 'done');
+    });
 });
 
 describe('busyPhase', () => {

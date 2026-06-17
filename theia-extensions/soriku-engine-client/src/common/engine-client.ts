@@ -50,6 +50,8 @@ export interface EngineClient {
     confirmTool(body: ConfirmRequest): Promise<ConfirmResponse>;
     /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
     executePlan(planId: string): Promise<PlanSignalResponse>;
+    /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */
+    cancelPlan(planId: string): Promise<PlanSignalResponse>;
 
     getCapabilities(): Promise<CapabilityMapResponse>;
     getRoutingGaps(): Promise<RoutingGapsResponse>;

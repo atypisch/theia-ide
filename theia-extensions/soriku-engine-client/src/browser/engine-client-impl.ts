@@ -112,6 +112,7 @@ export class EngineClientImpl implements EngineClient {
             model_id: params.modelId,
             worker_count: params.workerCount,
             worker_models: params.workerModels && params.workerModels.length > 0 ? params.workerModels : undefined,
+            tools_enabled: params.toolsEnabled,
             stream: true,
             client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
         };
@@ -128,6 +129,10 @@ export class EngineClientImpl implements EngineClient {
 
     async executePlan(planId: string): Promise<PlanSignalResponse> {
         return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/execute`, {});
+    }
+
+    async cancelPlan(planId: string): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/cancel`, {});
     }
 
     async getCapabilities(): Promise<CapabilityMapResponse> {

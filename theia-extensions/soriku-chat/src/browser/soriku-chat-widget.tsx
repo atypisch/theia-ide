@@ -9,7 +9,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { ChatMode, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { ChatMode, ChatStreamParams, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import {
@@ -21,28 +21,36 @@ import {
     reduceSseEvent,
 } from '../common/chat-model';
 
-/** Orchestration choices surfaced in the chat — mapped to engine ChatRequest.mode. */
+/** How the agent works (Cursor-style behaviour), independent of model choice. */
+type AgentBehavior = 'auto' | 'edit' | 'plan' | 'chat';
+
+interface BehaviorOption {
+    value: AgentBehavior;
+    label: string;
+    hint: string;
+}
+
+const BEHAVIOR_OPTIONS: BehaviorOption[] = [
+    { value: 'auto', label: 'Auto', hint: 'Soriku decides per task whether to plan or act directly.' },
+    { value: 'edit', label: 'Edit automatically', hint: 'The agent acts and edits files directly.' },
+    { value: 'plan', label: 'Plan', hint: 'Soriku drafts a plan you approve before anything runs.' },
+    { value: 'chat', label: 'Chat only', hint: 'Answer and discuss only — no file edits.' },
+];
+
+/** Which model(s) answer, independent of behaviour. */
+type Orchestration = 'auto' | 'single' | 'ensemble';
+
 interface OrchestrationOption {
-    mode: ChatMode;
+    value: Orchestration;
     label: string;
     hint: string;
 }
 
 const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
-    { mode: 'auto', label: 'Orchestrate (auto)', hint: 'Soriku routes to the best model via the capability map.' },
-    { mode: 'single', label: 'Single model', hint: 'Always use one specific model.' },
-    { mode: 'plan', label: 'Plan (multi-worker)', hint: 'Soriku decomposes the task and runs workers, then merges one answer.' },
-    { mode: 'ensemble', label: 'Ensemble (merge)', hint: 'Several models answer in parallel; Soriku merges them into one.' },
+    { value: 'auto', label: 'Auto model', hint: 'Soriku routes to the best model via the capability map.' },
+    { value: 'single', label: 'Single model', hint: 'Use one specific model.' },
+    { value: 'ensemble', label: 'Ensemble', hint: 'Several models you pick collaborate into one answer.' },
 ];
-
-const WORKER_COUNTS = ['auto', '2', '3', '4', '5'];
-
-/** Modes that run several collaborating models, so the worker-count picker applies. */
-const MULTI_WORKER_MODES: ChatMode[] = ['plan', 'ensemble'];
-
-function usesWorkers(mode: ChatMode): boolean {
-    return MULTI_WORKER_MODES.includes(mode);
-}
 
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
@@ -70,12 +78,14 @@ export class SorikuChatWidget extends ReactWidget {
     protected abortController: AbortController | undefined;
     protected inputRef = React.createRef<HTMLTextAreaElement>();
 
-    /** Orchestration controls. */
-    protected mode: ChatMode = 'auto';
+    /** Controls: agent behaviour (Mode) + model orchestration (Models). */
+    protected behavior: AgentBehavior = 'auto';
+    protected orchestration: Orchestration = 'auto';
     protected modelId = '';
-    protected workerCount = 'auto';
     protected workerModels: string[] = [];
     protected models: V1ModelDescriptor[] = [];
+    /** Plan ids currently being approved/cancelled (to disable the buttons). */
+    protected resolvingPlans = new Set<string>();
 
     @postConstruct()
     protected init(): void {
@@ -137,29 +147,22 @@ export class SorikuChatWidget extends ReactWidget {
         if (this.streaming) {
             return;
         }
+        this.resolvingPlans.clear();
         this.conversation.push({ role: 'user', id: this.nextId(), text });
         let turn = createAssistantTurn(this.nextId());
         const turnIndex = this.conversation.push(turn) - 1;
         this.streaming = true;
         this.abortController = new AbortController();
         this.update();
+        const params = this.buildStreamParams(text, agentId);
+        const needsApproval = params.mode === 'plan';
         try {
-            const stream = this.engineClient.chatStream(
-                {
-                    prompt: text,
-                    personaId: agentId,
-                    conversationId: this.conversationId,
-                    useWorker: true,
-                    clientTools: this.toolConfirmation.delegatedTools(),
-                    mode: this.mode,
-                    modelId: this.mode === 'single' && this.modelId ? this.modelId : undefined,
-                    workerCount: usesWorkers(this.mode) ? this.workerCount : undefined,
-                    workerModels: this.mode === 'ensemble' && this.workerModels.length >= 2 ? this.workerModels : undefined,
-                },
-                this.abortController.signal,
-            );
+            const stream = this.engineClient.chatStream(params, this.abortController.signal);
             for await (const event of stream) {
                 turn = reduceSseEvent(turn, event);
+                if (event.type === 'plan_awaiting_execution' && needsApproval) {
+                    turn = { ...turn, planNeedsApproval: true };
+                }
                 this.conversation[turnIndex] = turn;
                 if (turn.conversationId) {
                     this.conversationId = turn.conversationId;
@@ -172,10 +175,10 @@ export class SorikuChatWidget extends ReactWidget {
                     // Delegated tool: run it against the workspace, then POST the result. Same
                     // fire-and-forget reasoning — the engine blocks until the result arrives.
                     this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
-                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string') {
-                    // Plan parked for confirmation; resume it so the same stream runs the
-                    // workers + synthesis. Fire-and-forget — events arrive on this stream.
-                    this.engineClient.executePlan(event.plan_id).catch(() => { /* stream will surface errors */ });
+                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string' && !needsApproval) {
+                    // Not Plan mode (e.g. Ensemble): resume immediately so the same stream runs
+                    // the workers + synthesis. Plan mode instead waits for the user to approve.
+                    this.engineClient.executePlan(event.plan_id).catch(() => { /* stream surfaces errors */ });
                 }
                 this.update();
             }
@@ -191,6 +194,52 @@ export class SorikuChatWidget extends ReactWidget {
             this.abortController = undefined;
             this.update();
         }
+    }
+
+    /** Translate the two pickers (behaviour + models) into engine stream params. */
+    protected buildStreamParams(text: string, agentId: string): ChatStreamParams {
+        const editsEnabled = this.behavior !== 'chat';
+        const ensemble = this.orchestration === 'ensemble' && this.workerModels.length >= 2;
+        const single = this.orchestration === 'single' && !!this.modelId;
+
+        let mode: ChatMode;
+        if (this.behavior === 'plan') {
+            mode = 'plan';
+        } else if (ensemble) {
+            mode = 'ensemble';
+        } else if (single) {
+            mode = 'single';
+        } else if (this.behavior === 'edit') {
+            mode = 'single'; // act directly; router picks the model
+        } else {
+            mode = 'auto';
+        }
+
+        return {
+            prompt: text,
+            personaId: agentId,
+            conversationId: this.conversationId,
+            useWorker: true,
+            mode,
+            clientTools: editsEnabled ? this.toolConfirmation.delegatedTools() : undefined,
+            toolsEnabled: editsEnabled ? undefined : false,
+            modelId: single ? this.modelId : undefined,
+            workerModels: ensemble ? this.workerModels : undefined,
+        };
+    }
+
+    /** Approve a parked Plan so the engine runs it (Plan mode). */
+    protected approvePlan(planId: string): void {
+        this.resolvingPlans.add(planId);
+        this.update();
+        this.engineClient.executePlan(planId).catch(() => { /* stream surfaces errors */ });
+    }
+
+    /** Cancel a parked Plan before any worker runs (Plan mode). */
+    protected cancelPlan(planId: string): void {
+        this.resolvingPlans.add(planId);
+        this.update();
+        this.engineClient.cancelPlan(planId).catch(() => { /* stream surfaces errors */ });
     }
 
     protected stop(): void {
@@ -226,7 +275,7 @@ export class SorikuChatWidget extends ReactWidget {
                     ? <span>Agent: <span className='soriku-chat-agent'>{agentName ?? agentId}</span></span>
                     : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
             </div>
-            {agentId && this.renderOrchestration()}
+            {agentId && this.renderControls()}
             <div className='soriku-chat-messages'>
                 {this.conversation.length === 0
                     ? <div className='soriku-chat-empty'>Ask the agent a question to start.</div>
@@ -274,7 +323,8 @@ export class SorikuChatWidget extends ReactWidget {
                 </span>}
             </div>
             {turn.text && <div className='soriku-msg-text'>{turn.text}</div>}
-            {turn.status === 'streaming' && this.renderBusy(turn)}
+            {this.shouldShowApproval(turn) && this.renderPlanApproval(turn)}
+            {turn.status === 'streaming' && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
@@ -297,6 +347,37 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
+    protected shouldShowApproval(turn: AssistantTurn): boolean {
+        return !!turn.planNeedsApproval && !!turn.awaitingApproval && !!turn.pendingPlan && turn.status === 'streaming';
+    }
+
+    /** Plan card with the proposed tasks + Approve/Cancel (Plan mode). */
+    protected renderPlanApproval(turn: AssistantTurn): React.ReactNode {
+        const plan = turn.pendingPlan!;
+        const resolving = this.resolvingPlans.has(plan.planId);
+        return <div className='soriku-plan-approval'>
+            <div className='soriku-plan-title'>
+                <span className='codicon codicon-checklist' /> Plan — review before it runs
+                {typeof plan.costEur === 'number' && <span className='soriku-plan-cost'>est. €{plan.costEur.toFixed(2)}</span>}
+            </div>
+            <ol className='soriku-plan-tasks'>
+                {plan.tasks.map(t => <li key={t.id}>
+                    <span className='soriku-plan-role'>{t.role}</span>
+                    {t.model && <span className='soriku-plan-model'>{t.model}</span>}
+                    <span className='soriku-plan-goal'>{t.goal}</span>
+                </li>)}
+            </ol>
+            <div className='soriku-plan-actions'>
+                <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId)}>
+                    {resolving ? 'Starting…' : 'Approve & run'}
+                </button>
+                <button className='theia-button secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
+                    Cancel
+                </button>
+            </div>
+        </div>;
+    }
+
     /** Animated busy indicator shown while a turn streams (spinner + current phase). */
     protected renderBusy(turn: AssistantTurn): React.ReactNode {
         return <div className='soriku-msg-busy'>
@@ -306,22 +387,34 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
-    /** Orchestration toolbar: mode + (single) model picker + (ensemble) worker count. */
-    protected renderOrchestration(): React.ReactNode {
-        const active = ORCHESTRATION_OPTIONS.find(o => o.mode === this.mode) ?? ORCHESTRATION_OPTIONS[0];
+    /** Controls: a Mode picker (behaviour) + a Models picker (orchestration), Cursor-style. */
+    protected renderControls(): React.ReactNode {
+        const behavior = BEHAVIOR_OPTIONS.find(o => o.value === this.behavior) ?? BEHAVIOR_OPTIONS[0];
+        const orchestration = ORCHESTRATION_OPTIONS.find(o => o.value === this.orchestration) ?? ORCHESTRATION_OPTIONS[0];
         return <div className='soriku-chat-orchestration'>
-            <select
-                className='theia-select soriku-mode-select'
-                title={active.hint}
-                value={this.mode}
-                disabled={this.streaming}
-                onChange={e => { this.mode = e.target.value as ChatMode; this.update(); }}
-            >
-                {ORCHESTRATION_OPTIONS.map(o => <option key={o.mode} value={o.mode}>{o.label}</option>)}
-            </select>
-            {this.mode === 'single' && <select
+            <div className='soriku-control-row'>
+                <select
+                    className='theia-select soriku-mode-select'
+                    title={behavior.hint}
+                    value={this.behavior}
+                    disabled={this.streaming}
+                    onChange={e => { this.behavior = e.target.value as AgentBehavior; this.update(); }}
+                >
+                    {BEHAVIOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <select
+                    className='theia-select soriku-models-select'
+                    title={orchestration.hint}
+                    value={this.orchestration}
+                    disabled={this.streaming}
+                    onChange={e => { this.orchestration = e.target.value as Orchestration; this.update(); }}
+                >
+                    {ORCHESTRATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+            </div>
+            {this.orchestration === 'single' && <select
                 className='theia-select soriku-model-select'
-                title='Model to use for every answer'
+                title='Model to use for the answer'
                 value={this.modelId}
                 disabled={this.streaming}
                 onChange={e => { this.modelId = e.target.value; this.update(); }}
@@ -329,16 +422,7 @@ export class SorikuChatWidget extends ReactWidget {
                 <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
                 {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
             </select>}
-            {this.mode === 'plan' && <select
-                className='theia-select soriku-worker-select'
-                title='How many models collaborate on one answer'
-                value={this.workerCount}
-                disabled={this.streaming}
-                onChange={e => { this.workerCount = e.target.value; this.update(); }}
-            >
-                {WORKER_COUNTS.map(w => <option key={w} value={w}>{w === 'auto' ? 'auto workers' : `${w} workers`}</option>)}
-            </select>}
-            {this.mode === 'ensemble' && <div className='soriku-worker-models'>
+            {this.orchestration === 'ensemble' && <div className='soriku-worker-models'>
                 <div className='soriku-worker-models-hint'>
                     {this.workerModels.length >= 2
                         ? `${this.workerModels.length} models will collaborate`

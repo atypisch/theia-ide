@@ -279,6 +279,8 @@ export interface ChatStreamParams {
     workerCount?: string;
     /** Explicit models to combine in ensemble mode (overrides workerCount). */
     workerModels?: string[];
+    /** Set false for chat-only (no tools / no file edits). */
+    toolsEnabled?: boolean;
 }
 
 export interface EngineClientConfig {
