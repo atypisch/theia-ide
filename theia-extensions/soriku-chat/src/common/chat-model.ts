@@ -24,6 +24,8 @@ export interface AssistantTurn {
     conversationId?: string;
     text: string;
     toolCalls: ChatToolCall[];
+    /** Latest progress message from the engine (status / plan / worker events). */
+    phase?: string;
     status: 'streaming' | 'done' | 'error';
     error?: string;
 }
@@ -45,7 +47,35 @@ function asString(value: unknown): string | undefined {
 }
 
 function callIdOf(event: SorikuSseEvent): string | undefined {
-    return asString(event.confirmation_id) ?? asString(event.call_id) ?? asString(event.id);
+    return asString(event.request_id) ?? asString(event.confirmation_id) ?? asString(event.call_id) ?? asString(event.id);
+}
+
+/** Index of the last tool call that has not completed yet (for matching results without an id). */
+function lastUnfinished(calls: ChatToolCall[], tool?: string): number {
+    for (let i = calls.length - 1; i >= 0; i--) {
+        if (calls[i].status !== 'done' && (tool === undefined || calls[i].tool === tool)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * Upsert a tool call: reuse the matching/last-unfinished entry so an engine event and its
+ * delegated `tool_request` don't show as duplicates, then resolve it on `tool_result`.
+ */
+function upsertToolCall(calls: ChatToolCall[], event: SorikuSseEvent, status: ChatToolCall['status']): void {
+    const callId = callIdOf(event);
+    const tool = asString(event.tool) ?? 'tool';
+    let idx = callId ? calls.findIndex(c => c.callId === callId) : -1;
+    if (idx < 0) {
+        idx = lastUnfinished(calls, tool);
+    }
+    if (idx >= 0) {
+        calls[idx] = { ...calls[idx], status, tool, args: event.args ?? calls[idx].args, callId: callId ?? calls[idx].callId };
+    } else {
+        calls.push({ callId, tool, args: event.args, status });
+    }
 }
 
 /**
@@ -61,10 +91,20 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             next.conversationId = asString(event.conversation_id) ?? next.conversationId;
             break;
         case 'model_switch':
-            next.model = asString(event.to) ?? next.model;
+        case 'model_assist':
+            next.model = asString(event.to) ?? asString(event.model) ?? next.model;
             break;
         case 'routing':
             next.model = asString(event.model) ?? next.model;
+            break;
+        case 'status':
+            next.phase = asString(event.content) ?? asString(event.message) ?? asString(event.status) ?? next.phase;
+            break;
+        case 'plan_generated':
+            next.phase = 'Planning workers…';
+            break;
+        case 'synthesis_done':
+            next.phase = 'Merging answers…';
             break;
         case 'chunk':
             next.text += asString(event.content) ?? '';
@@ -77,18 +117,18 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             break;
         }
         case 'confirm_tool':
-        case 'tool_call': {
-            next.toolCalls.push({
-                callId: callIdOf(event),
-                tool: asString(event.tool) ?? 'tool',
-                args: event.args,
-                status: event.type === 'confirm_tool' ? 'requested' : 'running',
-            });
+            upsertToolCall(next.toolCalls, event, 'requested');
             break;
-        }
+        case 'tool_request':
+        case 'tool_call':
+            upsertToolCall(next.toolCalls, event, 'running');
+            break;
         case 'tool_result': {
             const callId = callIdOf(event);
-            const idx = next.toolCalls.findIndex(t => t.callId !== undefined && t.callId === callId);
+            let idx = callId ? next.toolCalls.findIndex(t => t.callId === callId) : -1;
+            if (idx < 0) {
+                idx = lastUnfinished(next.toolCalls, asString(event.tool));
+            }
             if (idx >= 0) {
                 next.toolCalls[idx] = { ...next.toolCalls[idx], status: 'done', result: event.result ?? event.output };
             }
@@ -107,4 +147,16 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             break;
     }
     return next;
+}
+
+/** Human-readable label for the busy indicator while a turn is still streaming. */
+export function busyPhase(turn: AssistantTurn): string {
+    const running = turn.toolCalls.find(c => c.status !== 'done');
+    if (running) {
+        return running.status === 'requested' ? `Awaiting approval: ${running.tool}` : `Running ${running.tool}…`;
+    }
+    if (turn.phase) {
+        return turn.phase;
+    }
+    return turn.text ? 'Writing…' : 'Thinking…';
 }

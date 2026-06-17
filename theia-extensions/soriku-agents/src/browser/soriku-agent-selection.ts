@@ -15,6 +15,7 @@ import { Emitter, Event } from '@theia/core/lib/common';
 export class SorikuAgentSelectionService {
 
     protected activeId: string | undefined;
+    protected activeName: string | undefined;
     protected readonly onDidChangeActiveEmitter = new Emitter<string | undefined>();
     readonly onDidChangeActive: Event<string | undefined> = this.onDidChangeActiveEmitter.event;
 
@@ -22,9 +23,15 @@ export class SorikuAgentSelectionService {
         return this.activeId;
     }
 
-    setActive(id: string | undefined): void {
-        if (id !== this.activeId) {
+    /** Display name of the active agent, if known (the engine is the source of truth). */
+    getActiveName(): string | undefined {
+        return this.activeName;
+    }
+
+    setActive(id: string | undefined, name?: string): void {
+        if (id !== this.activeId || name !== this.activeName) {
             this.activeId = id;
+            this.activeName = name;
             this.onDidChangeActiveEmitter.fire(id);
         }
     }

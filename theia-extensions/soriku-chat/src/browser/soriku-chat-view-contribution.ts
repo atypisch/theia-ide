@@ -45,7 +45,10 @@ export class SorikuChatViewContribution
         super.registerCommands(commands);
         commands.registerCommand(SorikuChatCommands.OPEN, {
             execute: (agentId?: string) => {
-                if (typeof agentId === 'string') {
+                // Only set selection if this is a different agent — the agents panel
+                // already calls setActive(id, name) before invoking this command, and
+                // passing no name here would clobber the stored display name.
+                if (typeof agentId === 'string' && agentId !== this.selection.getActiveId()) {
                     this.selection.setActive(agentId);
                 }
                 return this.openView({ activate: true, reveal: true });

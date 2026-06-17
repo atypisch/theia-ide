@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, createAssistantTurn, reduceSseEvent } from '../common/chat-model';
+import { AssistantTurn, busyPhase, createAssistantTurn, reduceSseEvent } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
     return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
@@ -84,5 +84,48 @@ describe('reduceSseEvent', () => {
             { type: 'answer', content: 'final answer' },
         ]);
         assert.equal(turn.text, 'final answer');
+    });
+
+    it('resolves a tool_result without an id against the last running call', () => {
+        const turn = fold([
+            { type: 'tool_call', tool: 'list_directory', args: { path: '.' } },
+            { type: 'tool_result', tool: 'list_directory', result: 'f a.ts' },
+        ]);
+        assert.equal(turn.toolCalls.length, 1);
+        assert.equal(turn.toolCalls[0].status, 'done');
+        assert.equal(turn.toolCalls[0].result, 'f a.ts');
+    });
+
+    it('does not duplicate a delegated tool_request then its tool_call', () => {
+        const turn = fold([
+            { type: 'tool_request', request_id: 'r1', tool: 'file_read', args: { path: 'a.ts' } },
+            { type: 'tool_call', tool: 'file_read', args: { path: 'a.ts' } },
+            { type: 'tool_result', tool: 'file_read', result: 'contents' },
+        ]);
+        assert.equal(turn.toolCalls.length, 1);
+        assert.equal(turn.toolCalls[0].status, 'done');
+    });
+
+    it('captures progress phase from a status event', () => {
+        const turn = fold([{ type: 'status', content: 'Routing to a model' }]);
+        assert.equal(turn.phase, 'Routing to a model');
+    });
+});
+
+describe('busyPhase', () => {
+    it('reports thinking before any output', () => {
+        assert.equal(busyPhase(createAssistantTurn('t')), 'Thinking…');
+    });
+    it('reports writing once text streams', () => {
+        const turn = reduceSseEvent(createAssistantTurn('t'), { type: 'chunk', content: 'hi' });
+        assert.equal(busyPhase(turn), 'Writing…');
+    });
+    it('reports the running tool', () => {
+        const turn = reduceSseEvent(createAssistantTurn('t'), { type: 'tool_call', tool: 'list_directory' });
+        assert.equal(busyPhase(turn), 'Running list_directory…');
+    });
+    it('reports awaiting approval for a confirm_tool', () => {
+        const turn = reduceSseEvent(createAssistantTurn('t'), { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c1' });
+        assert.equal(busyPhase(turn), 'Awaiting approval: file_write');
     });
 });

@@ -108,6 +108,8 @@ export class EngineClientImpl implements EngineClient {
             conversation_id: params.conversationId,
             project_id: params.projectId,
             mode: params.mode,
+            model_id: params.modelId,
+            worker_count: params.workerCount,
             stream: true,
             client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
         };

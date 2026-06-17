@@ -71,7 +71,7 @@ export class SorikuAgentsWidget extends ReactWidget {
     }
 
     protected openChat(item: AgentItem): void {
-        this.selection.setActive(item.id);
+        this.selection.setActive(item.id, item.name);
         if (this.commands.getCommand(SORIKU_CHAT_OPEN_COMMAND)) {
             this.commands.executeCommand(SORIKU_CHAT_OPEN_COMMAND, item.id);
         } else {

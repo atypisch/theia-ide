@@ -9,15 +9,33 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { ChatMode, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import {
     AssistantTurn,
     ChatMessage,
     ChatToolCall,
+    busyPhase,
     createAssistantTurn,
     reduceSseEvent,
 } from '../common/chat-model';
+
+/** Orchestration choices surfaced in the chat — mapped to engine ChatRequest.mode. */
+interface OrchestrationOption {
+    mode: ChatMode;
+    label: string;
+    hint: string;
+}
+
+const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
+    { mode: 'auto', label: 'Orchestrate (auto)', hint: 'Soriku routes to the best model via the capability map.' },
+    { mode: 'single', label: 'Single model', hint: 'Always use one specific model.' },
+    { mode: 'plan', label: 'Plan (multi-worker)', hint: 'Soriku decomposes the task and runs workers, then merges one answer.' },
+    { mode: 'ensemble', label: 'Ensemble (merge)', hint: 'Several models answer in parallel; Soriku merges them into one.' },
+];
+
+const WORKER_COUNTS = ['auto', '2', '3', '4', '5'];
 
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
@@ -45,6 +63,12 @@ export class SorikuChatWidget extends ReactWidget {
     protected abortController: AbortController | undefined;
     protected inputRef = React.createRef<HTMLTextAreaElement>();
 
+    /** Orchestration controls. */
+    protected mode: ChatMode = 'auto';
+    protected modelId = '';
+    protected workerCount = 'auto';
+    protected models: V1ModelDescriptor[] = [];
+
     @postConstruct()
     protected init(): void {
         this.id = SorikuChatWidget.ID;
@@ -55,7 +79,19 @@ export class SorikuChatWidget extends ReactWidget {
         this.node.tabIndex = 0;
         this.addClass('soriku-chat-widget');
         this.toDispose.push(this.selection.onDidChangeActive(() => this.onAgentChanged()));
+        this.loadModels();
         this.update();
+    }
+
+    /** Load the model list once for the Single-model picker (chat-capable models only). */
+    protected async loadModels(): Promise<void> {
+        try {
+            const response = await this.engineClient.listModels();
+            this.models = (response.data ?? []).filter(m => !/embed/i.test(m.id));
+            this.update();
+        } catch {
+            /* picker stays empty; modes other than Single are unaffected */
+        }
     }
 
     /** Switching the active agent starts a fresh conversation (no cross-agent history). */
@@ -107,6 +143,9 @@ export class SorikuChatWidget extends ReactWidget {
                     conversationId: this.conversationId,
                     useWorker: true,
                     clientTools: this.toolConfirmation.delegatedTools(),
+                    mode: this.mode,
+                    modelId: this.mode === 'single' && this.modelId ? this.modelId : undefined,
+                    workerCount: this.mode === 'ensemble' ? this.workerCount : undefined,
                 },
                 this.abortController.signal,
             );
@@ -167,12 +206,14 @@ export class SorikuChatWidget extends ReactWidget {
 
     protected render(): React.ReactNode {
         const agentId = this.selection.getActiveId();
+        const agentName = this.selection.getActiveName();
         return <div className='soriku-chat'>
             <div className='soriku-chat-header'>
                 {agentId
-                    ? <span>Agent: <span className='soriku-chat-agent'>{agentId}</span></span>
+                    ? <span>Agent: <span className='soriku-chat-agent'>{agentName ?? agentId}</span></span>
                     : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
             </div>
+            {agentId && this.renderOrchestration()}
             <div className='soriku-chat-messages'>
                 {this.conversation.length === 0
                     ? <div className='soriku-chat-empty'>Ask the agent a question to start.</div>
@@ -215,9 +256,9 @@ export class SorikuChatWidget extends ReactWidget {
             <div className='soriku-msg-meta'>
                 {turn.respondedBy && <span className='soriku-msg-agent'>{turn.respondedBy}</span>}
                 {turn.model && <span className='soriku-msg-model' title='Model that produced this answer'>{turn.model}</span>}
-                {turn.status === 'streaming' && <span className='soriku-msg-typing'>…</span>}
             </div>
             {turn.text && <div className='soriku-msg-text'>{turn.text}</div>}
+            {turn.status === 'streaming' && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
@@ -237,6 +278,50 @@ export class SorikuChatWidget extends ReactWidget {
                 title='Bad response'
                 onClick={() => this.submitFeedback(turn, 'negative')}
             ><span className='codicon codicon-thumbsdown' /></button>
+        </div>;
+    }
+
+    /** Animated busy indicator shown while a turn streams (spinner + current phase). */
+    protected renderBusy(turn: AssistantTurn): React.ReactNode {
+        return <div className='soriku-msg-busy'>
+            <span className='codicon codicon-loading codicon-modifier-spin' />
+            <span className='soriku-busy-label'>{busyPhase(turn)}</span>
+            <span className='soriku-busy-dots'><span>.</span><span>.</span><span>.</span></span>
+        </div>;
+    }
+
+    /** Orchestration toolbar: mode + (single) model picker + (ensemble) worker count. */
+    protected renderOrchestration(): React.ReactNode {
+        const active = ORCHESTRATION_OPTIONS.find(o => o.mode === this.mode) ?? ORCHESTRATION_OPTIONS[0];
+        return <div className='soriku-chat-orchestration'>
+            <select
+                className='theia-select soriku-mode-select'
+                title={active.hint}
+                value={this.mode}
+                disabled={this.streaming}
+                onChange={e => { this.mode = e.target.value as ChatMode; this.update(); }}
+            >
+                {ORCHESTRATION_OPTIONS.map(o => <option key={o.mode} value={o.mode}>{o.label}</option>)}
+            </select>
+            {this.mode === 'single' && <select
+                className='theia-select soriku-model-select'
+                title='Model to use for every answer'
+                value={this.modelId}
+                disabled={this.streaming}
+                onChange={e => { this.modelId = e.target.value; this.update(); }}
+            >
+                <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
+                {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+            </select>}
+            {this.mode === 'ensemble' && <select
+                className='theia-select soriku-worker-select'
+                title='How many workers to merge'
+                value={this.workerCount}
+                disabled={this.streaming}
+                onChange={e => { this.workerCount = e.target.value; this.update(); }}
+            >
+                {WORKER_COUNTS.map(w => <option key={w} value={w}>{w === 'auto' ? 'auto workers' : `${w} workers`}</option>)}
+            </select>}
         </div>;
     }
 

@@ -266,6 +266,10 @@ export interface ChatStreamParams {
     useWorker?: boolean;
     /** Tools the IDE will execute locally; forwarded to the engine as `client_tools`. */
     clientTools?: string[];
+    /** Force a specific model (only meaningful in `single` mode). */
+    modelId?: string;
+    /** Number of workers for ensemble mode ('auto' or 2..5). */
+    workerCount?: string;
 }
 
 export interface EngineClientConfig {

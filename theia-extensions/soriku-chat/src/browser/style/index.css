@@ -62,8 +62,51 @@
     padding: 0 5px;
 }
 
-.soriku-msg-typing {
+/* ─── Orchestration toolbar ─────────────────────────────────────────── */
+
+.soriku-chat-orchestration {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--theia-sideBarSectionHeader-border);
+}
+
+.soriku-chat-orchestration .theia-select {
+    font-size: var(--theia-ui-font-size0);
+    max-width: 100%;
+}
+
+/* ─── Busy / thinking indicator ─────────────────────────────────────── */
+
+.soriku-msg-busy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
     color: var(--theia-descriptionForeground);
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-busy-label {
+    font-style: italic;
+}
+
+.soriku-busy-dots span {
+    animation: soriku-busy-blink 1.2s infinite both;
+}
+
+.soriku-busy-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.soriku-busy-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes soriku-busy-blink {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
 }
 
 .soriku-msg-error {
