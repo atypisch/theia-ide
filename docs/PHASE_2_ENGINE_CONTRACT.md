@@ -119,7 +119,7 @@ Features referenced in bootstrap Phase 2.6 that **do not yet have a persistent e
 |---------|--------|------------------|
 | **Per-agent tool whitelist** (persisted) | **NOT IN API** | Per-request `disabled_tools` / `tools_enabled` on `ChatRequest` only |
 | **Per-agent routing mode** (single/verify/ensemble persisted) | **NOT IN API** | Per-request `mode` on `ChatRequest`; routing overrides are per-category at router level |
-| **Dedicated engine↔IDE tool-delegation endpoint** | **NOT NEEDED** | IDE executes tools locally when engine requests via SSE `confirm_tool` + local bridge; engine runs tools server-side today |
+| **Dedicated engine↔IDE tool-delegation endpoint** | **IMPLEMENTED (Phase 4.5)** | `ChatRequest.client_tools` opts in; engine emits `tool_request` SSE and waits for the IDE to POST the result via `/api/worker/confirm` (now carries a `result` field). IDE runs file tools against its workspace. See §4.4. |
 
 These are **engine-side gaps** — do not build fake IDE endpoints. Escalate to Marten before implementing.
 
@@ -313,6 +313,27 @@ async def run(prompt, system="", on_step=None, on_chunk=None) -> PilotResult
 # PilotResult: answer, steps[], iterations, model, generated_files[]
 # PilotStep: iteration, tool_name, tool_args, result, error, requires_confirmation
 ```
+
+### 4.4 Client-side tool delegation (Phase 4.5)
+
+Opt-in path so file tools run in the **IDE workspace** instead of the engine's own
+directory. Backward-compatible: callers that omit `client_tools` are unaffected.
+
+1. IDE sends `ChatRequest.client_tools` = `["file_read", "file_write", "list_directory"]`.
+2. For a delegated tool the engine emits an SSE `tool_request`
+   `{request_id, tool, args, iteration}` and suspends the `WorkerLoop`
+   (`execute_remote`/`remote_tools` hook in `core/agent_loop.py`).
+3. The IDE tools-bridge executes the tool via Theia `FileService` against the
+   open workspace (confirming `file_write`), then POSTs
+   `{confirmation_id: request_id, approved, result: {result|error}}` to
+   `/api/worker/confirm`.
+4. The engine feeds `result` back into the loop. Results mirror the engine's own
+   tool-output strings, so the model sees identical content.
+
+Timeout/denial reuse the confirmation machinery (120s auto-deny). `shell_exec`,
+`project_search` and `generate_document` are **not** delegated yet (stay
+server-side). Hosted mode still does not register filesystem tools, so delegation
+there is a follow-up (register tool schemas without local execution).
 
 ---
 
