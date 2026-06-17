@@ -37,6 +37,13 @@ const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
 
 const WORKER_COUNTS = ['auto', '2', '3', '4', '5'];
 
+/** Modes that run several collaborating models, so the worker-count picker applies. */
+const MULTI_WORKER_MODES: ChatMode[] = ['plan', 'ensemble'];
+
+function usesWorkers(mode: ChatMode): boolean {
+    return MULTI_WORKER_MODES.includes(mode);
+}
+
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
 
@@ -145,7 +152,7 @@ export class SorikuChatWidget extends ReactWidget {
                     clientTools: this.toolConfirmation.delegatedTools(),
                     mode: this.mode,
                     modelId: this.mode === 'single' && this.modelId ? this.modelId : undefined,
-                    workerCount: this.mode === 'ensemble' ? this.workerCount : undefined,
+                    workerCount: usesWorkers(this.mode) ? this.workerCount : undefined,
                 },
                 this.abortController.signal,
             );
@@ -313,9 +320,9 @@ export class SorikuChatWidget extends ReactWidget {
                 <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
                 {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
             </select>}
-            {this.mode === 'ensemble' && <select
+            {usesWorkers(this.mode) && <select
                 className='theia-select soriku-worker-select'
-                title='How many workers to merge'
+                title='How many models collaborate on one answer'
                 value={this.workerCount}
                 disabled={this.streaming}
                 onChange={e => { this.workerCount = e.target.value; this.update(); }}
