@@ -193,6 +193,11 @@
     white-space: nowrap;
 }
 
+.soriku-model-checkitem.unavailable {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 /* ─── Busy / thinking indicator ─────────────────────────────────────── */
 
 .soriku-msg-busy {

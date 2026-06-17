@@ -26,6 +26,7 @@ import {
     DeleteRoutingOverrideResponse,
     EngineClientConfig,
     PlanSignalResponse,
+    ProvidersResponse,
     HealthResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
@@ -163,6 +164,10 @@ export class EngineClientImpl implements EngineClient {
 
     async listModels(): Promise<V1ModelsResponse> {
         return this.createTransport().getJson<V1ModelsResponse>('/api/v1/models');
+    }
+
+    async listProviders(): Promise<ProvidersResponse> {
+        return this.createTransport().getJson<ProvidersResponse>('/api/providers');
     }
 
     async sendAgentFeedback(agentId: string, body: AgentFeedbackRequest): Promise<AgentFeedbackResponse> {

@@ -9,7 +9,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { ChatMode, ChatStreamParams, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { ChatMode, ChatStreamParams, ProviderInfo, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import {
@@ -84,6 +84,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected modelId = '';
     protected workerModels: string[] = [];
     protected models: V1ModelDescriptor[] = [];
+    protected providers: ProviderInfo[] = [];
     /** Plan ids currently being approved/cancelled (to disable the buttons). */
     protected resolvingPlans = new Set<string>();
 
@@ -98,6 +99,7 @@ export class SorikuChatWidget extends ReactWidget {
         this.addClass('soriku-chat-widget');
         this.toDispose.push(this.selection.onDidChangeActive(() => this.onAgentChanged()));
         this.loadModels();
+        this.loadProviders();
         this.update();
     }
 
@@ -110,6 +112,33 @@ export class SorikuChatWidget extends ReactWidget {
         } catch {
             /* picker stays empty; modes other than Single are unaffected */
         }
+    }
+
+    /** Load provider health so unavailable models (bad/expired key, no credits) are marked. */
+    protected async loadProviders(): Promise<void> {
+        try {
+            const response = await this.engineClient.listProviders();
+            this.providers = response.providers ?? [];
+            this.update();
+        } catch {
+            /* availability unknown → models are not blocked */
+        }
+    }
+
+    /** Availability of a model based on its provider's live health. */
+    protected modelAvailability(modelId: string): { ok: boolean; reason?: string } {
+        if (this.providers.length === 0) {
+            return { ok: true }; // health unknown — don't block
+        }
+        const prefix = modelId.includes(':') ? modelId.slice(0, modelId.indexOf(':')) : '';
+        const remote = this.providers.find(p => !p.is_local && p.name === prefix);
+        const provider = remote ?? this.providers.find(p => p.is_local);
+        if (!provider) {
+            return { ok: true };
+        }
+        return provider.healthy
+            ? { ok: true }
+            : { ok: false, reason: provider.error ?? `${provider.display_name} unavailable` };
     }
 
     /** Switching the active agent starts a fresh conversation (no cross-agent history). */
@@ -420,7 +449,12 @@ export class SorikuChatWidget extends ReactWidget {
                 onChange={e => { this.modelId = e.target.value; this.update(); }}
             >
                 <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
-                {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+                {this.models.map(m => {
+                    const avail = this.modelAvailability(m.id);
+                    return <option key={m.id} value={m.id} disabled={!avail.ok}>
+                        {m.id}{avail.ok ? '' : ` — ${avail.reason}`}
+                    </option>;
+                })}
             </select>}
             {this.orchestration === 'ensemble' && <div className='soriku-worker-models'>
                 <div className='soriku-worker-models-hint'>
@@ -431,15 +465,18 @@ export class SorikuChatWidget extends ReactWidget {
                 <div className='soriku-model-checklist'>
                     {this.models.length === 0
                         ? <div className='soriku-worker-models-hint'>No models available</div>
-                        : this.models.map(m => <label key={m.id} className='soriku-model-checkitem' title={m.id}>
-                            <input
-                                type='checkbox'
-                                checked={this.workerModels.includes(m.id)}
-                                disabled={this.streaming}
-                                onChange={() => this.toggleWorkerModel(m.id)}
-                            />
-                            <span className='soriku-model-checklabel'>{m.id}</span>
-                        </label>)}
+                        : this.models.map(m => {
+                            const avail = this.modelAvailability(m.id);
+                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
+                                <input
+                                    type='checkbox'
+                                    checked={this.workerModels.includes(m.id)}
+                                    disabled={this.streaming || !avail.ok}
+                                    onChange={() => this.toggleWorkerModel(m.id)}
+                                />
+                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
+                            </label>;
+                        })}
                 </div>
             </div>}
         </div>;

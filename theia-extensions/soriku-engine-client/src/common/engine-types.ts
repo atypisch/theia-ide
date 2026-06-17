@@ -139,6 +139,19 @@ export interface PlanSignalResponse {
     plan_id: string;
 }
 
+export interface ProviderInfo {
+    name: string;
+    display_name: string;
+    is_local: boolean;
+    healthy: boolean;
+    models_available: number;
+    error?: string | null;
+}
+
+export interface ProvidersResponse {
+    providers: ProviderInfo[];
+}
+
 export interface AuthModeResponse {
     auth_mode: string;
     simezu_base_url?: string | null;

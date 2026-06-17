@@ -19,6 +19,7 @@ import {
     ConfirmResponse,
     DeleteRoutingOverrideResponse,
     PlanSignalResponse,
+    ProvidersResponse,
     HealthResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
@@ -60,6 +61,8 @@ export interface EngineClient {
     deleteRoutingOverride(category: string): Promise<DeleteRoutingOverrideResponse>;
     getRecommendedRouting(): Promise<RecommendedRoutingResponse>;
     listModels(): Promise<V1ModelsResponse>;
+    /** Providers with live health (key valid, credits, reachable) for availability checks. */
+    listProviders(): Promise<ProvidersResponse>;
 
     sendAgentFeedback(agentId: string, body: AgentFeedbackRequest): Promise<AgentFeedbackResponse>;
 }
