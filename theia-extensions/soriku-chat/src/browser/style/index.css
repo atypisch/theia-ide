@@ -85,18 +85,43 @@
 .soriku-worker-models {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     flex: 1 1 100%;
-}
-
-.soriku-models-multiselect {
-    width: 100%;
-    box-sizing: border-box;
 }
 
 .soriku-worker-models-hint {
     font-size: var(--theia-ui-font-size0);
     color: var(--theia-descriptionForeground);
+}
+
+.soriku-model-checklist {
+    display: flex;
+    flex-direction: column;
+    max-height: 160px;
+    overflow-y: auto;
+    border: 1px solid var(--theia-editorGroup-border);
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+.soriku-model-checkitem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    cursor: pointer;
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-model-checkitem input {
+    cursor: pointer;
+    margin: 0;
+}
+
+.soriku-model-checklabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ─── Busy / thinking indicator ─────────────────────────────────────── */

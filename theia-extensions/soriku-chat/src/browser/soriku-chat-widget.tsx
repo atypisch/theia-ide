@@ -339,24 +339,34 @@ export class SorikuChatWidget extends ReactWidget {
                 {WORKER_COUNTS.map(w => <option key={w} value={w}>{w === 'auto' ? 'auto workers' : `${w} workers`}</option>)}
             </select>}
             {this.mode === 'ensemble' && <div className='soriku-worker-models'>
-                <select
-                    multiple
-                    className='theia-select soriku-models-multiselect'
-                    title='Pick the models that collaborate on one answer'
-                    size={Math.min(6, Math.max(3, this.models.length))}
-                    disabled={this.streaming || this.models.length === 0}
-                    value={this.workerModels}
-                    onChange={e => { this.workerModels = Array.from(e.target.selectedOptions).map(o => o.value); this.update(); }}
-                >
-                    {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
-                </select>
                 <div className='soriku-worker-models-hint'>
                     {this.workerModels.length >= 2
                         ? `${this.workerModels.length} models will collaborate`
-                        : 'Pick 2+ models to combine (empty = Soriku chooses)'}
+                        : 'Tick 2+ models to combine (none = Soriku chooses)'}
+                </div>
+                <div className='soriku-model-checklist'>
+                    {this.models.length === 0
+                        ? <div className='soriku-worker-models-hint'>No models available</div>
+                        : this.models.map(m => <label key={m.id} className='soriku-model-checkitem' title={m.id}>
+                            <input
+                                type='checkbox'
+                                checked={this.workerModels.includes(m.id)}
+                                disabled={this.streaming}
+                                onChange={() => this.toggleWorkerModel(m.id)}
+                            />
+                            <span className='soriku-model-checklabel'>{m.id}</span>
+                        </label>)}
                 </div>
             </div>}
         </div>;
+    }
+
+    /** Toggle a model in the ensemble collaboration set. */
+    protected toggleWorkerModel(modelId: string): void {
+        this.workerModels = this.workerModels.includes(modelId)
+            ? this.workerModels.filter(id => id !== modelId)
+            : [...this.workerModels, modelId];
+        this.update();
     }
 
     protected renderToolCall(turnId: string, call: ChatToolCall, index: number): React.ReactNode {
