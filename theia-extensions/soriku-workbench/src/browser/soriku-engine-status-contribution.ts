@@ -50,6 +50,9 @@ export class SorikuEngineStatusContribution implements FrontendApplicationContri
     async onStart(): Promise<void> {
         this.status.onDidChangeState(state => this.updateStatusBar(state));
         this.updateStatusBar(this.status.getState());
+        // Wait for stored user settings before reading the first-run flag, otherwise
+        // the schema default (false) is read and the prompt reappears every launch.
+        await this.preferences.ready;
         if (!this.preferences.get<boolean>(SORIKU_ENGINE_FIRST_RUN_COMPLETE, false)) {
             await this.promptFirstRun();
             return;
