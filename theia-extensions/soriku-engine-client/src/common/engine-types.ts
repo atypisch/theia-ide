@@ -110,12 +110,22 @@ export interface ChatRequest {
     pilot_tools?: boolean | null;
     disabled_tools?: string[] | null;
     tools_enabled?: boolean | null;
+    /** Tools the IDE will execute itself (against its workspace) instead of the engine. */
+    client_tools?: string[] | null;
 }
 
 export interface ConfirmRequest {
     confirmation_id: string;
     approved: boolean;
     remember?: '' | 'session';
+    /** For client-executed tools: the tool output, shaped {result|error: string}. */
+    result?: ToolExecResult | null;
+}
+
+/** Result of executing a tool, matching the engine's ToolRegistry.execute() shape. */
+export interface ToolExecResult {
+    result?: string;
+    error?: string;
 }
 
 export interface ConfirmResponse {
@@ -254,6 +264,8 @@ export interface ChatStreamParams {
     projectId?: string;
     mode?: ChatMode;
     useWorker?: boolean;
+    /** Tools the IDE will execute locally; forwarded to the engine as `client_tools`. */
+    clientTools?: string[];
 }
 
 export interface EngineClientConfig {

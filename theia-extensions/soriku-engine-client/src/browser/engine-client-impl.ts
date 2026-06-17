@@ -109,6 +109,7 @@ export class EngineClientImpl implements EngineClient {
             project_id: params.projectId,
             mode: params.mode,
             stream: true,
+            client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
         };
         const path = params.useWorker === false ? '/api/chat' : '/api/worker';
         const transport = this.createTransport();

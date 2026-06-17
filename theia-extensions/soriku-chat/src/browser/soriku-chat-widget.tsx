@@ -101,7 +101,13 @@ export class SorikuChatWidget extends ReactWidget {
         this.update();
         try {
             const stream = this.engineClient.chatStream(
-                { prompt: text, personaId: agentId, conversationId: this.conversationId, useWorker: true },
+                {
+                    prompt: text,
+                    personaId: agentId,
+                    conversationId: this.conversationId,
+                    useWorker: true,
+                    clientTools: this.toolConfirmation.delegatedTools(),
+                },
                 this.abortController.signal,
             );
             for await (const event of stream) {
@@ -114,6 +120,10 @@ export class SorikuChatWidget extends ReactWidget {
                     // Fire-and-forget: the engine blocks until /api/worker/confirm, then the stream
                     // resumes. Awaiting here would deadlock the loop waiting for the next event.
                     this.toolConfirmation.confirm(event).catch(() => { /* default-deny already posted */ });
+                } else if (event.type === 'tool_request') {
+                    // Delegated tool: run it against the workspace, then POST the result. Same
+                    // fire-and-forget reasoning — the engine blocks until the result arrives.
+                    this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
                 }
                 this.update();
             }
