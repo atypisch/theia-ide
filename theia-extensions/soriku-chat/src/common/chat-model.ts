@@ -24,6 +24,8 @@ export interface AssistantTurn {
     conversationId?: string;
     text: string;
     toolCalls: ChatToolCall[];
+    /** Models that collaborated on this answer (multi-worker / ensemble), for transparency. */
+    workers: string[];
     /** Latest progress message from the engine (status / plan / worker events). */
     phase?: string;
     status: 'streaming' | 'done' | 'error';
@@ -39,7 +41,12 @@ export interface UserMessage {
 export type ChatMessage = UserMessage | AssistantTurn;
 
 export function createAssistantTurn(id: string): AssistantTurn {
-    return { role: 'assistant', id, text: '', toolCalls: [], status: 'streaming' };
+    return { role: 'assistant', id, text: '', toolCalls: [], workers: [], status: 'streaming' };
+}
+
+/** The model behind a worker event — never the opaque worker_id (kept out of the UI list). */
+function workerModelOf(event: SorikuSseEvent): string | undefined {
+    return asString(event.model) ?? asString(event.model_id);
 }
 
 function asString(value: unknown): string | undefined {
@@ -83,7 +90,7 @@ function upsertToolCall(calls: ChatToolCall[], event: SorikuSseEvent, status: Ch
  * widget can keep prior snapshots and the logic is unit-testable without Theia or the network.
  */
 export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): AssistantTurn {
-    const next: AssistantTurn = { ...turn, toolCalls: turn.toolCalls.slice() };
+    const next: AssistantTurn = { ...turn, toolCalls: turn.toolCalls.slice(), workers: turn.workers.slice() };
     switch (event.type) {
         case 'meta':
             next.model = asString(event.model) ?? next.model;
@@ -101,10 +108,58 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             next.phase = asString(event.content) ?? asString(event.message) ?? asString(event.status) ?? next.phase;
             break;
         case 'plan_generated':
+        case 'deprecated_mode_translation':
             next.phase = 'Planning workers…';
             break;
-        case 'synthesis_done':
+        case 'plan_awaiting_execution':
+            next.phase = 'Starting workers…';
+            break;
+        case 'worker_start': {
+            const model = workerModelOf(event);
+            if (model && !next.workers.includes(model)) {
+                next.workers.push(model);
+            }
+            next.phase = model ? `Worker answering: ${model}` : 'Workers answering…';
+            break;
+        }
+        case 'worker_done': {
+            const model = workerModelOf(event);
+            if (model && !next.workers.includes(model)) {
+                next.workers.push(model);
+            }
+            break;
+        }
+        case 'synthesis_start':
             next.phase = 'Merging answers…';
+            next.text = '';
+            break;
+        case 'synthesis_chunk':
+            next.text += asString(event.chunk) ?? asString(event.content) ?? '';
+            break;
+        case 'synthesis_done': {
+            const finalText = asString(event.final_text);
+            if (finalText) {
+                next.text = finalText;
+            }
+            next.model = asString(event.synthesizer_model) ?? next.model;
+            next.phase = undefined;
+            break;
+        }
+        case 'plan_done': {
+            const finalText = asString(event.final_response);
+            if (finalText) {
+                next.text = finalText;
+            }
+            if (next.status === 'streaming') {
+                next.status = 'done';
+            }
+            break;
+        }
+        case 'plan_failed':
+        case 'plan_no_conductor':
+        case 'plan_cancelled':
+            next.status = 'error';
+            next.error = asString(event.error) ?? asString(event.reason) ?? 'Plan failed';
             break;
         case 'chunk':
             next.text += asString(event.content) ?? '';

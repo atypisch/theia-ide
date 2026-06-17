@@ -62,6 +62,11 @@
     padding: 0 5px;
 }
 
+.soriku-msg-workers {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+}
+
 /* ─── Orchestration toolbar ─────────────────────────────────────────── */
 
 .soriku-chat-orchestration {
@@ -75,6 +80,23 @@
 .soriku-chat-orchestration .theia-select {
     font-size: var(--theia-ui-font-size0);
     max-width: 100%;
+}
+
+.soriku-worker-models {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 100%;
+}
+
+.soriku-models-multiselect {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.soriku-worker-models-hint {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
 }
 
 /* ─── Busy / thinking indicator ─────────────────────────────────────── */

@@ -25,6 +25,7 @@ import {
     ConfirmResponse,
     DeleteRoutingOverrideResponse,
     EngineClientConfig,
+    PlanSignalResponse,
     HealthResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
@@ -110,6 +111,7 @@ export class EngineClientImpl implements EngineClient {
             mode: params.mode,
             model_id: params.modelId,
             worker_count: params.workerCount,
+            worker_models: params.workerModels && params.workerModels.length > 0 ? params.workerModels : undefined,
             stream: true,
             client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
         };
@@ -122,6 +124,10 @@ export class EngineClientImpl implements EngineClient {
 
     async confirmTool(body: ConfirmRequest): Promise<ConfirmResponse> {
         return this.createTransport().postJson<ConfirmResponse>('/api/worker/confirm', body);
+    }
+
+    async executePlan(planId: string): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/execute`, {});
     }
 
     async getCapabilities(): Promise<CapabilityMapResponse> {

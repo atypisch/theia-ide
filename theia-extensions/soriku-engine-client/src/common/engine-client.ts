@@ -18,6 +18,7 @@ import {
     ConfirmRequest,
     ConfirmResponse,
     DeleteRoutingOverrideResponse,
+    PlanSignalResponse,
     HealthResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
@@ -47,6 +48,8 @@ export interface EngineClient {
 
     chatStream(params: ChatStreamParams, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent>;
     confirmTool(body: ConfirmRequest): Promise<ConfirmResponse>;
+    /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
+    executePlan(planId: string): Promise<PlanSignalResponse>;
 
     getCapabilities(): Promise<CapabilityMapResponse>;
     getRoutingGaps(): Promise<RoutingGapsResponse>;

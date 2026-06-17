@@ -74,6 +74,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected mode: ChatMode = 'auto';
     protected modelId = '';
     protected workerCount = 'auto';
+    protected workerModels: string[] = [];
     protected models: V1ModelDescriptor[] = [];
 
     @postConstruct()
@@ -153,6 +154,7 @@ export class SorikuChatWidget extends ReactWidget {
                     mode: this.mode,
                     modelId: this.mode === 'single' && this.modelId ? this.modelId : undefined,
                     workerCount: usesWorkers(this.mode) ? this.workerCount : undefined,
+                    workerModels: this.mode === 'ensemble' && this.workerModels.length >= 2 ? this.workerModels : undefined,
                 },
                 this.abortController.signal,
             );
@@ -170,6 +172,10 @@ export class SorikuChatWidget extends ReactWidget {
                     // Delegated tool: run it against the workspace, then POST the result. Same
                     // fire-and-forget reasoning — the engine blocks until the result arrives.
                     this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
+                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string') {
+                    // Plan parked for confirmation; resume it so the same stream runs the
+                    // workers + synthesis. Fire-and-forget — events arrive on this stream.
+                    this.engineClient.executePlan(event.plan_id).catch(() => { /* stream will surface errors */ });
                 }
                 this.update();
             }
@@ -263,6 +269,9 @@ export class SorikuChatWidget extends ReactWidget {
             <div className='soriku-msg-meta'>
                 {turn.respondedBy && <span className='soriku-msg-agent'>{turn.respondedBy}</span>}
                 {turn.model && <span className='soriku-msg-model' title='Model that produced this answer'>{turn.model}</span>}
+                {turn.workers.length > 0 && <span className='soriku-msg-workers' title='Models that collaborated on this answer'>
+                    {turn.workers.length} workers: {turn.workers.join(', ')}
+                </span>}
             </div>
             {turn.text && <div className='soriku-msg-text'>{turn.text}</div>}
             {turn.status === 'streaming' && this.renderBusy(turn)}
@@ -320,7 +329,7 @@ export class SorikuChatWidget extends ReactWidget {
                 <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
                 {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
             </select>}
-            {usesWorkers(this.mode) && <select
+            {this.mode === 'plan' && <select
                 className='theia-select soriku-worker-select'
                 title='How many models collaborate on one answer'
                 value={this.workerCount}
@@ -329,6 +338,24 @@ export class SorikuChatWidget extends ReactWidget {
             >
                 {WORKER_COUNTS.map(w => <option key={w} value={w}>{w === 'auto' ? 'auto workers' : `${w} workers`}</option>)}
             </select>}
+            {this.mode === 'ensemble' && <div className='soriku-worker-models'>
+                <select
+                    multiple
+                    className='theia-select soriku-models-multiselect'
+                    title='Pick the models that collaborate on one answer'
+                    size={Math.min(6, Math.max(3, this.models.length))}
+                    disabled={this.streaming || this.models.length === 0}
+                    value={this.workerModels}
+                    onChange={e => { this.workerModels = Array.from(e.target.selectedOptions).map(o => o.value); this.update(); }}
+                >
+                    {this.models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+                </select>
+                <div className='soriku-worker-models-hint'>
+                    {this.workerModels.length >= 2
+                        ? `${this.workerModels.length} models will collaborate`
+                        : 'Pick 2+ models to combine (empty = Soriku chooses)'}
+                </div>
+            </div>}
         </div>;
     }
 

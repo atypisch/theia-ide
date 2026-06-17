@@ -112,6 +112,8 @@ export interface ChatRequest {
     tools_enabled?: boolean | null;
     /** Tools the IDE will execute itself (against its workspace) instead of the engine. */
     client_tools?: string[] | null;
+    /** Explicit models to collaborate on one ensemble answer (one worker each). */
+    worker_models?: string[] | null;
 }
 
 export interface ConfirmRequest {
@@ -130,6 +132,11 @@ export interface ToolExecResult {
 
 export interface ConfirmResponse {
     ok: boolean;
+}
+
+export interface PlanSignalResponse {
+    status: string;
+    plan_id: string;
 }
 
 export interface AuthModeResponse {
@@ -270,6 +277,8 @@ export interface ChatStreamParams {
     modelId?: string;
     /** Number of workers for ensemble mode ('auto' or 2..5). */
     workerCount?: string;
+    /** Explicit models to combine in ensemble mode (overrides workerCount). */
+    workerModels?: string[];
 }
 
 export interface EngineClientConfig {

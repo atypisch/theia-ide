@@ -110,6 +110,29 @@ describe('reduceSseEvent', () => {
         const turn = fold([{ type: 'status', content: 'Routing to a model' }]);
         assert.equal(turn.phase, 'Routing to a model');
     });
+
+    it('renders a plan/ensemble answer from synthesis events and tracks worker models', () => {
+        const turn = fold([
+            { type: 'plan_generated' },
+            { type: 'worker_start', worker_id: 'w1', model: 'qwen2.5-coder:7b' },
+            { type: 'worker_start', worker_id: 'w2', model: 'gemma3:4b' },
+            { type: 'synthesis_start' },
+            { type: 'synthesis_chunk', chunk: 'Merged ' },
+            { type: 'synthesis_chunk', chunk: 'answer.' },
+            { type: 'synthesis_done', final_text: 'Merged answer.', synthesizer_model: 'deepseek-r1:7b' },
+            { type: 'plan_done', final_response: 'Merged answer.' },
+        ]);
+        assert.equal(turn.text, 'Merged answer.');
+        assert.equal(turn.model, 'deepseek-r1:7b');
+        assert.deepEqual(turn.workers, ['qwen2.5-coder:7b', 'gemma3:4b']);
+        assert.equal(turn.status, 'done');
+    });
+
+    it('marks a plan failure as an error', () => {
+        const turn = fold([{ type: 'plan_failed', reason: 'no_model' }]);
+        assert.equal(turn.status, 'error');
+        assert.equal(turn.error, 'no_model');
+    });
 });
 
 describe('busyPhase', () => {
