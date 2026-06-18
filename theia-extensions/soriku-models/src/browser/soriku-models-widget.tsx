@@ -145,6 +145,7 @@ export class SorikuModelsWidget extends ReactWidget {
                 await this.engineClient.deactivateModel(model.id);
             }
             await this.mutated();
+            this.messages.info(`${model.id} ${active ? 'activated' : 'deactivated'}.`);
         } catch (e) {
             this.messages.error(`Could not update ${model.id}: ${(e as Error).message}`);
         } finally {
@@ -168,6 +169,7 @@ export class SorikuModelsWidget extends ReactWidget {
         try {
             await this.engineClient.deleteModel(model.id);
             await this.mutated();
+            this.messages.info(`Deleted ${model.id}.`);
         } catch (e) {
             this.messages.error(`Could not delete ${model.id}: ${(e as Error).message}`);
         } finally {
@@ -275,6 +277,7 @@ export class SorikuModelsWidget extends ReactWidget {
         try {
             await this.engineClient.deleteUserProvider(provider.id);
             await this.mutated();
+            this.messages.info(`Removed ${provider.display_name}.`);
         } catch (e) {
             this.messages.error(`Could not remove provider: ${(e as Error).message}`);
         }
