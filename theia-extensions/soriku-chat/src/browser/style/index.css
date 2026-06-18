@@ -93,6 +93,15 @@
     min-width: 0;
 }
 
+.soriku-manage-models {
+    background: transparent;
+    border: none;
+    color: var(--theia-icon-foreground);
+    cursor: pointer;
+    flex: 0 0 auto;
+    padding: 0 4px;
+}
+
 /* ─── Plan approval card ─────────────────────────────────────────────── */
 
 .soriku-plan-approval {

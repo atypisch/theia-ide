@@ -7,7 +7,7 @@
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { MessageService } from '@theia/core/lib/common';
+import { CommandService, MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { ChatMode, ChatStreamParams, ProviderInfo, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
@@ -66,6 +66,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(MessageService)
     protected readonly messages: MessageService;
+
+    @inject(CommandService)
+    protected readonly commands: CommandService;
 
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
@@ -440,6 +443,13 @@ export class SorikuChatWidget extends ReactWidget {
                 >
                     {ORCHESTRATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+                <button
+                    className='soriku-manage-models'
+                    title='Add or manage models'
+                    onClick={() => this.commands.executeCommand('soriku.models.open')}
+                >
+                    <span className='codicon codicon-gear' />
+                </button>
             </div>
             {this.orchestration === 'single' && <select
                 className='theia-select soriku-model-select'
