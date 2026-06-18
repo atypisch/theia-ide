@@ -152,6 +152,106 @@ export interface ProvidersResponse {
     providers: ProviderInfo[];
 }
 
+export interface InstalledModel {
+    id: string;
+    name?: string;
+    tag?: string;
+    size_gb?: number;
+    role?: string;
+    is_running?: boolean;
+    is_embedding?: boolean;
+    inactive?: boolean;
+    [key: string]: unknown;
+}
+
+export interface InstalledModelsResponse {
+    models: InstalledModel[];
+}
+
+export interface ProviderPreset {
+    id: string;
+    display_name: string;
+    icon?: string;
+    base_url?: string;
+    api_key_url?: string;
+    provider_class?: string;
+    tags?: string[];
+    description?: string;
+}
+
+export interface ProviderPresetsResponse {
+    presets: ProviderPreset[];
+}
+
+export interface AddProviderRequest {
+    preset_id?: string;
+    display_name?: string;
+    base_url?: string;
+    api_key?: string;
+    models?: string[];
+    is_local?: boolean;
+    tags?: string[];
+}
+
+export interface AddProviderResponse {
+    id: string;
+    status: string;
+}
+
+export interface UserProvider {
+    id: string;
+    preset_id?: string | null;
+    display_name: string;
+    base_url?: string;
+    enabled?: boolean;
+    models?: string[];
+    is_local?: boolean;
+    tags?: string[];
+}
+
+export interface UserProvidersResponse {
+    providers: UserProvider[];
+}
+
+export interface BrowseModel {
+    model_id: string;
+    name?: string;
+    source?: string;
+    provider?: string;
+    description?: string;
+    parameters?: string;
+    size_gb?: number;
+    cost_type?: string;
+    cost_label?: string;
+    tags?: string[];
+    is_installed?: boolean;
+    [key: string]: unknown;
+}
+
+export interface BrowseModelsResponse {
+    models: BrowseModel[];
+    [key: string]: unknown;
+}
+
+export interface DiscoveredModel {
+    id: string;
+    display_name?: string;
+    context_window?: number;
+}
+
+export interface DiscoverModelsResponse {
+    models: DiscoveredModel[];
+}
+
+/** Generic ok/status response for model mutations (delete/activate/…). */
+export interface ModelMutationResponse {
+    ok?: boolean;
+    status?: string;
+    model_id?: string;
+    error?: string;
+    [key: string]: unknown;
+}
+
 export interface AuthModeResponse {
     auth_mode: string;
     simezu_base_url?: string | null;

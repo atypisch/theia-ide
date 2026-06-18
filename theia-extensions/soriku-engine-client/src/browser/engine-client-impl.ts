@@ -10,6 +10,8 @@ import { EngineClient } from '../common/engine-client';
 import { EngineHttpTransport } from '../common/engine-http';
 import { EngineAuthTokenHolder } from './engine-auth-token-holder';
 import {
+    AddProviderRequest,
+    AddProviderResponse,
     AgentCreateRequest,
     AgentDeleteResponse,
     AgentFeedbackRequest,
@@ -18,22 +20,28 @@ import {
     AgentResponse,
     AgentUpdateRequest,
     AuthModeResponse,
+    BrowseModelsResponse,
     CapabilityMapResponse,
     ChatRequest,
     ChatStreamParams,
     ConfirmRequest,
     ConfirmResponse,
     DeleteRoutingOverrideResponse,
+    DiscoverModelsResponse,
     EngineClientConfig,
-    PlanSignalResponse,
-    ProvidersResponse,
     HealthResponse,
+    InstalledModelsResponse,
+    ModelMutationResponse,
+    PlanSignalResponse,
+    ProviderPresetsResponse,
+    ProvidersResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
     RoutingOverridesResponse,
     SetRoutingOverrideRequest,
     SetRoutingOverrideResponse,
     SorikuSseEvent,
+    UserProvidersResponse,
     V1ModelsResponse,
     WhoamiResponse,
 } from '../common/engine-types';
@@ -168,6 +176,52 @@ export class EngineClientImpl implements EngineClient {
 
     async listProviders(): Promise<ProvidersResponse> {
         return this.createTransport().getJson<ProvidersResponse>('/api/providers');
+    }
+
+    async listInstalledModels(): Promise<InstalledModelsResponse> {
+        return this.createTransport().getJson<InstalledModelsResponse>('/api/models/installed');
+    }
+
+    async *pullModel(name: string, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent> {
+        for await (const event of this.createTransport().postSse('/api/models/pull', { name }, signal)) {
+            yield event;
+        }
+    }
+
+    async deleteModel(modelId: string): Promise<ModelMutationResponse> {
+        return this.createTransport().deleteJson<ModelMutationResponse>(`/api/models/${encodeURIComponent(modelId)}`);
+    }
+
+    async activateModel(modelId: string): Promise<ModelMutationResponse> {
+        return this.createTransport().postJson<ModelMutationResponse>(`/api/models/${encodeURIComponent(modelId)}/activate`, {});
+    }
+
+    async deactivateModel(modelId: string): Promise<ModelMutationResponse> {
+        return this.createTransport().postJson<ModelMutationResponse>(`/api/models/${encodeURIComponent(modelId)}/deactivate`, {});
+    }
+
+    async browseModels(query: string): Promise<BrowseModelsResponse> {
+        return this.createTransport().getJson<BrowseModelsResponse>(`/api/models/browse?q=${encodeURIComponent(query)}&limit=40`);
+    }
+
+    async listProviderPresets(): Promise<ProviderPresetsResponse> {
+        return this.createTransport().getJson<ProviderPresetsResponse>('/api/providers/presets');
+    }
+
+    async listUserProviders(): Promise<UserProvidersResponse> {
+        return this.createTransport().getJson<UserProvidersResponse>('/api/providers/user');
+    }
+
+    async addProvider(body: AddProviderRequest): Promise<AddProviderResponse> {
+        return this.createTransport().postJson<AddProviderResponse>('/api/providers/add', body);
+    }
+
+    async deleteUserProvider(providerId: string): Promise<ModelMutationResponse> {
+        return this.createTransport().deleteJson<ModelMutationResponse>(`/api/providers/user/${encodeURIComponent(providerId)}`);
+    }
+
+    async discoverProviderModels(baseUrl: string, apiKey?: string): Promise<DiscoverModelsResponse> {
+        return this.createTransport().postJson<DiscoverModelsResponse>('/api/providers/discover-models', { base_url: baseUrl, api_key: apiKey ?? '' });
     }
 
     async sendAgentFeedback(agentId: string, body: AgentFeedbackRequest): Promise<AgentFeedbackResponse> {

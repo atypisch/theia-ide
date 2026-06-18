@@ -5,6 +5,8 @@
  ********************************************************************************/
 
 import {
+    AddProviderRequest,
+    AddProviderResponse,
     AgentCreateRequest,
     AgentDeleteResponse,
     AgentFeedbackRequest,
@@ -13,20 +15,26 @@ import {
     AgentResponse,
     AgentUpdateRequest,
     AuthModeResponse,
+    BrowseModelsResponse,
     CapabilityMapResponse,
     ChatStreamParams,
     ConfirmRequest,
     ConfirmResponse,
     DeleteRoutingOverrideResponse,
-    PlanSignalResponse,
-    ProvidersResponse,
+    DiscoverModelsResponse,
     HealthResponse,
+    InstalledModelsResponse,
+    ModelMutationResponse,
+    PlanSignalResponse,
+    ProviderPresetsResponse,
+    ProvidersResponse,
     RecommendedRoutingResponse,
     RoutingGapsResponse,
     RoutingOverridesResponse,
     SetRoutingOverrideRequest,
     SetRoutingOverrideResponse,
     SorikuSseEvent,
+    UserProvidersResponse,
     V1ModelsResponse,
     WhoamiResponse,
 } from './engine-types';
@@ -63,6 +71,21 @@ export interface EngineClient {
     listModels(): Promise<V1ModelsResponse>;
     /** Providers with live health (key valid, credits, reachable) for availability checks. */
     listProviders(): Promise<ProvidersResponse>;
+
+    // ── Model management (mirrors the Soriku install) ──
+    listInstalledModels(): Promise<InstalledModelsResponse>;
+    pullModel(name: string, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent>;
+    deleteModel(modelId: string): Promise<ModelMutationResponse>;
+    activateModel(modelId: string): Promise<ModelMutationResponse>;
+    deactivateModel(modelId: string): Promise<ModelMutationResponse>;
+    browseModels(query: string): Promise<BrowseModelsResponse>;
+
+    // ── Provider management ──
+    listProviderPresets(): Promise<ProviderPresetsResponse>;
+    listUserProviders(): Promise<UserProvidersResponse>;
+    addProvider(body: AddProviderRequest): Promise<AddProviderResponse>;
+    deleteUserProvider(providerId: string): Promise<ModelMutationResponse>;
+    discoverProviderModels(baseUrl: string, apiKey?: string): Promise<DiscoverModelsResponse>;
 
     sendAgentFeedback(agentId: string, body: AgentFeedbackRequest): Promise<AgentFeedbackResponse>;
 }
