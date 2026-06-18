@@ -10,6 +10,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-model-catalog';
 import {
     BrowseModel, InstalledModel, ProviderInfo, ProviderPreset, UserProvider,
 } from 'soriku-engine-client-ext/lib/common/engine-types';
@@ -26,6 +27,9 @@ export class SorikuModelsWidget extends ReactWidget {
 
     @inject(MessageService)
     protected readonly messages: MessageService;
+
+    @inject(SorikuModelCatalog)
+    protected readonly catalog: SorikuModelCatalog;
 
     protected providers: ProviderInfo[] = [];
     protected userProviders: UserProvider[] = [];
@@ -89,6 +93,12 @@ export class SorikuModelsWidget extends ReactWidget {
         this.update();
     }
 
+    /** Refresh and notify other views (chat pickers) that the catalog changed. */
+    protected async mutated(): Promise<void> {
+        await this.refresh();
+        this.catalog.notifyChanged();
+    }
+
     // ── Pull ────────────────────────────────────────────────────────
     protected async pull(): Promise<void> {
         const name = this.pullName.trim();
@@ -120,7 +130,7 @@ export class SorikuModelsWidget extends ReactWidget {
             this.pulling = false;
             this.pullStatus = '';
             this.pullPercent = undefined;
-            await this.refresh();
+            await this.mutated();
         }
     }
 
@@ -134,7 +144,7 @@ export class SorikuModelsWidget extends ReactWidget {
             } else {
                 await this.engineClient.deactivateModel(model.id);
             }
-            await this.refresh();
+            await this.mutated();
         } catch (e) {
             this.messages.error(`Could not update ${model.id}: ${(e as Error).message}`);
         } finally {
@@ -157,7 +167,7 @@ export class SorikuModelsWidget extends ReactWidget {
         this.update();
         try {
             await this.engineClient.deleteModel(model.id);
-            await this.refresh();
+            await this.mutated();
         } catch (e) {
             this.messages.error(`Could not delete ${model.id}: ${(e as Error).message}`);
         } finally {
@@ -196,7 +206,7 @@ export class SorikuModelsWidget extends ReactWidget {
                 }
             }
             this.messages.info(`Installed ${model.model_id}.`);
-            await this.refresh();
+            await this.mutated();
         } catch (e) {
             this.messages.error(`Install failed: ${(e as Error).message}`);
         } finally {
@@ -243,7 +253,7 @@ export class SorikuModelsWidget extends ReactWidget {
             this.apiKey = '';
             this.baseUrl = '';
             this.displayName = '';
-            await this.refresh();
+            await this.mutated();
         } catch (e) {
             this.messages.error(`Could not add provider: ${(e as Error).message}`);
         } finally {
@@ -264,7 +274,7 @@ export class SorikuModelsWidget extends ReactWidget {
         }
         try {
             await this.engineClient.deleteUserProvider(provider.id);
-            await this.refresh();
+            await this.mutated();
         } catch (e) {
             this.messages.error(`Could not remove provider: ${(e as Error).message}`);
         }

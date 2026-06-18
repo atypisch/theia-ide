@@ -9,6 +9,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-model-catalog';
 import { ChatMode, ChatStreamParams, ProviderInfo, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
@@ -73,6 +74,9 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
+    @inject(SorikuModelCatalog)
+    protected readonly catalog: SorikuModelCatalog;
+
     protected conversation: ChatMessage[] = [];
     protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
     protected conversationId: string | undefined;
@@ -101,6 +105,12 @@ export class SorikuChatWidget extends ReactWidget {
         this.node.tabIndex = 0;
         this.addClass('soriku-chat-widget');
         this.toDispose.push(this.selection.onDidChangeActive(() => this.onAgentChanged()));
+        // Reload the model list + availability live when the catalog changes
+        // (a model pulled/removed or a provider added in the Manage Models view).
+        this.toDispose.push(this.catalog.onDidChange(() => {
+            this.loadModels();
+            this.loadProviders();
+        }));
         this.loadModels();
         this.loadProviders();
         this.update();
