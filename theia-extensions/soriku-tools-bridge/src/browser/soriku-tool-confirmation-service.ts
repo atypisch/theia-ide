@@ -17,7 +17,7 @@ import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/com
 import { describeToolConfirmation, parseConfirmToolEvent } from '../common/tool-confirmation';
 import {
     DELEGATED_TOOLS, ToolRequest, errorResult, formatDirectoryListing, formatWriteResult,
-    getNumberArg, getStringArg, okResult, parseToolRequestEvent, truncateToMaxLines,
+    getNumberArg, getStringArg, okResult, parseToolRequestEvent, pathKind, truncateToMaxLines,
 } from '../common/tool-delegation';
 
 @injectable()
@@ -149,10 +149,11 @@ export class SorikuToolConfirmationService {
         if (!root) {
             throw new Error('No workspace folder is open — open a folder to let agents use file tools.');
         }
-        if (!path) {
-            return root;
+        switch (pathKind(path)) {
+            case 'root': return root;
+            case 'absolute': return root.withPath(path);
+            default: return root.resolve(path);
         }
-        return path.startsWith('/') ? root.withPath(path) : root.resolve(path);
     }
 
     protected renderMessage(message: string): HTMLElement {

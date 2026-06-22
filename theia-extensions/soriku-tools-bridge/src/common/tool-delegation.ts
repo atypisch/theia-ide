@@ -73,6 +73,16 @@ export function truncateToMaxLines(content: string, maxLines = 200): string {
     return content;
 }
 
+/** How a tool `path` arg resolves against the workspace root. */
+export type PathKind = 'root' | 'absolute' | 'relative';
+
+export function pathKind(path: string): PathKind {
+    if (!path || !path.trim()) {
+        return 'root';
+    }
+    return path.startsWith('/') ? 'absolute' : 'relative';
+}
+
 export function okResult(result: string): ToolExecResult {
     return { result };
 }

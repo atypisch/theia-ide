@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, truncateToMaxLines,
+    DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind, truncateToMaxLines,
 } from '../common/tool-delegation';
 
 describe('parseToolRequestEvent', () => {
@@ -56,6 +56,20 @@ describe('formatDirectoryListing', () => {
 describe('formatWriteResult', () => {
     it('matches the engine file_write JSON shape', () => {
         assert.equal(formatWriteResult('/ws/a.txt', 'a.txt', 5), JSON.stringify({ written: '/ws/a.txt', filename: 'a.txt', size: 5 }));
+    });
+});
+
+describe('pathKind', () => {
+    it('empty/blank → root', () => {
+        assert.equal(pathKind(''), 'root');
+        assert.equal(pathKind('   '), 'root');
+    });
+    it('leading slash → absolute', () => {
+        assert.equal(pathKind('/Users/x/a.txt'), 'absolute');
+    });
+    it('otherwise → relative (resolved against workspace root)', () => {
+        assert.equal(pathKind('src/a.ts'), 'relative');
+        assert.equal(pathKind('a.txt'), 'relative');
     });
 });
 
