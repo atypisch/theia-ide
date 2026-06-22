@@ -53,3 +53,22 @@
     display: flex;
     justify-content: flex-end;
 }
+
+/* What this agent has learned (read-only) */
+.soriku-agent-learning {
+    margin-top: 14px;
+    border-top: 1px solid var(--theia-editorGroup-border);
+    padding-top: 8px;
+}
+
+.soriku-agent-learning-h {
+    font-weight: 600;
+    margin-top: 6px;
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-agent-learning-body ul {
+    margin: 2px 0 0;
+    padding-left: 18px;
+    font-size: var(--theia-ui-font-size0);
+}

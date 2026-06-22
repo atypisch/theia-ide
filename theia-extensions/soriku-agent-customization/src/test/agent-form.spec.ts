@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentPersona } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { buildUpdateRequest, toAgentForm } from '../common/agent-form';
+import { buildUpdateRequest, summarizeLearning, toAgentForm } from '../common/agent-form';
 
 function persona(over: Partial<AgentPersona> & { id: string }): AgentPersona {
     const base: AgentPersona = {
@@ -67,5 +67,38 @@ describe('buildUpdateRequest', () => {
         });
         assert.ok(!('visibility' in body));
         assert.equal(body.preferred_model, '');
+    });
+});
+
+describe('summarizeLearning', () => {
+    it('extracts feedback rules, quality scores, stack and stats', () => {
+        const p = persona({
+            id: 'a1',
+            intelligence: {
+                system_prompt: '',
+                // richer engine shape (objects), read defensively
+                domain_rules: [
+                    { rule: "Adreseer 'kubernetes' expliciet.", weight: 0.8, source: 'feedback' },
+                    { rule: 'Template rule', weight: 1.0, source: 'template' },
+                ],
+            } as unknown as AgentPersona['intelligence'],
+            learning: { quality_scores: { coding: { ratio: 0.83, count: 6 } } } as unknown as AgentPersona['learning'],
+            memory: { stack_fingerprint: { confirmed: ['kubernetes', 'fastapi'] } } as unknown as AgentPersona['memory'],
+            stats: { interactions: 9, positive_feedback: 5, negative_feedback: 1 } as unknown as AgentPersona['stats'],
+        });
+        const l = summarizeLearning(p);
+        assert.deepEqual(l.feedbackRules, ["Adreseer 'kubernetes' expliciet."]); // template rule excluded
+        assert.deepEqual(l.qualityScores, [{ category: 'coding', ratio: 0.83, count: 6 }]);
+        assert.deepEqual(l.stack, ['kubernetes', 'fastapi']);
+        assert.equal(l.interactions, 9);
+        assert.equal(l.positive, 5);
+        assert.equal(l.negative, 1);
+    });
+
+    it('is empty-safe for a fresh agent', () => {
+        const l = summarizeLearning(persona({ id: 'a2' }));
+        assert.deepEqual(l.feedbackRules, []);
+        assert.deepEqual(l.qualityScores, []);
+        assert.equal(l.interactions, 0);
     });
 });

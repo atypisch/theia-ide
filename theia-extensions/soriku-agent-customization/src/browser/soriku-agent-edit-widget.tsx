@@ -9,12 +9,13 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { AgentForm, buildUpdateRequest, toAgentForm } from '../common/agent-form';
+import { AgentForm, LearningSummary, buildUpdateRequest, summarizeLearning, toAgentForm } from '../common/agent-form';
 
 interface EditState {
     status: 'empty' | 'loading' | 'error' | 'ready' | 'saving';
     agentId?: string;
     form?: AgentForm;
+    learning?: LearningSummary;
     error?: string;
 }
 
@@ -56,7 +57,11 @@ export class SorikuAgentEditWidget extends ReactWidget {
         this.update();
         try {
             const response = await this.engineClient.getAgent(agentId);
-            this.state = { status: 'ready', agentId, form: toAgentForm(response.data) };
+            this.state = {
+                status: 'ready', agentId,
+                form: toAgentForm(response.data),
+                learning: summarizeLearning(response.data),
+            };
             this.title.label = `Edit: ${response.data.name || agentId}`;
         } catch (e) {
             this.state = { status: 'error', agentId, error: (e as Error).message };
@@ -130,6 +135,40 @@ export class SorikuAgentEditWidget extends ReactWidget {
                     {saving ? 'Saving…' : 'Save'}
                 </button>
             </div>
+            {this.renderLearning()}
+        </div>;
+    }
+
+    /** Read-only view of what this agent has learned from feedback/use. */
+    protected renderLearning(): React.ReactNode {
+        const l = this.state.learning;
+        if (!l) {
+            return undefined;
+        }
+        const empty = l.feedbackRules.length === 0 && l.qualityScores.length === 0
+            && l.stack.length === 0 && l.interactions === 0;
+        return <div className='soriku-agent-learning'>
+            <label className='soriku-agent-edit-label'>What this agent has learned</label>
+            {empty
+                ? <div className='soriku-agent-edit-note'>No learning yet — give the agent feedback (👍/👎) in chat.</div>
+                : <div className='soriku-agent-learning-body'>
+                    <div className='soriku-agent-edit-note'>
+                        {l.interactions} interactions · 👍 {l.positive} · 👎 {l.negative}
+                    </div>
+                    {l.feedbackRules.length > 0 && <div>
+                        <div className='soriku-agent-learning-h'>Rules learned from feedback</div>
+                        <ul>{l.feedbackRules.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                    </div>}
+                    {l.qualityScores.length > 0 && <div>
+                        <div className='soriku-agent-learning-h'>Quality by category</div>
+                        <ul>{l.qualityScores.map((q, i) =>
+                            <li key={i}>{q.category}: {Math.round(q.ratio * 100)}% positive ({q.count})</li>)}</ul>
+                    </div>}
+                    {l.stack.length > 0 && <div>
+                        <div className='soriku-agent-learning-h'>Detected stack</div>
+                        <div>{l.stack.join(', ')}</div>
+                    </div>}
+                </div>}
         </div>;
     }
 
