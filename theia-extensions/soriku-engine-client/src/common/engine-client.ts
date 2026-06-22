@@ -20,6 +20,8 @@ import {
     ChatStreamParams,
     ConfirmRequest,
     ConfirmResponse,
+    ConversationDetail,
+    ConversationSummary,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
     HealthResponse,
@@ -29,6 +31,7 @@ import {
     ProviderPresetsResponse,
     ProvidersResponse,
     RecommendedRoutingResponse,
+    RenameConversationResponse,
     RoutingGapsResponse,
     RoutingOverridesResponse,
     SetRoutingOverrideRequest,
@@ -79,6 +82,12 @@ export interface EngineClient {
     activateModel(modelId: string): Promise<ModelMutationResponse>;
     deactivateModel(modelId: string): Promise<ModelMutationResponse>;
     browseModels(query: string): Promise<BrowseModelsResponse>;
+
+    // ── Conversation history ──
+    listConversations(): Promise<ConversationSummary[]>;
+    getConversation(id: string): Promise<ConversationDetail>;
+    deleteConversation(id: string): Promise<ModelMutationResponse>;
+    renameConversation(id: string, title: string): Promise<RenameConversationResponse>;
 
     // ── Provider management ──
     listProviderPresets(): Promise<ProviderPresetsResponse>;

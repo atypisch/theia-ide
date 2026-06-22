@@ -243,6 +243,40 @@ export interface DiscoverModelsResponse {
     models: DiscoveredModel[];
 }
 
+export interface ConversationSummary {
+    id: string;
+    title: string;
+    created_at: string;
+    message_count: number;
+    project_id?: string | null;
+    persona_id?: string | null;
+    visibility?: string;
+}
+
+export interface ConversationMessage {
+    role: string;
+    content: string;
+    model?: string | null;
+    mode?: string | null;
+    timestamp?: string;
+    [key: string]: unknown;
+}
+
+export interface ConversationDetail {
+    id: string;
+    title: string;
+    created_at?: string;
+    messages: ConversationMessage[];
+    persona_id?: string | null;
+    project_id?: string | null;
+    [key: string]: unknown;
+}
+
+export interface RenameConversationResponse {
+    ok: boolean;
+    title: string;
+}
+
 /** Generic ok/status response for model mutations (delete/activate/…). */
 export interface ModelMutationResponse {
     ok?: boolean;

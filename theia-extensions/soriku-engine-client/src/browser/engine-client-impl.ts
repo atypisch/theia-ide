@@ -26,6 +26,8 @@ import {
     ChatStreamParams,
     ConfirmRequest,
     ConfirmResponse,
+    ConversationDetail,
+    ConversationSummary,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
     EngineClientConfig,
@@ -36,6 +38,7 @@ import {
     ProviderPresetsResponse,
     ProvidersResponse,
     RecommendedRoutingResponse,
+    RenameConversationResponse,
     RoutingGapsResponse,
     RoutingOverridesResponse,
     SetRoutingOverrideRequest,
@@ -202,6 +205,22 @@ export class EngineClientImpl implements EngineClient {
 
     async browseModels(query: string): Promise<BrowseModelsResponse> {
         return this.createTransport().getJson<BrowseModelsResponse>(`/api/models/browse?q=${encodeURIComponent(query)}&limit=40`);
+    }
+
+    async listConversations(): Promise<ConversationSummary[]> {
+        return this.createTransport().getJson<ConversationSummary[]>('/api/conversations');
+    }
+
+    async getConversation(id: string): Promise<ConversationDetail> {
+        return this.createTransport().getJson<ConversationDetail>(`/api/conversations/${encodeURIComponent(id)}`);
+    }
+
+    async deleteConversation(id: string): Promise<ModelMutationResponse> {
+        return this.createTransport().deleteJson<ModelMutationResponse>(`/api/conversations/${encodeURIComponent(id)}`);
+    }
+
+    async renameConversation(id: string, title: string): Promise<RenameConversationResponse> {
+        return this.createTransport().postJson<RenameConversationResponse>(`/api/conversations/${encodeURIComponent(id)}/rename`, { title });
     }
 
     async listProviderPresets(): Promise<ProviderPresetsResponse> {
