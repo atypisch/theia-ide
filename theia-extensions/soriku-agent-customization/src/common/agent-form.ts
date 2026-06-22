@@ -18,6 +18,42 @@ export interface AgentForm {
     preferredModel: string;
     visibility: string;
     systemPrompt: string;
+    /** Editable "keyword: weight" lines, one per decision pattern. */
+    decisionPatternsText: string;
+}
+
+/** Read `memory.decision_patterns.patterns` defensively into "keyword: weight" lines. */
+export function decisionPatternsToText(persona: AgentPersona): string {
+    const raw = persona as unknown as Record<string, unknown>;
+    const memory = (raw.memory && typeof raw.memory === 'object' ? raw.memory : {}) as Record<string, unknown>;
+    const dp = (memory.decision_patterns && typeof memory.decision_patterns === 'object'
+        ? memory.decision_patterns : {}) as Record<string, unknown>;
+    const patterns = (dp.patterns && typeof dp.patterns === 'object' ? dp.patterns : {}) as Record<string, unknown>;
+    return Object.entries(patterns)
+        .filter(([, w]) => typeof w === 'number')
+        .map(([k, w]) => `${k}: ${w as number}`)
+        .join('\n');
+}
+
+/** Parse "keyword: weight" lines into a {keyword: weight in [0,1]} map (drops invalid lines). */
+export function parseDecisionPatterns(text: string): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const line of (text || '').split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            continue;
+        }
+        const idx = trimmed.lastIndexOf(':');
+        if (idx <= 0) {
+            continue;
+        }
+        const key = trimmed.slice(0, idx).trim();
+        const weight = Number(trimmed.slice(idx + 1).trim());
+        if (key && Number.isFinite(weight)) {
+            out[key] = Math.max(0, Math.min(1, weight));
+        }
+    }
+    return out;
 }
 
 export function toAgentForm(persona: AgentPersona): AgentForm {
@@ -28,6 +64,7 @@ export function toAgentForm(persona: AgentPersona): AgentForm {
         preferredModel: persona.preferred_model ?? '',
         visibility: persona.simezu?.visibility ?? '',
         systemPrompt: persona.intelligence?.system_prompt ?? '',
+        decisionPatternsText: decisionPatternsToText(persona),
     };
 }
 
@@ -107,5 +144,6 @@ export function buildUpdateRequest(form: AgentForm): AgentUpdateRequest {
     if (visibility) {
         body.visibility = visibility;
     }
+    body.decision_patterns = parseDecisionPatterns(form.decisionPatternsText);
     return body;
 }

@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentPersona } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { buildUpdateRequest, summarizeLearning, toAgentForm } from '../common/agent-form';
+import { buildUpdateRequest, decisionPatternsToText, parseDecisionPatterns, summarizeLearning, toAgentForm } from '../common/agent-form';
 
 function persona(over: Partial<AgentPersona> & { id: string }): AgentPersona {
     const base: AgentPersona = {
@@ -37,6 +37,7 @@ describe('toAgentForm', () => {
             preferredModel: 'auto',
             visibility: 'private',
             systemPrompt: 'You are Koda.',
+            decisionPatternsText: '',
         });
     });
 
@@ -53,20 +54,25 @@ describe('buildUpdateRequest', () => {
         const body = buildUpdateRequest({
             name: ' Koda ', role: ' reviewer ', description: 'd',
             preferredModel: ' auto ', visibility: 'team', systemPrompt: 'sp',
+            decisionPatternsText: 'kubernetes: 0.8\nreact: 1.5\nbad line\n: 0.2',
         });
         assert.equal(body.name, 'Koda');
         assert.equal(body.role, 'reviewer');
         assert.equal(body.preferred_model, 'auto');
         assert.equal(body.system_prompt, 'sp');
         assert.equal(body.visibility, 'team');
+        // parsed + clamped; junk/empty-key lines dropped
+        assert.deepEqual(body.decision_patterns, { kubernetes: 0.8, react: 1 });
     });
 
     it('omits visibility when blank', () => {
         const body = buildUpdateRequest({
-            name: 'x', role: '', description: '', preferredModel: '', visibility: '   ', systemPrompt: '',
+            name: 'x', role: '', description: '', preferredModel: '', visibility: '   ',
+            systemPrompt: '', decisionPatternsText: '',
         });
         assert.ok(!('visibility' in body));
         assert.equal(body.preferred_model, '');
+        assert.deepEqual(body.decision_patterns, {});
     });
 });
 
@@ -100,5 +106,25 @@ describe('summarizeLearning', () => {
         assert.deepEqual(l.feedbackRules, []);
         assert.deepEqual(l.qualityScores, []);
         assert.equal(l.interactions, 0);
+    });
+});
+
+describe('decision patterns round-trip', () => {
+    it('reads patterns into "key: weight" lines', () => {
+        const text = decisionPatternsToText(persona({
+            id: 'a1',
+            memory: { decision_patterns: { patterns: { kubernetes: 0.8, react: 0.5 } } } as unknown as AgentPersona['memory'],
+        }));
+        assert.equal(text, 'kubernetes: 0.8\nreact: 0.5');
+    });
+    it('parses, clamps to 0..1 and drops invalid lines', () => {
+        assert.deepEqual(
+            parseDecisionPatterns('kubernetes: 0.8\nreact: 2\nneg: -1\nnope\n: 0.3\n  '),
+            { kubernetes: 0.8, react: 1, neg: 0 },
+        );
+    });
+    it('is empty-safe', () => {
+        assert.deepEqual(parseDecisionPatterns(''), {});
+        assert.equal(decisionPatternsToText(persona({ id: 'a2' })), '');
     });
 });

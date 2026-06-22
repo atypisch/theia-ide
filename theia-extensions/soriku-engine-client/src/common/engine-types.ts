@@ -85,6 +85,8 @@ export interface AgentUpdateRequest {
     system_prompt?: string;
     preferred_model?: string | null;
     visibility?: string;
+    /** Editable keyword→weight decision patterns (memory.decision_patterns). */
+    decision_patterns?: Record<string, number>;
 }
 
 export interface ChatContextItem {

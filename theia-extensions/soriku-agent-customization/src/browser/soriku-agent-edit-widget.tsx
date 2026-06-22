@@ -39,6 +39,7 @@ export class SorikuAgentEditWidget extends ReactWidget {
     protected modelRef = React.createRef<HTMLInputElement>();
     protected visibilityRef = React.createRef<HTMLInputElement>();
     protected promptRef = React.createRef<HTMLTextAreaElement>();
+    protected decisionPatternsRef = React.createRef<HTMLTextAreaElement>();
 
     @postConstruct()
     protected init(): void {
@@ -77,6 +78,7 @@ export class SorikuAgentEditWidget extends ReactWidget {
             preferredModel: this.modelRef.current?.value ?? '',
             visibility: this.visibilityRef.current?.value ?? '',
             systemPrompt: this.promptRef.current?.value ?? '',
+            decisionPatternsText: this.decisionPatternsRef.current?.value ?? '',
         };
     }
 
@@ -125,6 +127,14 @@ export class SorikuAgentEditWidget extends ReactWidget {
                 className='theia-input soriku-agent-edit-prompt'
                 rows={12}
                 defaultValue={form.systemPrompt}
+            />
+            <label className='soriku-agent-edit-label'>Decision patterns (one “keyword: weight” per line, 0–1)</label>
+            <textarea
+                ref={this.decisionPatternsRef}
+                className='theia-input soriku-agent-edit-prompt'
+                rows={5}
+                placeholder={'kubernetes: 0.8\nreact: 0.5'}
+                defaultValue={form.decisionPatternsText}
             />
             <div className='soriku-agent-edit-note'>
                 Per-agent tool whitelist and routing mode are not yet persisted by the engine.
