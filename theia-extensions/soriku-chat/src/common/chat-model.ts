@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { ConversationMessage, SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 
 export interface ChatToolCall {
     callId?: string;
@@ -263,6 +263,33 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             break;
     }
     return next;
+}
+
+/**
+ * Map a stored engine conversation (user/assistant messages) into chat view
+ * messages, so a saved conversation can be reopened with its history. Empty
+ * assistant placeholders and non user/assistant roles are skipped; tool/plan
+ * detail isn't re-streamed (history shows the final text).
+ */
+export function fromEngineMessages(messages: ConversationMessage[]): ChatMessage[] {
+    const out: ChatMessage[] = [];
+    messages.forEach((m, i) => {
+        const text = typeof m.content === 'string' ? m.content : '';
+        if (m.role === 'user') {
+            out.push({ role: 'user', id: `h${i}`, text });
+        } else if (m.role === 'assistant' && text) {
+            out.push({
+                role: 'assistant',
+                id: `h${i}`,
+                text,
+                model: m.model ?? undefined,
+                toolCalls: [],
+                workers: [],
+                status: 'done',
+            });
+        }
+    });
+    return out;
 }
 
 /** Human-readable label for the busy indicator while a turn is still streaming. */

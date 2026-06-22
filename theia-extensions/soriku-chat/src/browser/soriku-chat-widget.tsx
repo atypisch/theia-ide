@@ -8,8 +8,10 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService } from '@theia/core/lib/common';
+import { StorageService } from '@theia/core/lib/browser/storage-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-model-catalog';
+import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { ChatMode, ChatStreamParams, ProviderInfo, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
@@ -19,8 +21,13 @@ import {
     ChatToolCall,
     busyPhase,
     createAssistantTurn,
+    fromEngineMessages,
     reduceSseEvent,
 } from '../common/chat-model';
+
+/** Persisted (across reloads) pointer to the chat the user was last in. */
+const ACTIVE_CHAT_STORAGE_KEY = 'soriku.chat.active';
+interface ActiveChatState { conversationId: string; agentId?: string; agentName?: string; }
 
 /** How the agent works (Cursor-style behaviour), independent of model choice. */
 type AgentBehavior = 'auto' | 'edit' | 'plan' | 'chat';
@@ -77,6 +84,15 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuModelCatalog)
     protected readonly catalog: SorikuModelCatalog;
 
+    @inject(SorikuConversationLink)
+    protected readonly conversationLink: SorikuConversationLink;
+
+    @inject(StorageService)
+    protected readonly storage: StorageService;
+
+    /** When restoring/loading a saved chat, suppress the agent-change reset. */
+    protected restoring = false;
+
     protected conversation: ChatMessage[] = [];
     protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
     protected conversationId: string | undefined;
@@ -111,9 +127,59 @@ export class SorikuChatWidget extends ReactWidget {
             this.loadModels();
             this.loadProviders();
         }));
+        // Open a stored conversation when the user picks one in the history panel.
+        this.toDispose.push(this.conversationLink.onDidRequestOpen(id => {
+            this.loadConversation(id).catch(e => this.messages.error(`Could not open conversation: ${(e as Error).message}`));
+        }));
         this.loadModels();
         this.loadProviders();
+        this.restoreActiveChat();
         this.update();
+    }
+
+    /** Resume the last active conversation across IDE reloads. */
+    protected async restoreActiveChat(): Promise<void> {
+        let state: ActiveChatState | undefined;
+        try {
+            state = await this.storage.getData<ActiveChatState | undefined>(ACTIVE_CHAT_STORAGE_KEY, undefined);
+        } catch {
+            return;
+        }
+        if (state?.conversationId) {
+            await this.loadConversation(state.conversationId, state.agentId, state.agentName).catch(() => { /* stale id — ignore */ });
+        }
+    }
+
+    /** Load a stored conversation (messages + context) into the chat. */
+    protected async loadConversation(id: string, agentIdHint?: string, agentNameHint?: string): Promise<void> {
+        const conv = await this.engineClient.getConversation(id);
+        const agentId = (conv.persona_id as string | undefined) ?? agentIdHint;
+        this.restoring = true;
+        try {
+            if (agentId) {
+                this.selection.setActive(agentId, agentNameHint);
+            }
+        } finally {
+            this.restoring = false;
+        }
+        this.conversation = fromEngineMessages(conv.messages ?? []);
+        this.conversationId = conv.id;
+        this.feedbackByTurn.clear();
+        this.persistActiveChat();
+        this.update();
+    }
+
+    /** Persist the active conversation pointer for reload-resume. */
+    protected persistActiveChat(): void {
+        if (!this.conversationId) {
+            return;
+        }
+        const state: ActiveChatState = {
+            conversationId: this.conversationId,
+            agentId: this.selection.getActiveId(),
+            agentName: this.selection.getActiveName(),
+        };
+        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, state).catch(() => { /* best-effort */ });
     }
 
     /** Load the model list once for the Single-model picker (chat-capable models only). */
@@ -156,11 +222,17 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Switching the active agent starts a fresh conversation (no cross-agent history). */
     protected onAgentChanged(): void {
+        // Loading a saved conversation re-selects its agent; don't wipe it then.
+        if (this.restoring) {
+            return;
+        }
         this.abortController?.abort();
         this.conversation = [];
         this.feedbackByTurn.clear();
         this.conversationId = undefined;
         this.streaming = false;
+        // Explicit agent switch starts fresh — forget the resumed pointer.
+        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
         this.update();
     }
 
@@ -206,8 +278,9 @@ export class SorikuChatWidget extends ReactWidget {
                     turn = { ...turn, planNeedsApproval: true };
                 }
                 this.conversation[turnIndex] = turn;
-                if (turn.conversationId) {
+                if (turn.conversationId && turn.conversationId !== this.conversationId) {
                     this.conversationId = turn.conversationId;
+                    this.persistActiveChat();
                 }
                 if (event.type === 'confirm_tool') {
                     // Fire-and-forget: the engine blocks until /api/worker/confirm, then the stream

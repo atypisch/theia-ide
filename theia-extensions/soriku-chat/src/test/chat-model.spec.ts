@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, busyPhase, createAssistantTurn, reduceSseEvent } from '../common/chat-model';
+import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
     return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
@@ -157,6 +157,32 @@ describe('reduceSseEvent', () => {
         ]);
         assert.equal(turn.awaitingApproval, false);
         assert.equal(turn.status, 'done');
+    });
+});
+
+describe('fromEngineMessages', () => {
+    it('maps user + assistant turns and keeps the model', () => {
+        const msgs = fromEngineMessages([
+            { role: 'user', content: 'hello' },
+            { role: 'assistant', content: 'hi there', model: 'qwen2.5-coder:7b' },
+        ]);
+        assert.equal(msgs.length, 2);
+        assert.equal(msgs[0].role, 'user');
+        assert.equal((msgs[0] as { text: string }).text, 'hello');
+        const a = msgs[1] as AssistantTurn;
+        assert.equal(a.role, 'assistant');
+        assert.equal(a.text, 'hi there');
+        assert.equal(a.model, 'qwen2.5-coder:7b');
+        assert.equal(a.status, 'done');
+    });
+    it('skips empty assistant placeholders and non user/assistant roles', () => {
+        const msgs = fromEngineMessages([
+            { role: 'system', content: 'sys' },
+            { role: 'user', content: 'q' },
+            { role: 'assistant', content: '' },
+        ]);
+        assert.equal(msgs.length, 1);
+        assert.equal(msgs[0].role, 'user');
     });
 });
 
