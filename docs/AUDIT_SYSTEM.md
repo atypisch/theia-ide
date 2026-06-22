@@ -77,11 +77,11 @@ profile). See `docs/PROOF_AGENT_LEARNING.md`.
 | # | Pri | Finding | Recommendation | Status |
 |---|-----|---------|----------------|--------|
 | C0 | — | No critical, broken, or insecure behaviour found in the IDE/engine paths exercised. | — | — |
-| H1 | High | Small local models (qwen2.5-coder:7b, qwen3:8b) reliably print fenced code instead of calling `file_write`, so **agent file edits are unreliable** even though native tool-calling is enabled and the delegation→disk path works (read proven). | Use a stronger tool-calling model for edits (Claude/GPT/large local), OR add an opt-in fallback that parses a fenced ```lang\n# filename: …``` block into a `file_write` tool call. | open (needs go/no-go) |
-| H2 | High | `decision_patterns` + `quality_scores` are persisted but never consumed. | Either wire `quality_scores` into routing/agent display, or remove the dead write paths. | open (design) |
+| H1 | High | Small local models (qwen2.5-coder:7b, qwen3:8b) reliably print fenced code instead of calling `file_write`, so **agent file edits were unreliable**. | The worker loop now converts a fenced `# filename: <path>` block into a real (confirmed) `file_write`. | **FIXED** (engine `ea025fe`; verified: file on disk) |
+| H2 | High | `decision_patterns` + `quality_scores` persisted but never surfaced/consumed. | The agent edit view now shows learned domain rules, quality ratios, stack and feedback stats. | **FIXED** (IDE `e77986d`) — `decision_patterns` still unused (kept as scaffold) |
 | H3 | Med | Conversations created before persona binding have `persona_id: null`, so "resume with same agent" only works for new chats. | Acceptable; optionally backfill from the first message's agent. | accepted |
-| H4 | Med | `gemini.py`/`custom.py` health probe `/models`, so a valid key with exhausted quota/credits can still read as healthy (unlike `claude.py`'s completion probe). | Optionally switch to a 1-token completion probe like `claude.py`. | open (low) |
-| M1 | Med | `tests/perf/test_tracer_overhead.py` asserts <5% overhead and fails under concurrent machine load (saw 13.8% while builds+engine+IDE ran). | Mark as a perf-only suite (run in isolation) rather than loosen the threshold (which would mask real regressions). | open |
+| H4 | Med | `gemini.py`/`custom.py` health probed `/models`, so a valid key with exhausted quota/credits read as healthy. | Both now do a 1-token completion probe and classify 400/402/403 as unhealthy with the real message (like `claude.py`). | **FIXED** (engine `a05b976`) |
+| M1 | Med | `tests/perf/test_tracer_overhead.py` asserts <5% overhead and fails under concurrent machine load. | `pytest.ini` deselects `-m perf` by default; run perf in isolation with `pytest -m perf`. | **FIXED** (engine `f87a10f`) |
 | M2 | Low | Missing `DEFORK_5_*` final-state/handoff docs from the original plan. | Author when the de-fork branch is finalised. | open |
 
 ## 7. How to run / verify (operational)
