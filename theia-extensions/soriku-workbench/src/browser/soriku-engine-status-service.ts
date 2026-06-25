@@ -7,6 +7,7 @@
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { Emitter, Event } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { EngineConnectionState } from '../common/engine-status';
 
 @injectable()
@@ -14,6 +15,9 @@ export class SorikuEngineStatusService {
 
     @inject(EngineClient)
     protected readonly engineClient: EngineClient;
+
+    @inject(SorikuConversationLink)
+    protected readonly conversationLink: SorikuConversationLink;
 
     protected state: EngineConnectionState = { status: 'idle', baseUrl: '' };
 
@@ -31,6 +35,7 @@ export class SorikuEngineStatusService {
         try {
             await this.engineClient.ping();
             this.setState({ status: 'connected', baseUrl });
+            this.conversationLink.notifyChanged();
         } catch (e) {
             this.setState({ status: 'unreachable', baseUrl, error: (e as Error).message });
         }

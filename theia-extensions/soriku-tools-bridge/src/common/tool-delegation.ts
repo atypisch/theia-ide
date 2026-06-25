@@ -23,7 +23,9 @@ export interface ToolRequest {
  * as `client_tools`; everything else stays server-side. Filesystem-scoped tools
  * only — shell/search/document generation remain on the engine for now.
  */
-export const DELEGATED_TOOLS: readonly string[] = ['file_read', 'file_write', 'list_directory'];
+export const DELEGATED_TOOLS: readonly string[] = [
+    'file_read', 'file_write', 'list_directory', 'apply_patch', 'project_search', 'shell_exec',
+];
 
 /** Extract a delegated tool request from a `tool_request` SSE event, or undefined if malformed. */
 export function parseToolRequestEvent(event: SorikuSseEvent): ToolRequest | undefined {
@@ -85,6 +87,49 @@ export function pathKind(path: string): PathKind {
 
 export function okResult(result: string): ToolExecResult {
     return { result };
+}
+
+/** Apply a minimal unified-diff patch (single-file, @@ hunks). */
+export function applyUnifiedPatch(original: string, patch: string): string {
+    const lines = original.split('\n');
+    const patchLines = patch.split('\n');
+    let i = 0;
+    while (i < patchLines.length) {
+        const header = patchLines[i];
+        if (!header.startsWith('@@')) {
+            i++;
+            continue;
+        }
+        const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(header);
+        if (!match) {
+            throw new Error('Invalid patch hunk header');
+        }
+        let lineNo = parseInt(match[1], 10) - 1;
+        i++;
+        while (i < patchLines.length && !patchLines[i].startsWith('@@')) {
+            const pl = patchLines[i];
+            if (pl.startsWith(' ')) {
+                lineNo++;
+            } else if (pl.startsWith('-')) {
+                lines.splice(lineNo, 1);
+            } else if (pl.startsWith('+')) {
+                lines.splice(lineNo, 0, pl.slice(1));
+                lineNo++;
+            }
+            i++;
+        }
+    }
+    return lines.join('\n');
+}
+
+/** Format project_search hits like the engine tool. */
+export function formatSearchResults(hits: { path: string; line: number; text: string }[], capped = 50): string {
+    if (hits.length === 0) {
+        return '(no matches)';
+    }
+    const shown = hits.slice(0, capped);
+    const body = shown.map(h => `${h.path}:${h.line}: ${h.text}`).join('\n');
+    return hits.length > capped ? `${body}\n... and ${hits.length - capped} more` : body;
 }
 
 export function errorResult(error: string): ToolExecResult {

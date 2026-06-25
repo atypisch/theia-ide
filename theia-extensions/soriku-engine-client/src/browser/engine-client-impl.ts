@@ -30,6 +30,7 @@ import {
     ConversationSummary,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
+    ExecutePlanRequest,
     EngineClientConfig,
     HealthResponse,
     InstalledModelsResponse,
@@ -127,10 +128,13 @@ export class EngineClientImpl implements EngineClient {
             tools_enabled: params.toolsEnabled,
             stream: true,
             client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
+            pilot_tools: params.mode === 'plan' || params.mode === 'single' || params.mode === 'auto' ? true : undefined,
+            context: params.context && params.context.length > 0 ? params.context : undefined,
+            plan_auto_execute: params.mode === 'plan' ? false : params.planAutoExecute,
+            routing_strategy: params.routingStrategy,
         };
-        const path = params.useWorker === false ? '/api/chat' : '/api/worker';
         const transport = this.createTransport();
-        for await (const event of transport.postSse(path, body, signal)) {
+        for await (const event of transport.postSse('/api/worker', body, signal)) {
             yield event;
         }
     }
@@ -139,8 +143,11 @@ export class EngineClientImpl implements EngineClient {
         return this.createTransport().postJson<ConfirmResponse>('/api/worker/confirm', body);
     }
 
-    async executePlan(planId: string): Promise<PlanSignalResponse> {
-        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/execute`, {});
+    async executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(
+            `/api/plan/${encodeURIComponent(planId)}/execute`,
+            body ?? {},
+        );
     }
 
     async cancelPlan(planId: string): Promise<PlanSignalResponse> {
@@ -201,6 +208,10 @@ export class EngineClientImpl implements EngineClient {
 
     async deactivateModel(modelId: string): Promise<ModelMutationResponse> {
         return this.createTransport().postJson<ModelMutationResponse>(`/api/models/${encodeURIComponent(modelId)}/deactivate`, {});
+    }
+
+    async warmModel(modelId: string): Promise<ModelMutationResponse> {
+        return this.createTransport().postJson<ModelMutationResponse>(`/api/models/${encodeURIComponent(modelId)}/load`, {});
     }
 
     async browseModels(query: string): Promise<BrowseModelsResponse> {

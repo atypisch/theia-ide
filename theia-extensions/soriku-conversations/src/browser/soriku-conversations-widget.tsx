@@ -7,13 +7,14 @@
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
+import { Message } from '@theia/core/lib/browser/widgets/widget';
 import { CommandService, MessageService } from '@theia/core/lib/common';
 import { QuickInputService } from '@theia/core/lib/browser';
 import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { cleanTitle, relativeAge } from '../common/conversation-view';
+import { cleanTitle, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
 
 /** Chat view command (registered by soriku-chat) used to reveal the chat. */
 const SORIKU_CHAT_OPEN = 'soriku.chat.open';
@@ -43,6 +44,8 @@ export class SorikuConversationsWidget extends ReactWidget {
     protected loading = true;
     protected error?: string;
     protected busyIds = new Set<string>();
+    protected activeConversationId?: string;
+    protected refreshRetryTimer: number | undefined;
 
     @postConstruct()
     protected init(): void {
@@ -53,8 +56,25 @@ export class SorikuConversationsWidget extends ReactWidget {
         this.title.closable = true;
         this.node.tabIndex = 0;
         this.addClass('soriku-conversations-widget');
+        this.toDispose.push(this.link.onDidChange(() => this.refresh()));
+        this.toDispose.push(this.link.onDidRequestOpen(id => { this.activeConversationId = id; this.update(); }));
         this.update();
         this.refresh();
+    }
+
+    override onActivateRequest(msg: Message): void {
+        super.onActivateRequest(msg);
+        this.refresh();
+    }
+
+    protected scheduleRefreshRetry(): void {
+        if (this.refreshRetryTimer !== undefined) {
+            return;
+        }
+        this.refreshRetryTimer = window.setTimeout(() => {
+            this.refreshRetryTimer = undefined;
+            this.refresh();
+        }, 3000);
     }
 
     async refresh(): Promise<void> {
@@ -63,9 +83,12 @@ export class SorikuConversationsWidget extends ReactWidget {
         this.update();
         try {
             this.items = await this.engineClient.listConversations();
+            this.error = undefined;
         } catch (e) {
             this.error = (e as Error).message;
-            this.items = [];
+            if (this.items.length === 0) {
+                this.scheduleRefreshRetry();
+            }
         }
         this.loading = false;
         this.update();
@@ -130,7 +153,7 @@ export class SorikuConversationsWidget extends ReactWidget {
         const now = Date.now();
         return <div className='soriku-conversations'>
             <div className='soriku-conversations-toolbar'>
-                <span className='soriku-conversations-title'>Conversations</span>
+                <span className='soriku-conversations-title'>Conversations ({this.items.length})</span>
                 <button className='theia-button secondary' disabled={this.loading} onClick={() => this.refresh()}>
                     <span className='codicon codicon-refresh' /> Refresh
                 </button>
@@ -141,12 +164,22 @@ export class SorikuConversationsWidget extends ReactWidget {
                 : <ul className='soriku-conversations-list'>
                     {this.items.map(item => {
                         const busy = this.busyIds.has(item.id);
-                        return <li key={item.id} className='soriku-conversations-row'>
+                        const mode = modeFromTitle(item.title);
+                        const project = projectLabel(item.project_id);
+                        const active = item.id === this.activeConversationId;
+                        return <li key={item.id} className={`soriku-conversations-row${active ? ' active' : ''}`}>
                             <button className='soriku-conversations-open' title='Open conversation' disabled={busy}
                                 onClick={() => this.open(item)}>
-                                <span className='soriku-conversations-name'>{cleanTitle(item.title)}</span>
+                                <span className='soriku-conversations-name'>
+                                    {mode && <span className='soriku-conversations-mode'>{mode}</span>}
+                                    {cleanTitle(item.title)}
+                                </span>
                                 <span className='soriku-conversations-meta'>
-                                    {[relativeAge(item.created_at, now), `${item.message_count} msg`].filter(Boolean).join(' · ')}
+                                    {[
+                                        relativeAge(item.created_at, now),
+                                        `${item.message_count} msg`,
+                                        project,
+                                    ].filter(Boolean).join(' · ')}
                                 </span>
                             </button>
                             <button className='soriku-iconbtn' title='Rename' disabled={busy} onClick={() => this.rename(item)}>

@@ -9,18 +9,28 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService } from '@theia/core/lib/common';
 import { StorageService } from '@theia/core/lib/browser/storage-service';
+import { OpenerService } from '@theia/core/lib/browser/opener-service';
+import URI from '@theia/core/lib/common/uri';
+import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-model-catalog';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
-import { ChatMode, ChatStreamParams, ProviderInfo, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
+import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
+import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
+import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
+import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
+import { ChatMarkdown } from './chat-markdown-view';
 import {
     AssistantTurn,
     ChatMessage,
     ChatToolCall,
+    PlanTaskView,
     busyPhase,
     createAssistantTurn,
+    formatToolCallSummary,
     fromEngineMessages,
     reduceSseEvent,
 } from '../common/chat-model';
@@ -37,6 +47,14 @@ interface BehaviorOption {
     label: string;
     hint: string;
 }
+
+/** Short badge labels for non-clean tool outcomes (engine reliability signals). */
+const OUTCOME_LABELS: Record<string, string> = {
+    blocked: 'blocked',
+    salvaged: 'recovered',
+    denied: 'denied',
+    error: 'error',
+};
 
 const BEHAVIOR_OPTIONS: BehaviorOption[] = [
     { value: 'auto', label: 'Auto', hint: 'Soriku decides per task whether to plan or act directly.' },
@@ -60,6 +78,23 @@ const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
     { value: 'ensemble', label: 'Ensemble', hint: 'Several models you pick collaborate into one answer.' },
 ];
 
+/**
+ * Where compute runs, per request — local-first by default. Sent as
+ * `routingStrategy`; never changes the soriku web app's saved setting.
+ */
+interface RoutingOption {
+    value: RoutingStrategy;
+    label: string;
+    hint: string;
+}
+
+const ROUTING_OPTIONS: RoutingOption[] = [
+    { value: 'prefer_local', label: 'Local-first', hint: 'Local models only — nothing leaves this machine. Default.' },
+    { value: 'local_with_remote_conductor', label: 'Hybrid', hint: 'Local workers do the work; a stronger remote model may plan.' },
+    { value: 'balanced', label: 'Balanced', hint: 'Cost-aware mix of local and cloud models.' },
+    { value: 'prefer_quality', label: 'Best quality', hint: 'Pick the best model regardless of locality or cost (cloud allowed).' },
+];
+
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
 
@@ -81,14 +116,29 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
+    @inject(SorikuToolApprovalBridge)
+    protected readonly toolApproval: SorikuToolApprovalBridge;
+
+    @inject(SorikuEditorRevealService)
+    protected readonly editorReveal: SorikuEditorRevealService;
+
     @inject(SorikuModelCatalog)
     protected readonly catalog: SorikuModelCatalog;
 
     @inject(SorikuConversationLink)
     protected readonly conversationLink: SorikuConversationLink;
 
+    @inject(SorikuPlanLiveBridge)
+    protected readonly planLiveBridge: SorikuPlanLiveBridge;
+
     @inject(StorageService)
     protected readonly storage: StorageService;
+
+    @inject(WorkspaceService)
+    protected readonly workspaceService: WorkspaceService;
+
+    @inject(OpenerService)
+    protected readonly openerService: OpenerService;
 
     /** When restoring/loading a saved chat, suppress the agent-change reset. */
     protected restoring = false;
@@ -96,6 +146,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected conversation: ChatMessage[] = [];
     protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
     protected conversationId: string | undefined;
+    protected conversationTitle?: string;
     protected streaming = false;
     protected idSeq = 0;
     protected abortController: AbortController | undefined;
@@ -104,12 +155,41 @@ export class SorikuChatWidget extends ReactWidget {
     /** Controls: agent behaviour (Mode) + model orchestration (Models). */
     protected behavior: AgentBehavior = 'auto';
     protected orchestration: Orchestration = 'auto';
+    /**
+     * Per-request routing strategy — local-first by default (the soriku principle).
+     * Sent to the engine per request; never writes the global setting.
+     */
+    protected routingStrategy: RoutingStrategy = 'prefer_local';
     protected modelId = '';
     protected workerModels: string[] = [];
     protected models: V1ModelDescriptor[] = [];
     protected providers: ProviderInfo[] = [];
-    /** Plan ids currently being approved/cancelled (to disable the buttons). */
+    /** Plan id currently being approved/cancelled (to disable the buttons). */
     protected resolvingPlans = new Set<string>();
+    /** User-edited task goals keyed by plan id, then task id. */
+    protected planTaskEdits = new Map<string, Map<string, string>>();
+    /** Coalesce React re-renders during SSE streaming (Cursor-style ~60fps cap). */
+    protected updateScheduled = false;
+
+    protected scheduleUpdate(immediate = false): void {
+        if (immediate) {
+            this.updateScheduled = false;
+            this.update();
+            return;
+        }
+        if (this.updateScheduled) {
+            return;
+        }
+        this.updateScheduled = true;
+        requestAnimationFrame(() => {
+            this.updateScheduled = false;
+            this.update();
+        });
+    }
+    /** Live follow of an engine plan started outside this widget (CLI/API). */
+    protected externalFollowConvId?: string;
+    protected externalTurnIndex = -1;
+    protected approvalRememberSession = false;
 
     @postConstruct()
     protected init(): void {
@@ -131,6 +211,10 @@ export class SorikuChatWidget extends ReactWidget {
         this.toDispose.push(this.conversationLink.onDidRequestOpen(id => {
             this.loadConversation(id).catch(e => this.messages.error(`Could not open conversation: ${(e as Error).message}`));
         }));
+        this.toDispose.push(this.planLiveBridge.onDidReceivePlanEvent(event => {
+            void this.ingestLivePlanEvent(event);
+        }));
+        this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
         this.loadModels();
         this.loadProviders();
         this.restoreActiveChat();
@@ -164,9 +248,30 @@ export class SorikuChatWidget extends ReactWidget {
         }
         this.conversation = fromEngineMessages(conv.messages ?? []);
         this.conversationId = conv.id;
+        this.conversationTitle = conv.title;
+        this.conversationLink.notifyChanged();
         this.feedbackByTurn.clear();
         this.persistActiveChat();
         this.update();
+    }
+
+    /** Start a fresh conversation (keeps the active agent). */
+    protected startNewConversation(): void {
+        this.abortController?.abort();
+        this.conversation = [];
+        this.feedbackByTurn.clear();
+        this.conversationId = undefined;
+        this.conversationTitle = undefined;
+        this.streaming = false;
+        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
+        this.update();
+    }
+
+    /** Workspace root path sent to the engine as project_id. */
+    protected async workspaceProjectId(): Promise<string | undefined> {
+        const roots = await this.workspaceService.roots;
+        const path = roots[0]?.resource.path.toString();
+        return path && path.length > 0 ? path : undefined;
     }
 
     /** Persist the active conversation pointer for reload-resume. */
@@ -187,10 +292,26 @@ export class SorikuChatWidget extends ReactWidget {
         try {
             const response = await this.engineClient.listModels();
             this.models = (response.data ?? []).filter(m => !/embed/i.test(m.id));
+            this.warmSelectedModel();
             this.update();
         } catch {
             /* picker stays empty; modes other than Single are unaffected */
         }
+    }
+
+    /** Opportunistically preload the picked local model to cut first-token latency. */
+    protected warmSelectedModel(): void {
+        if (this.orchestration !== 'single' || !this.modelId) {
+            return;
+        }
+        const avail = this.modelAvailability(this.modelId);
+        if (!avail.ok) {
+            return;
+        }
+        const bare = this.modelId.includes(':')
+            ? this.modelId.slice(this.modelId.indexOf(':') + 1)
+            : this.modelId;
+        this.engineClient.warmModel(bare).catch(() => { /* best-effort */ });
     }
 
     /** Load provider health so unavailable models (bad/expired key, no credits) are marked. */
@@ -230,6 +351,7 @@ export class SorikuChatWidget extends ReactWidget {
         this.conversation = [];
         this.feedbackByTurn.clear();
         this.conversationId = undefined;
+        this.conversationTitle = undefined;
         this.streaming = false;
         // Explicit agent switch starts fresh — forget the resumed pointer.
         this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
@@ -267,8 +389,9 @@ export class SorikuChatWidget extends ReactWidget {
         const turnIndex = this.conversation.push(turn) - 1;
         this.streaming = true;
         this.abortController = new AbortController();
-        this.update();
-        const params = this.buildStreamParams(text, agentId);
+        this.editorReveal.resetDedup();
+        this.scheduleUpdate(true);
+        const params = await this.buildStreamParams(text, agentId);
         const needsApproval = params.mode === 'plan';
         try {
             const stream = this.engineClient.chatStream(params, this.abortController.signal);
@@ -290,12 +413,16 @@ export class SorikuChatWidget extends ReactWidget {
                     // Delegated tool: run it against the workspace, then POST the result. Same
                     // fire-and-forget reasoning — the engine blocks until the result arrives.
                     this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
-                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string' && !needsApproval) {
-                    // Not Plan mode (e.g. Ensemble): resume immediately so the same stream runs
-                    // the workers + synthesis. Plan mode instead waits for the user to approve.
-                    this.engineClient.executePlan(event.plan_id).catch(() => { /* stream surfaces errors */ });
+                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string') {
+                    // Plan behaviour always waits for the user — engine auto_execute is for Auto/Edit.
+                    const autoExecute = (event as { auto_execute?: boolean }).auto_execute;
+                    const shouldRun = needsApproval ? false : autoExecute !== false;
+                    if (shouldRun) {
+                        this.engineClient.executePlan(event.plan_id).catch(() => { /* stream surfaces errors */ });
+                    }
                 }
-                this.update();
+                void this.handleLiveActivity(event);
+                this.scheduleUpdate();
             }
             if (turn.status === 'streaming') {
                 turn = { ...turn, status: 'done' };
@@ -307,12 +434,13 @@ export class SorikuChatWidget extends ReactWidget {
         } finally {
             this.streaming = false;
             this.abortController = undefined;
-            this.update();
+            this.conversationLink.notifyChanged();
+            this.scheduleUpdate(true);
         }
     }
 
     /** Translate the two pickers (behaviour + models) into engine stream params. */
-    protected buildStreamParams(text: string, agentId: string): ChatStreamParams {
+    protected async buildStreamParams(text: string, agentId: string): Promise<ChatStreamParams> {
         const editsEnabled = this.behavior !== 'chat';
         const ensemble = this.orchestration === 'ensemble' && this.workerModels.length >= 2;
         const single = this.orchestration === 'single' && !!this.modelId;
@@ -330,24 +458,58 @@ export class SorikuChatWidget extends ReactWidget {
             mode = 'auto';
         }
 
+        const [projectId, editorContext] = await Promise.all([
+            this.workspaceProjectId(),
+            this.buildEditorContext(text),
+        ]);
+
         return {
             prompt: text,
             personaId: agentId,
             conversationId: this.conversationId,
+            projectId,
             useWorker: true,
             mode,
+            context: editorContext,
             clientTools: editsEnabled ? this.toolConfirmation.delegatedTools() : undefined,
             toolsEnabled: editsEnabled ? undefined : false,
             modelId: single ? this.modelId : undefined,
             workerModels: ensemble ? this.workerModels : undefined,
+            planAutoExecute: this.behavior === 'plan' ? false : undefined,
+            routingStrategy: this.routingStrategy,
         };
     }
 
+    /** @file mentions + open editor tabs as engine context items. */
+    protected async buildEditorContext(prompt: string): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[]> {
+        const items: import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[] = [];
+        const roots = await this.workspaceService.roots;
+        const root = roots[0]?.resource;
+        if (root) {
+            items.push({ type: 'text', value: `Workspace root: ${root.path.toString()}` });
+        }
+        const mentionRe = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
+        let match: RegExpExecArray | null;
+        const seen = new Set<string>();
+        while ((match = mentionRe.exec(prompt)) !== null) {
+            const rel = match[1];
+            if (seen.has(rel)) {
+                continue;
+            }
+            seen.add(rel);
+            items.push({ type: 'file', value: rel });
+        }
+        return items;
+    }
+
     /** Approve a parked Plan so the engine runs it (Plan mode). */
-    protected approvePlan(planId: string): void {
+    protected approvePlan(planId: string, tasks: PlanTaskView[]): void {
         this.resolvingPlans.add(planId);
         this.update();
-        this.engineClient.executePlan(planId).catch(() => { /* stream surfaces errors */ });
+        const edits = this.collectPlanTaskEdits(planId, tasks);
+        const body = edits.length > 0 ? { task_edits: edits } : undefined;
+        this.engineClient.executePlan(planId, body).catch(() => { /* stream surfaces errors */ });
+        this.planTaskEdits.delete(planId);
     }
 
     /** Cancel a parked Plan before any worker runs (Plan mode). */
@@ -355,6 +517,35 @@ export class SorikuChatWidget extends ReactWidget {
         this.resolvingPlans.add(planId);
         this.update();
         this.engineClient.cancelPlan(planId).catch(() => { /* stream surfaces errors */ });
+        this.planTaskEdits.delete(planId);
+    }
+
+    protected getPlanTaskGoal(planId: string, taskId: string, defaultGoal: string): string {
+        return this.planTaskEdits.get(planId)?.get(taskId) ?? defaultGoal;
+    }
+
+    protected setPlanTaskGoal(planId: string, taskId: string, goal: string): void {
+        let byTask = this.planTaskEdits.get(planId);
+        if (!byTask) {
+            byTask = new Map();
+            this.planTaskEdits.set(planId, byTask);
+        }
+        byTask.set(taskId, goal);
+    }
+
+    protected collectPlanTaskEdits(planId: string, tasks: PlanTaskView[]): { id: string; goal: string }[] {
+        const byTask = this.planTaskEdits.get(planId);
+        if (!byTask) {
+            return [];
+        }
+        const edits: { id: string; goal: string }[] = [];
+        for (const task of tasks) {
+            const edited = byTask.get(task.id);
+            if (edited !== undefined && edited.trim() !== task.goal.trim()) {
+                edits.push({ id: task.id, goal: edited.trim() });
+            }
+        }
+        return edits;
     }
 
     protected stop(): void {
@@ -386,9 +577,16 @@ export class SorikuChatWidget extends ReactWidget {
         const agentName = this.selection.getActiveName();
         return <div className='soriku-chat'>
             <div className='soriku-chat-header'>
-                {agentId
-                    ? <span>Agent: <span className='soriku-chat-agent'>{agentName ?? agentId}</span></span>
-                    : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
+                <div className='soriku-chat-header-main'>
+                    {agentId
+                        ? <span>Agent: <span className='soriku-chat-agent'>{agentName ?? agentId}</span></span>
+                        : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
+                    {this.conversationTitle && <span className='soriku-chat-conv-title' title={this.conversationTitle}>{this.conversationTitle}</span>}
+                </div>
+                <button className='theia-button secondary soriku-chat-new' title='Start a new conversation'
+                    disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
+                    New chat
+                </button>
             </div>
             {agentId && this.renderControls()}
             <div className='soriku-chat-messages'>
@@ -396,6 +594,7 @@ export class SorikuChatWidget extends ReactWidget {
                     ? <div className='soriku-chat-empty'>Ask the agent a question to start.</div>
                     : this.conversation.map(message => this.renderMessage(message))}
             </div>
+            {this.renderInlineToolApproval()}
             <div className='soriku-chat-input'>
                 <textarea
                     ref={this.inputRef}
@@ -436,11 +635,15 @@ export class SorikuChatWidget extends ReactWidget {
                 {turn.workers.length > 0 && <span className='soriku-msg-workers' title='Models that collaborated on this answer'>
                     {turn.workers.length} workers: {turn.workers.join(', ')}
                 </span>}
+                {typeof turn.ttftMs === 'number' && <span className='soriku-msg-timing' title='Time to first token'>
+                    {turn.ttftMs < 1000 ? `${turn.ttftMs}ms` : `${(turn.ttftMs / 1000).toFixed(1)}s`} TTFT
+                </span>}
             </div>
-            {turn.text && <div className='soriku-msg-text'>{turn.text}</div>}
+            {turn.text && <ChatMarkdown text={turn.text} streaming={turn.status === 'streaming'} />}
             {this.shouldShowApproval(turn) && this.renderPlanApproval(turn)}
-            {turn.status === 'streaming' && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
+            {turn.status === 'streaming' && !turn.text && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
+            {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
             {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
         </div>;
@@ -477,13 +680,24 @@ export class SorikuChatWidget extends ReactWidget {
             </div>
             <ol className='soriku-plan-tasks'>
                 {plan.tasks.map(t => <li key={t.id}>
-                    <span className='soriku-plan-role'>{t.role}</span>
-                    {t.model && <span className='soriku-plan-model'>{t.model}</span>}
-                    <span className='soriku-plan-goal'>{t.goal}</span>
+                    <div className='soriku-plan-task-head'>
+                        <span className='soriku-plan-role'>{t.role}</span>
+                        {t.model && <span className='soriku-plan-model'>{t.model}</span>}
+                    </div>
+                    <textarea
+                        className='theia-input soriku-plan-goal-edit'
+                        rows={2}
+                        disabled={resolving}
+                        value={this.getPlanTaskGoal(plan.planId, t.id, t.goal)}
+                        onChange={e => {
+                            this.setPlanTaskGoal(plan.planId, t.id, e.target.value);
+                            this.scheduleUpdate(true);
+                        }}
+                    />
                 </li>)}
             </ol>
             <div className='soriku-plan-actions'>
-                <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId)}>
+                <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
                     {resolving ? 'Starting…' : 'Approve & run'}
                 </button>
                 <button className='theia-button secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
@@ -506,6 +720,7 @@ export class SorikuChatWidget extends ReactWidget {
     protected renderControls(): React.ReactNode {
         const behavior = BEHAVIOR_OPTIONS.find(o => o.value === this.behavior) ?? BEHAVIOR_OPTIONS[0];
         const orchestration = ORCHESTRATION_OPTIONS.find(o => o.value === this.orchestration) ?? ORCHESTRATION_OPTIONS[0];
+        const routing = ROUTING_OPTIONS.find(o => o.value === this.routingStrategy) ?? ROUTING_OPTIONS[0];
         return <div className='soriku-chat-orchestration'>
             <div className='soriku-control-row'>
                 <select
@@ -518,11 +733,20 @@ export class SorikuChatWidget extends ReactWidget {
                     {BEHAVIOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
                 <select
+                    className='theia-select soriku-routing-select'
+                    title={`Where compute runs · ${routing.hint}`}
+                    value={this.routingStrategy}
+                    disabled={this.streaming}
+                    onChange={e => { this.routingStrategy = e.target.value as RoutingStrategy; this.update(); }}
+                >
+                    {ROUTING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <select
                     className='theia-select soriku-models-select'
                     title={orchestration.hint}
                     value={this.orchestration}
                     disabled={this.streaming}
-                    onChange={e => { this.orchestration = e.target.value as Orchestration; this.update(); }}
+                    onChange={e => { this.orchestration = e.target.value as Orchestration; this.warmSelectedModel(); this.update(); }}
                 >
                     {ORCHESTRATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -539,7 +763,7 @@ export class SorikuChatWidget extends ReactWidget {
                 title='Model to use for the answer'
                 value={this.modelId}
                 disabled={this.streaming}
-                onChange={e => { this.modelId = e.target.value; this.update(); }}
+                onChange={e => { this.modelId = e.target.value; this.warmSelectedModel(); this.update(); }}
             >
                 <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
                 {this.models.map(m => {
@@ -583,13 +807,162 @@ export class SorikuChatWidget extends ReactWidget {
         this.update();
     }
 
+    protected renderGeneratedFiles(turn: AssistantTurn): React.ReactNode {
+        return <ul className='soriku-generated-files'>
+            {turn.generatedFiles.map(file => <li key={file.path}>
+                <button className='soriku-generated-file' title={file.path}
+                    onClick={() => this.openGeneratedFile(file.path)}>
+                    <span className='codicon codicon-file' />
+                    {file.filename ?? file.path.split('/').pop() ?? file.path}
+                </button>
+            </li>)}
+        </ul>;
+    }
+
+    protected async openGeneratedFile(path: string): Promise<void> {
+        try {
+            const uri = new URI(path);
+            const opener = await this.openerService.getOpener(uri);
+            await opener.open(uri);
+        } catch (e) {
+            this.messages.error(`Could not open ${path}: ${(e as Error).message}`);
+        }
+    }
+
+    protected async ingestLivePlanEvent(event: import('soriku-engine-client-ext/lib/common/engine-types').SorikuSseEvent): Promise<void> {
+        if (this.streaming) {
+            return;
+        }
+        const convId = typeof event.conversation_id === 'string' ? event.conversation_id : undefined;
+        if (convId && convId !== this.externalFollowConvId) {
+            await this.followExternalPlan(convId);
+        }
+        if (this.externalTurnIndex < 0) {
+            return;
+        }
+        const current = this.conversation[this.externalTurnIndex];
+        if (!current || current.role !== 'assistant') {
+            return;
+        }
+        let turn = reduceSseEvent(current, event);
+        if (event.type === 'plan_done' || event.type === 'plan_failed' || event.type === 'plan_cancelled') {
+            turn = { ...turn, status: event.type === 'plan_done' ? 'done' : 'error' };
+            this.externalFollowConvId = undefined;
+            this.externalTurnIndex = -1;
+        } else {
+            turn = { ...turn, status: 'streaming' };
+        }
+        this.conversation[this.externalTurnIndex] = turn;
+        void this.handleLiveActivity(event);
+        this.conversationLink.notifyChanged();
+        this.scheduleUpdate();
+    }
+
+    /** Attach to a plan conversation broadcast from the engine (CLI/API runs). */
+    protected async followExternalPlan(convId: string): Promise<void> {
+        this.externalFollowConvId = convId;
+        try {
+            const conv = await this.engineClient.getConversation(convId);
+            this.conversation = fromEngineMessages(conv.messages ?? []);
+            this.conversationId = conv.id;
+            this.conversationTitle = conv.title;
+            let idx = this.conversation.length - 1;
+            if (idx < 0 || this.conversation[idx].role !== 'assistant') {
+                const turn = createAssistantTurn(this.nextId());
+                turn.status = 'streaming';
+                turn.phase = 'Plan running…';
+                idx = this.conversation.push(turn) - 1;
+            } else {
+                const last = this.conversation[idx] as AssistantTurn;
+                this.conversation[idx] = { ...last, status: 'streaming', phase: last.phase ?? 'Plan running…' };
+            }
+            this.externalTurnIndex = idx;
+            this.persistActiveChat();
+            this.conversationLink.requestOpen(convId);
+            this.messages.info('Live plan gestart — je ziet file writes hier en in de editor.');
+        } catch (e) {
+            this.messages.error(`Kon plan-conversatie niet openen: ${(e as Error).message}`);
+        }
+    }
+
+    protected async handleLiveActivity(event: import('soriku-engine-client-ext/lib/common/engine-types').SorikuSseEvent): Promise<void> {
+        if (event.type === 'worker_tool_call' && shouldRevealWrite(event)) {
+            const args = event.args && typeof event.args === 'object'
+                ? event.args as Record<string, unknown>
+                : {};
+            const path = typeof args.path === 'string' ? args.path : '';
+            if (path) {
+                await this.editorReveal.revealPath(path);
+            }
+            return;
+        }
+        if (event.type === 'generated_files' || event.type === 'worker_done') {
+            const files = event.type === 'generated_files'
+                ? (Array.isArray(event.files) ? event.files : [])
+                : (Array.isArray(event.generated_files) ? event.generated_files : []);
+            const last = files[files.length - 1] as Record<string, unknown> | undefined;
+            const path = last && typeof last.path === 'string' ? last.path : undefined;
+            if (path) {
+                await this.editorReveal.revealPath(path);
+            }
+        }
+    }
+
+    protected renderInlineToolApproval(): React.ReactNode {
+        const pending = this.toolApproval.pending;
+        if (!pending) {
+            return undefined;
+        }
+        return <div className={`soriku-inline-approval${pending.view.destructive ? ' destructive' : ''}`}>
+            <div className='soriku-inline-approval-head'>
+                <span className='codicon codicon-shield' />
+                <span className='soriku-inline-approval-title'>{pending.view.title}</span>
+            </div>
+            <pre className='soriku-inline-approval-msg'>{pending.view.message}</pre>
+            <label className='soriku-inline-approval-remember'>
+                <input
+                    type='checkbox'
+                    checked={this.approvalRememberSession}
+                    onChange={e => { this.approvalRememberSession = e.target.checked; this.scheduleUpdate(true); }}
+                />
+                Allow always this session
+            </label>
+            <div className='soriku-inline-approval-actions'>
+                <button className='theia-button secondary' onClick={() => this.respondToolApproval(false)}>Deny</button>
+                <button className='theia-button' onClick={() => this.respondToolApproval(true)}>Allow</button>
+            </div>
+        </div>;
+    }
+
+    protected respondToolApproval(approved: boolean): void {
+        this.toolApproval.respond(approved, approved && this.approvalRememberSession);
+        this.approvalRememberSession = false;
+        this.scheduleUpdate(true);
+    }
+
     protected renderToolCall(turnId: string, call: ChatToolCall, index: number): React.ReactNode {
-        return <details key={`${turnId}-tool-${index}`} className='soriku-tool-call'>
-            <summary>
-                <span className='codicon codicon-tools' /> {call.tool}
+        const summary = formatToolCallSummary(call);
+        const path = summary.subtitle;
+        const outcome = call.outcome && call.outcome !== 'ok' ? call.outcome : undefined;
+        return <div key={`${turnId}-tool-${index}`} className={`soriku-tool-call${summary.isWrite ? ' soriku-tool-write' : ''}${outcome ? ` soriku-tool-${outcome}` : ''}`}>
+            <div className='soriku-tool-call-head'>
+                <span className={`codicon ${summary.isWrite ? 'codicon-file-code' : 'codicon-tools'}`} />
+                <span className='soriku-tool-title'>{summary.title}</span>
                 <span className={`soriku-tool-status ${call.status}`}>{call.status}</span>
-            </summary>
-            <pre className='soriku-tool-detail'>{JSON.stringify({ args: call.args, result: call.result }, undefined, 2)}</pre>
-        </details>;
+                {outcome && <span className={`soriku-tool-outcome soriku-tool-outcome-${outcome}`} title={call.outcomeReason ?? ''}>{OUTCOME_LABELS[outcome]}</span>}
+                {path && summary.isWrite && <button
+                    className='soriku-tool-open'
+                    title='Open in editor'
+                    onClick={() => this.openGeneratedFile(path)}
+                >Open</button>}
+            </div>
+            {outcome && call.outcomeReason && <div className='soriku-tool-outcome-reason'>{call.outcomeReason}</div>}
+            {summary.subtitle && <div className='soriku-tool-path'>{summary.subtitle}</div>}
+            {summary.preview && <pre className='soriku-tool-preview'>{summary.preview}</pre>}
+            {!summary.isWrite && <details className='soriku-tool-details'>
+                <summary>Details</summary>
+                <pre className='soriku-tool-detail'>{JSON.stringify({ args: call.args, result: call.result }, undefined, 2)}</pre>
+            </details>}
+        </div>;
     }
 }

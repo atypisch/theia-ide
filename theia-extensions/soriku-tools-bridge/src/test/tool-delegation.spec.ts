@@ -30,7 +30,9 @@ describe('parseToolRequestEvent', () => {
 
 describe('DELEGATED_TOOLS', () => {
     it('covers the filesystem tools only', () => {
-        assert.deepEqual([...DELEGATED_TOOLS], ['file_read', 'file_write', 'list_directory']);
+        assert.deepEqual([...DELEGATED_TOOLS], [
+            'file_read', 'file_write', 'list_directory', 'apply_patch', 'project_search', 'shell_exec',
+        ]);
     });
 });
 

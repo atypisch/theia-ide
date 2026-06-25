@@ -116,7 +116,24 @@ export interface ChatRequest {
     client_tools?: string[] | null;
     /** Explicit models to collaborate on one ensemble answer (one worker each). */
     worker_models?: string[] | null;
+    /** Override settings.plan.auto_execute for this request (IDE Plan mode sends false). */
+    plan_auto_execute?: boolean | null;
+    /**
+     * Per-request routing strategy — overrides the engine's saved one for THIS
+     * request only (never persisted), so the IDE can run local-first without
+     * touching the soriku web app's global setting.
+     */
+    routing_strategy?: RoutingStrategy | null;
 }
+
+/**
+ * Routing strategy buckets the engine understands (core/routing_policy.py).
+ * - prefer_local: local models only (drop paid/external)
+ * - local_with_remote_conductor: local workers, a remote model may plan ("hybrid")
+ * - balanced: cost-aware mix
+ * - prefer_quality: best model regardless of locality/cost (cloud allowed)
+ */
+export type RoutingStrategy = 'prefer_local' | 'local_with_remote_conductor' | 'balanced' | 'prefer_quality';
 
 export interface ConfirmRequest {
     confirmation_id: string;
@@ -134,6 +151,15 @@ export interface ToolExecResult {
 
 export interface ConfirmResponse {
     ok: boolean;
+}
+
+export interface PlanTaskEdit {
+    id: string;
+    goal: string;
+}
+
+export interface ExecutePlanRequest {
+    task_edits?: PlanTaskEdit[];
 }
 
 export interface PlanSignalResponse {
@@ -418,6 +444,8 @@ export interface ChatStreamParams {
     personaId: string;
     conversationId?: string;
     projectId?: string;
+    /** Editor / workspace context forwarded to the engine. */
+    context?: ChatContextItem[];
     mode?: ChatMode;
     useWorker?: boolean;
     /** Tools the IDE will execute locally; forwarded to the engine as `client_tools`. */
@@ -430,6 +458,14 @@ export interface ChatStreamParams {
     workerModels?: string[];
     /** Set false for chat-only (no tools / no file edits). */
     toolsEnabled?: boolean;
+    /** When false, park the plan until the user approves (Plan behaviour). */
+    planAutoExecute?: boolean;
+    /**
+     * Per-request routing strategy (local-first / balanced / quality). Sent to
+     * the engine as `routing_strategy`; not persisted, so it never changes the
+     * soriku web app's global setting.
+     */
+    routingStrategy?: RoutingStrategy;
 }
 
 export interface EngineClientConfig {

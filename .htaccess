@@ -1,0 +1,12 @@
+RewriteEngine On
+RewriteBase /soriku-ide/
+
+Options -Indexes
+
+# WebSocket connections for Theia backend messaging.
+RewriteCond %{HTTP:Upgrade} =websocket [NC]
+RewriteRule ^(.*)$ ws://127.0.0.1:3000/$1 [P,L]
+
+# Proxy all HTTP traffic to the Soriku IDE browser app (yarn browser start).
+RewriteCond %{HTTP:Upgrade} !=websocket [NC]
+RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]

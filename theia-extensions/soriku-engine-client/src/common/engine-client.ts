@@ -24,6 +24,7 @@ import {
     ConversationSummary,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
+    ExecutePlanRequest,
     HealthResponse,
     InstalledModelsResponse,
     ModelMutationResponse,
@@ -61,7 +62,7 @@ export interface EngineClient {
     chatStream(params: ChatStreamParams, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent>;
     confirmTool(body: ConfirmRequest): Promise<ConfirmResponse>;
     /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
-    executePlan(planId: string): Promise<PlanSignalResponse>;
+    executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */
     cancelPlan(planId: string): Promise<PlanSignalResponse>;
 
@@ -82,6 +83,8 @@ export interface EngineClient {
     activateModel(modelId: string): Promise<ModelMutationResponse>;
     deactivateModel(modelId: string): Promise<ModelMutationResponse>;
     browseModels(query: string): Promise<BrowseModelsResponse>;
+    /** Fire-and-forget warm-load of a local model into VRAM (reduces TTFT). */
+    warmModel(modelId: string): Promise<ModelMutationResponse>;
 
     // ── Conversation history ──
     listConversations(): Promise<ConversationSummary[]>;

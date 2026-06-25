@@ -54,8 +54,24 @@
     border-radius: 4px;
 }
 
-.soriku-conversations-open:hover {
+.soriku-conversations-open:hover,
+.soriku-conversations-row.active .soriku-conversations-open {
     background-color: var(--theia-list-hoverBackground);
+}
+
+.soriku-conversations-row.active .soriku-conversations-open {
+    background-color: var(--theia-list-activeSelectionBackground);
+    color: var(--theia-list-activeSelectionForeground);
+}
+
+.soriku-conversations-mode {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: var(--theia-ui-font-size0);
+    background: var(--theia-badge-background);
+    color: var(--theia-badge-foreground);
 }
 
 .soriku-conversations-name {

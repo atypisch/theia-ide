@@ -31,3 +31,22 @@ export function cleanTitle(title: string): string {
     const t = (title || '').trim();
     return t.length > 0 ? t : 'Untitled conversation';
 }
+
+/** Mode badge from a conversation title, e.g. "[Plan] …" → "Plan". */
+export function modeFromTitle(title: string): string | undefined {
+    const match = /^\[([^\]]+)\]/.exec((title || '').trim());
+    return match?.[1];
+}
+
+/** Short workspace label from an absolute project path. */
+export function projectLabel(projectId?: string | null): string | undefined {
+    if (!projectId) {
+        return undefined;
+    }
+    const normalized = projectId.replace(/\\/g, '/').replace(/\/+$/, '');
+    const parts = normalized.split('/');
+    if (parts.length <= 2) {
+        return normalized;
+    }
+    return parts.slice(-2).join('/');
+}

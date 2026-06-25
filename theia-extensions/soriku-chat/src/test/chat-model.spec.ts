@@ -50,6 +50,35 @@ describe('reduceSseEvent', () => {
         assert.deepEqual(turn.toolCalls[0].result, { ok: true });
     });
 
+    it('surfaces a blocked file_write outcome from worker_tool_call', () => {
+        const turn = fold([
+            {
+                type: 'worker_tool_call', tool: 'file_write', args: { path: 'x.html' },
+                error: 'Incomplete deliverable: HTML file must contain real markup',
+                outcome: 'blocked', outcome_reason: 'HTML file must contain real markup',
+            },
+        ]);
+        assert.equal(turn.toolCalls.length, 1);
+        assert.equal(turn.toolCalls[0].outcome, 'blocked');
+        assert.equal(turn.toolCalls[0].outcomeReason, 'HTML file must contain real markup');
+    });
+
+    it('surfaces a salvaged outcome and still tracks the generated file', () => {
+        const turn = fold([
+            { type: 'worker_tool_call', tool: 'file_write', args: { path: 'app/x.php' }, outcome: 'salvaged', outcome_reason: 'recovered a file_read call from the body' },
+        ]);
+        assert.equal(turn.toolCalls[0].outcome, 'salvaged');
+        assert.equal(turn.generatedFiles.length, 1);
+        assert.equal(turn.generatedFiles[0].path, 'app/x.php');
+    });
+
+    it('leaves outcome undefined for a clean tool call', () => {
+        const turn = fold([
+            { type: 'worker_tool_call', tool: 'file_write', args: { path: 'ok.php' }, outcome: 'ok' },
+        ]);
+        assert.equal(turn.toolCalls[0].outcome, undefined);
+    });
+
     it('marks confirm_tool calls as requested', () => {
         const turn = fold([
             { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c9', args: { path: 'b.ts' } },
@@ -184,6 +213,25 @@ describe('fromEngineMessages', () => {
         assert.equal(msgs.length, 1);
         assert.equal(msgs[0].role, 'user');
     });
+    it('restores tool steps, workers and generated files from stored history', () => {
+        const msgs = fromEngineMessages([
+            { role: 'user', content: 'write file' },
+            {
+                role: 'assistant',
+                content: 'done',
+                model: 'qwen2.5-coder:7b',
+                steps: [{ tool: 'file_write', args: { path: 'a.txt' }, result: 'ok' }],
+                generated_files: [{ path: '/tmp/a.txt', filename: 'a.txt' }],
+                workers: [{ model: 'qwen3.5:4b', status: 'done' }],
+            },
+        ]);
+        assert.equal(msgs.length, 2);
+        const a = msgs[1] as AssistantTurn;
+        assert.equal(a.toolCalls.length, 1);
+        assert.equal(a.toolCalls[0].tool, 'file_write');
+        assert.equal(a.generatedFiles[0].path, '/tmp/a.txt');
+        assert.deepEqual(a.workers, ['qwen3.5:4b']);
+    });
 });
 
 describe('busyPhase', () => {
@@ -201,5 +249,24 @@ describe('busyPhase', () => {
     it('reports awaiting approval for a confirm_tool', () => {
         const turn = reduceSseEvent(createAssistantTurn('t'), { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c1' });
         assert.equal(busyPhase(turn), 'Awaiting approval: file_write');
+    });
+});
+
+describe('worker_chunk and timing', () => {
+    it('appends worker_chunk to turn text', () => {
+        let turn = createAssistantTurn('t');
+        turn = reduceSseEvent(turn, { type: 'worker_chunk', worker_id: 'w1', chunk: 'Hello ' });
+        turn = reduceSseEvent(turn, { type: 'worker_chunk', worker_id: 'w1', chunk: 'world' });
+        assert.equal(turn.text, 'Hello world');
+    });
+    it('records ttft from timing event', () => {
+        const turn = reduceSseEvent(createAssistantTurn('t'), { type: 'timing', ttft_ms: 842 });
+        assert.equal(turn.ttftMs, 842);
+    });
+    it('does not clear text on synthesis_start', () => {
+        let turn = reduceSseEvent(createAssistantTurn('t'), { type: 'worker_chunk', chunk: 'worker output' });
+        turn = reduceSseEvent(turn, { type: 'synthesis_start' });
+        assert.equal(turn.text, 'worker output');
+        assert.equal(turn.phase, 'Merging answers…');
     });
 });
