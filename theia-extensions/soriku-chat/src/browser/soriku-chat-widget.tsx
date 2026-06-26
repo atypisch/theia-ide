@@ -817,10 +817,12 @@ export class SorikuChatWidget extends ReactWidget {
                 <span>Agent fleet · {turn.agents.length}{active > 0 ? ` · ${active} active` : ''}</span>
             </div>
             {turn.agents.map(a => {
-                const label = a.role ?? a.personaId ?? a.workerId.slice(0, 8);
+                const label = a.agentName ?? a.role ?? a.personaId ?? a.workerId.slice(0, 8);
+                const sub = a.agentName && a.role ? a.role : undefined;
                 return <div key={a.workerId} className={`soriku-fleet-row soriku-fleet-${a.status}`}>
                     <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
                     <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
+                    {sub && <span className='soriku-fleet-subrole'>{sub}</span>}
                     {a.model && <span className='soriku-fleet-model'>{a.model}</span>}
                     {a.files.length > 0 && <span className='soriku-fleet-files' title={a.files.join('\n')}>
                         {a.files.length} file{a.files.length > 1 ? 's' : ''}

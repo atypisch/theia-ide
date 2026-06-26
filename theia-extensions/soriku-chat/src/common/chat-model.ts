@@ -48,6 +48,8 @@ export interface AgentActivity {
     model?: string;
     /** Persona/agent id when the conductor assigned one (else a bare role worker). */
     personaId?: string;
+    /** Human agent name when the worker runs under a persona (from worker_start). */
+    agentName?: string;
     status: 'running' | 'done' | 'error';
     /** Files this worker wrote (paths). */
     files: string[];
@@ -259,6 +261,7 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
                     role: asString(event.role),
                     model,
                     personaId: asString(event.persona_id),
+                    agentName: asString(event.agent_name),
                     status: 'running',
                 });
             }

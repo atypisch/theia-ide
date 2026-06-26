@@ -81,7 +81,7 @@ describe('reduceSseEvent', () => {
 
     it('builds a Fleet agent row from worker_start → tool_call → worker_done', () => {
         const turn = fold([
-            { type: 'worker_start', worker_id: 'w1', task_id: 't1', model: 'qwen2.5-coder:7b', role: 'backend-developer', persona_id: 'koda' },
+            { type: 'worker_start', worker_id: 'w1', task_id: 't1', model: 'qwen2.5-coder:7b', role: 'backend-developer', persona_id: 'koda', agent_name: 'Koda' },
             { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'api/x.php' }, outcome: 'ok' },
             { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'api/x.php' }, outcome: 'blocked', outcome_reason: 'bad' },
             { type: 'worker_done', worker_id: 'w1', task_id: 't1', result: { generated_files: [] } },
@@ -92,6 +92,7 @@ describe('reduceSseEvent', () => {
         assert.equal(a.role, 'backend-developer');
         assert.equal(a.model, 'qwen2.5-coder:7b');
         assert.equal(a.personaId, 'koda');
+        assert.equal(a.agentName, 'Koda');
         assert.equal(a.status, 'done');
         assert.deepEqual(a.files, ['api/x.php']);
         assert.equal(a.corrections, 1);
