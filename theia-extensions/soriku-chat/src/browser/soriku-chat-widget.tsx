@@ -830,6 +830,10 @@ export class SorikuChatWidget extends ReactWidget {
                     {a.corrections > 0 && <span className='soriku-fleet-fix' title='Writes the engine blocked or recovered for this worker'>
                         {a.corrections} fix
                     </span>}
+                    {a.verdict && <span
+                        className={`soriku-fleet-verdict soriku-fleet-verdict-${a.verdict.status}`}
+                        title={a.verdict.notes ?? ''}
+                    >{a.verdict.status === 'approved' ? '✓ approved' : '⟳ changes'}</span>}
                     <span className='soriku-fleet-status'>{a.status}</span>
                 </div>;
             })}

@@ -482,6 +482,19 @@
     font-weight: 600;
 }
 
+.soriku-fleet-verdict {
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.soriku-fleet-verdict-approved {
+    color: var(--theia-successBackground, #388a34);
+}
+
+.soriku-fleet-verdict-changes_requested {
+    color: var(--theia-editorWarning-foreground, #b58900);
+}
+
 .soriku-fleet-status {
     margin-left: auto;
     color: var(--theia-descriptionForeground);

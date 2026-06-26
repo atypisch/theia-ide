@@ -55,6 +55,8 @@ export interface AgentActivity {
     files: string[];
     /** Count of tool calls the engine blocked/recovered for this worker (reliability signal). */
     corrections: number;
+    /** Review verdict when this worker is a reviewer (code-reviewer / editor). */
+    verdict?: { status: 'approved' | 'changes_requested'; notes?: string };
 }
 
 export interface AssistantTurn {
@@ -314,6 +316,16 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
                     next.generatedFiles.push(f);
                 }
             });
+            break;
+        }
+        case 'review_verdict': {
+            const workerId = asString(event.worker_id);
+            const status = asString(event.status);
+            if (workerId && (status === 'approved' || status === 'changes_requested')) {
+                upsertAgent(next.agents, workerId, {
+                    verdict: { status, notes: asString(event.notes) },
+                });
+            }
             break;
         }
         case 'worker_tool_call': {

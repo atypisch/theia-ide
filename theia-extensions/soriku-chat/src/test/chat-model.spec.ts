@@ -98,6 +98,16 @@ describe('reduceSseEvent', () => {
         assert.equal(a.corrections, 1);
     });
 
+    it('attaches a review_verdict to the reviewer agent row', () => {
+        const turn = fold([
+            { type: 'worker_start', worker_id: 'w2', task_id: 't2', role: 'code-reviewer', model: 'deepseek-r1:7b' },
+            { type: 'review_verdict', worker_id: 'w2', task_id: 't2', target_task_id: 't1', status: 'changes_requested', notes: 'fixed a bug' },
+        ]);
+        const a = turn.agents.find(x => x.workerId === 'w2');
+        assert.equal(a?.verdict?.status, 'changes_requested');
+        assert.equal(a?.verdict?.notes, 'fixed a bug');
+    });
+
     it('tracks two workers in parallel as distinct Fleet rows', () => {
         const turn = fold([
             { type: 'worker_start', worker_id: 'w1', task_id: 't1', model: 'qwen2.5-coder:7b', role: 'backend-developer' },
