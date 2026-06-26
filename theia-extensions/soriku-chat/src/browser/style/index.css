@@ -408,6 +408,82 @@
     word-break: break-word;
 }
 
+/* Agent fleet — per-worker rows in a multi-agent plan run. */
+.soriku-fleet {
+    margin-top: 6px;
+    border: 1px solid var(--theia-editorGroup-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.soriku-fleet-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.soriku-fleet-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-fleet-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--theia-descriptionForeground);
+}
+
+.soriku-fleet-dot-running {
+    background: var(--theia-progressBar-background, #3794ff);
+    animation: soriku-fleet-pulse 1.2s ease-in-out infinite;
+}
+
+.soriku-fleet-dot-done {
+    background: var(--theia-successBackground, #388a34);
+}
+
+.soriku-fleet-dot-error {
+    background: var(--theia-errorForeground);
+}
+
+@keyframes soriku-fleet-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.soriku-fleet-role {
+    font-weight: 600;
+    min-width: 120px;
+}
+
+.soriku-fleet-model {
+    color: var(--theia-descriptionForeground);
+    font-family: var(--theia-code-font-family);
+}
+
+.soriku-fleet-files {
+    color: var(--theia-textLink-foreground);
+}
+
+.soriku-fleet-fix {
+    color: var(--theia-editorWarning-foreground, #b58900);
+    font-weight: 600;
+}
+
+.soriku-fleet-status {
+    margin-left: auto;
+    color: var(--theia-descriptionForeground);
+    text-transform: uppercase;
+    font-size: 0.85em;
+}
+
 .soriku-chat-input {
     border-top: 1px solid var(--theia-sideBarSectionHeader-border);
     padding: 8px 10px;

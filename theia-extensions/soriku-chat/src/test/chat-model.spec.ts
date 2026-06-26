@@ -79,6 +79,35 @@ describe('reduceSseEvent', () => {
         assert.equal(turn.toolCalls[0].outcome, undefined);
     });
 
+    it('builds a Fleet agent row from worker_start → tool_call → worker_done', () => {
+        const turn = fold([
+            { type: 'worker_start', worker_id: 'w1', task_id: 't1', model: 'qwen2.5-coder:7b', role: 'backend-developer', persona_id: 'koda' },
+            { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'api/x.php' }, outcome: 'ok' },
+            { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'api/x.php' }, outcome: 'blocked', outcome_reason: 'bad' },
+            { type: 'worker_done', worker_id: 'w1', task_id: 't1', result: { generated_files: [] } },
+        ]);
+        assert.equal(turn.agents.length, 1);
+        const a = turn.agents[0];
+        assert.equal(a.workerId, 'w1');
+        assert.equal(a.role, 'backend-developer');
+        assert.equal(a.model, 'qwen2.5-coder:7b');
+        assert.equal(a.personaId, 'koda');
+        assert.equal(a.status, 'done');
+        assert.deepEqual(a.files, ['api/x.php']);
+        assert.equal(a.corrections, 1);
+    });
+
+    it('tracks two workers in parallel as distinct Fleet rows', () => {
+        const turn = fold([
+            { type: 'worker_start', worker_id: 'w1', task_id: 't1', model: 'qwen2.5-coder:7b', role: 'backend-developer' },
+            { type: 'worker_start', worker_id: 'w2', task_id: 't2', model: 'deepseek-r1:7b', role: 'code-reviewer' },
+            { type: 'worker_done', worker_id: 'w1', result: {} },
+        ]);
+        assert.equal(turn.agents.length, 2);
+        assert.equal(turn.agents.find(a => a.workerId === 'w1')?.status, 'done');
+        assert.equal(turn.agents.find(a => a.workerId === 'w2')?.status, 'running');
+    });
+
     it('marks confirm_tool calls as requested', () => {
         const turn = fold([
             { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c9', args: { path: 'b.ts' } },

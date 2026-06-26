@@ -641,6 +641,7 @@ export class SorikuChatWidget extends ReactWidget {
             </div>
             {turn.text && <ChatMarkdown text={turn.text} streaming={turn.status === 'streaming'} />}
             {this.shouldShowApproval(turn) && this.renderPlanApproval(turn)}
+            {turn.agents.length > 0 && this.renderFleet(turn)}
             {turn.status === 'streaming' && !turn.text && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
@@ -805,6 +806,32 @@ export class SorikuChatWidget extends ReactWidget {
             ? this.workerModels.filter(id => id !== modelId)
             : [...this.workerModels, modelId];
         this.update();
+    }
+
+    /** Fleet view: one row per parallel worker/agent in a plan run. */
+    protected renderFleet(turn: AssistantTurn): React.ReactNode {
+        const active = turn.agents.filter(a => a.status === 'running').length;
+        return <div className='soriku-fleet'>
+            <div className='soriku-fleet-head'>
+                <span className='codicon codicon-organization' />
+                <span>Agent fleet · {turn.agents.length}{active > 0 ? ` · ${active} active` : ''}</span>
+            </div>
+            {turn.agents.map(a => {
+                const label = a.role ?? a.personaId ?? a.workerId.slice(0, 8);
+                return <div key={a.workerId} className={`soriku-fleet-row soriku-fleet-${a.status}`}>
+                    <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
+                    <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
+                    {a.model && <span className='soriku-fleet-model'>{a.model}</span>}
+                    {a.files.length > 0 && <span className='soriku-fleet-files' title={a.files.join('\n')}>
+                        {a.files.length} file{a.files.length > 1 ? 's' : ''}
+                    </span>}
+                    {a.corrections > 0 && <span className='soriku-fleet-fix' title='Writes the engine blocked or recovered for this worker'>
+                        {a.corrections} fix
+                    </span>}
+                    <span className='soriku-fleet-status'>{a.status}</span>
+                </div>;
+            })}
+        </div>;
     }
 
     protected renderGeneratedFiles(turn: AssistantTurn): React.ReactNode {
