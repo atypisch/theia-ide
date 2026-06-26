@@ -21,6 +21,7 @@ import {
 } from '../common/tool-delegation';
 import { SorikuEditorRevealService } from './soriku-editor-reveal-service';
 import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
+import { SorikuDiffReviewService } from './soriku-diff-review-service';
 
 /** Session-scoped auto-approve for destructive tools (Allow always). */
 const SESSION_ALLOW = new Set<string>();
@@ -42,6 +43,9 @@ export class SorikuToolConfirmationService {
 
     @inject(SorikuToolApprovalBridge)
     protected readonly approvalBridge: SorikuToolApprovalBridge;
+
+    @inject(SorikuDiffReviewService)
+    protected readonly diffReview: SorikuDiffReviewService;
 
     /** Tools the IDE can execute locally — sent to the engine as `client_tools`. */
     delegatedTools(): string[] {
@@ -116,6 +120,11 @@ export class SorikuToolConfirmationService {
         if (SESSION_ALLOW.has(request.tool)) {
             return true;
         }
+        // File writes get a diff review (see proposed changes, then accept/reject)
+        // instead of a plain banner. shell_exec keeps the banner — there's no diff.
+        if (request.tool === 'file_write' || request.tool === 'apply_patch') {
+            return this.reviewWrite(request);
+        }
         const view = describeToolConfirmation({
             confirmationId: request.requestId,
             tool: request.tool,
@@ -135,6 +144,28 @@ export class SorikuToolConfirmationService {
         confirmationId: string,
     ): Promise<{ approved: boolean; rememberSession: boolean }> {
         return this.approvalBridge.prompt(confirmationId, tool, view);
+    }
+
+    /**
+     * Compute the full proposed content for a file_write / apply_patch and show it
+     * as a diff for the user to accept or reject — before anything is written.
+     */
+    protected async reviewWrite(request: ToolRequest): Promise<boolean> {
+        const uri = await this.resolveUri(getStringArg(request.args, 'path') ?? '');
+        let proposed: string;
+        if (request.tool === 'apply_patch') {
+            const patch = getStringArg(request.args, 'patch') ?? getStringArg(request.args, 'content') ?? '';
+            let existing = '';
+            try {
+                existing = (await this.fileService.read(uri)).value;
+            } catch {
+                existing = '';
+            }
+            proposed = applyUnifiedPatch(existing, patch);
+        } else {
+            proposed = getStringArg(request.args, 'content') ?? '';
+        }
+        return this.diffReview.reviewProposedWrite(uri, proposed, request.tool);
     }
 
     protected async runTool(request: ToolRequest): Promise<ToolExecResult> {
