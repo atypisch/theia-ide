@@ -441,6 +441,27 @@
     font-size: var(--theia-ui-font-size0);
 }
 
+/* Minions nested under their head agent (Fase F). */
+.soriku-fleet-minions {
+    margin: 2px 0 4px 10px;
+    padding-left: 8px;
+    border-left: 2px solid var(--theia-editorGroup-border);
+}
+
+.soriku-fleet-minions-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--theia-ui-font-size0);
+    font-weight: 600;
+    opacity: 0.8;
+    margin: 2px 0;
+}
+
+.soriku-fleet-row-nested {
+    opacity: 0.92;
+}
+
 .soriku-fleet-dot {
     width: 8px;
     height: 8px;

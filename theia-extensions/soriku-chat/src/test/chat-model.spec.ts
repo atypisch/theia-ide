@@ -98,6 +98,21 @@ describe('reduceSseEvent', () => {
         assert.equal(a.corrections, 1);
     });
 
+    it('captures parent_agent_id so minions nest under their head (Fase F)', () => {
+        const turn = fold([
+            { type: 'worker_start', worker_id: 'w1', task_id: 't1', role: 'generalist', persona_id: 'koda', agent_name: 'Koda' },
+            {
+                type: 'worker_start', worker_id: 'm1', task_id: 'minion-1', role: 'researcher',
+                persona_id: 'agent-minion-koda-1', agent_name: 'minion-koda-1', parent_agent_id: 'koda',
+            },
+            { type: 'worker_done', worker_id: 'm1', task_id: 'minion-1', parent_agent_id: 'koda', result: { generated_files: [] } },
+        ]);
+        const head = turn.agents.find(a => a.workerId === 'w1');
+        const minion = turn.agents.find(a => a.workerId === 'm1');
+        assert.equal(head?.parentAgentId, undefined);
+        assert.equal(minion?.parentAgentId, 'koda');
+    });
+
     it('attaches a review_verdict to the reviewer agent row', () => {
         const turn = fold([
             { type: 'worker_start', worker_id: 'w2', task_id: 't2', role: 'code-reviewer', model: 'deepseek-r1:7b' },

@@ -7,7 +7,7 @@
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { CommandService, MessageService } from '@theia/core/lib/common';
+import { CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
 import { StorageService } from '@theia/core/lib/browser/storage-service';
 import { OpenerService } from '@theia/core/lib/browser/opener-service';
 import URI from '@theia/core/lib/common/uri';
@@ -24,6 +24,7 @@ import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/s
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { ChatMarkdown } from './chat-markdown-view';
 import {
+    AgentActivity,
     AgentInsights,
     AssistantTurn,
     ChatMessage,
@@ -39,6 +40,8 @@ import {
 
 /** Persisted (across reloads) pointer to the chat the user was last in. */
 const ACTIVE_CHAT_STORAGE_KEY = 'soriku.chat.active';
+/** User-configurable term for a head agent's spawned sub-agents (Fase F). */
+const SUBAGENT_LABEL_PREF = 'soriku.ui.subagentLabel';
 interface ActiveChatState { conversationId: string; agentId?: string; agentName?: string; }
 
 /** How the agent works (Cursor-style behaviour), independent of model choice. */
@@ -141,6 +144,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(OpenerService)
     protected readonly openerService: OpenerService;
+
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
 
     /** When restoring/loading a saved chat, suppress the agent-change reset. */
     protected restoring = false;
@@ -913,35 +919,71 @@ export class SorikuChatWidget extends ReactWidget {
         this.update();
     }
 
-    /** Fleet view: one row per parallel worker/agent in a plan run. */
+    /** The user-configurable term for a head agent's spawned sub-agents (Fase F). */
+    protected getSubagentLabel(): string {
+        const raw = this.preferences.get<string>(SUBAGENT_LABEL_PREF, 'minions');
+        return (raw ?? 'minions').trim() || 'minions';
+    }
+
+    /** Fleet view: one row per parallel worker/agent, with minions nested under their head. */
     protected renderFleet(turn: AssistantTurn): React.ReactNode {
         const active = turn.agents.filter(a => a.status === 'running').length;
+        // Minions (parentAgentId set) nest under the head whose personaId matches.
+        const heads = new Set(turn.agents.map(a => a.personaId).filter((id): id is string => !!id));
+        const minionsByParent = new Map<string, AgentActivity[]>();
+        const topLevel: AgentActivity[] = [];
+        for (const a of turn.agents) {
+            if (a.parentAgentId && heads.has(a.parentAgentId)) {
+                const list = minionsByParent.get(a.parentAgentId) ?? [];
+                list.push(a);
+                minionsByParent.set(a.parentAgentId, list);
+            } else {
+                topLevel.push(a);
+            }
+        }
+        const subLabel = this.getSubagentLabel();
+        const subTitle = subLabel.charAt(0).toUpperCase() + subLabel.slice(1);
         return <div className='soriku-fleet'>
             <div className='soriku-fleet-head'>
                 <span className='codicon codicon-organization' />
                 <span>Agent fleet · {turn.agents.length}{active > 0 ? ` · ${active} active` : ''}</span>
             </div>
-            {turn.agents.map(a => {
-                const label = a.agentName ?? a.role ?? a.personaId ?? a.workerId.slice(0, 8);
-                const sub = a.agentName && a.role ? a.role : undefined;
-                return <div key={a.workerId} className={`soriku-fleet-row soriku-fleet-${a.status}`}>
-                    <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
-                    <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
-                    {sub && <span className='soriku-fleet-subrole'>{sub}</span>}
-                    {a.model && <span className='soriku-fleet-model'>{a.model}</span>}
-                    {a.files.length > 0 && <span className='soriku-fleet-files' title={a.files.join('\n')}>
-                        {a.files.length} file{a.files.length > 1 ? 's' : ''}
-                    </span>}
-                    {a.corrections > 0 && <span className='soriku-fleet-fix' title='Writes the engine blocked or recovered for this worker'>
-                        {a.corrections} fix
-                    </span>}
-                    {a.verdict && <span
-                        className={`soriku-fleet-verdict soriku-fleet-verdict-${a.verdict.status}`}
-                        title={a.verdict.notes ?? ''}
-                    >{a.verdict.status === 'approved' ? '✓ approved' : '⟳ changes'}</span>}
-                    <span className='soriku-fleet-status'>{a.status}</span>
-                </div>;
+            {topLevel.map(a => {
+                const minions = a.personaId ? minionsByParent.get(a.personaId) : undefined;
+                return <React.Fragment key={a.workerId}>
+                    {this.renderFleetRow(a)}
+                    {minions && minions.length > 0 && <div className='soriku-fleet-minions'>
+                        <div className='soriku-fleet-minions-head'>
+                            <span className='codicon codicon-type-hierarchy-sub' />
+                            <span>{subTitle} fleet · {minions.length}</span>
+                        </div>
+                        {minions.map(m => this.renderFleetRow(m, true))}
+                    </div>}
+                </React.Fragment>;
             })}
+        </div>;
+    }
+
+    /** One Fleet row. `nested` indents it as a minion under its head agent. */
+    protected renderFleetRow(a: AgentActivity, nested = false): React.ReactNode {
+        const label = a.agentName ?? a.role ?? a.personaId ?? a.workerId.slice(0, 8);
+        const sub = a.agentName && a.role ? a.role : undefined;
+        return <div key={a.workerId} className={`soriku-fleet-row soriku-fleet-${a.status}${nested ? ' soriku-fleet-row-nested' : ''}`}>
+            <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
+            <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
+            {sub && <span className='soriku-fleet-subrole'>{sub}</span>}
+            {a.model && <span className='soriku-fleet-model'>{a.model}</span>}
+            {a.files.length > 0 && <span className='soriku-fleet-files' title={a.files.join('\n')}>
+                {a.files.length} file{a.files.length > 1 ? 's' : ''}
+            </span>}
+            {a.corrections > 0 && <span className='soriku-fleet-fix' title='Writes the engine blocked or recovered for this worker'>
+                {a.corrections} fix
+            </span>}
+            {a.verdict && <span
+                className={`soriku-fleet-verdict soriku-fleet-verdict-${a.verdict.status}`}
+                title={a.verdict.notes ?? ''}
+            >{a.verdict.status === 'approved' ? '✓ approved' : '⟳ changes'}</span>}
+            <span className='soriku-fleet-status'>{a.status}</span>
         </div>;
     }
 

@@ -50,6 +50,8 @@ export interface AgentActivity {
     personaId?: string;
     /** Human agent name when the worker runs under a persona (from worker_start). */
     agentName?: string;
+    /** Head agent id when this worker is a minion (Fase F) — the Fleet nests it under that head. */
+    parentAgentId?: string;
     status: 'running' | 'done' | 'error';
     /** Files this worker wrote (paths). */
     files: string[];
@@ -266,6 +268,7 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
                     model,
                     personaId: asString(event.persona_id),
                     agentName: asString(event.agent_name),
+                    parentAgentId: asString(event.parent_agent_id),
                     status: 'running',
                 });
             }
