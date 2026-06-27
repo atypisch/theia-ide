@@ -211,6 +211,9 @@ export class SorikuChatWidget extends ReactWidget {
         this.toDispose.push(this.conversationLink.onDidRequestOpen(id => {
             this.loadConversation(id).catch(e => this.messages.error(`Could not open conversation: ${(e as Error).message}`));
         }));
+        this.toDispose.push(this.conversationLink.onDidReviewWrite(({ accepted, path }) => {
+            void this.submitImplicitWriteFeedback(accepted, path);
+        }));
         this.toDispose.push(this.planLiveBridge.onDidReceivePlanEvent(event => {
             void this.ingestLivePlanEvent(event);
         }));
@@ -569,6 +572,27 @@ export class SorikuChatWidget extends ReactWidget {
             this.feedbackByTurn.delete(turn.id);
             this.messages.error(`Could not send feedback: ${(e as Error).message}`);
             this.update();
+        }
+    }
+
+    /**
+     * Fase E: turn a diff-review decision into implicit agent feedback — accept =
+     * the proposed code was good, reject = it wasn't — so the agent learns from
+     * what the user actually keeps, with zero extra effort.
+     */
+    protected async submitImplicitWriteFeedback(accepted: boolean, path: string): Promise<void> {
+        const agentId = this.selection.getActiveId();
+        if (!agentId) {
+            return;
+        }
+        try {
+            await this.engineClient.sendAgentFeedback(agentId, {
+                rating: accepted ? 'positive' : 'negative',
+                input: `Proposed write to ${path}`,
+                output: accepted ? 'User accepted the change.' : 'User rejected the change.',
+            });
+        } catch {
+            /* implicit feedback is best-effort — never interrupt the user */
         }
     }
 

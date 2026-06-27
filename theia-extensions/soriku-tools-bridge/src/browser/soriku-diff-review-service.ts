@@ -17,6 +17,7 @@ import { InMemoryResources } from '@theia/core/lib/common/resource';
 import URI from '@theia/core/lib/common/uri';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 
 @injectable()
 export class SorikuDiffReviewService {
@@ -32,6 +33,9 @@ export class SorikuDiffReviewService {
 
     @inject(FileService)
     protected readonly fileService: FileService;
+
+    @inject(SorikuConversationLink)
+    protected readonly conversationLink: SorikuConversationLink;
 
     /** Monotonic id so each review gets unique in-memory URIs (no collisions). */
     protected reviewCounter = 0;
@@ -75,7 +79,10 @@ export class SorikuDiffReviewService {
                 'Accept',
                 'Reject',
             );
-            return action === 'Accept';
+            const accepted = action === 'Accept';
+            // Fase E: the accept/reject is free implicit feedback for the agent.
+            this.conversationLink.notifyReviewWrite(accepted, base);
+            return accepted;
         } catch {
             // If the diff can't be shown, fail safe: do not auto-write.
             const action = await this.messages.warn(
