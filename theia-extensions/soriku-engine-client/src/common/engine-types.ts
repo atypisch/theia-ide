@@ -124,6 +124,11 @@ export interface ChatRequest {
      * touching the soriku web app's global setting.
      */
     routing_strategy?: RoutingStrategy | null;
+    /**
+     * Per-request cloud spend cap in EUR for this plan (not persisted). Local
+     * models are free, so this caps cloud usage: 0 blocks any paid plan.
+     */
+    cloud_cost_cap_eur?: number | null;
 }
 
 /**
@@ -466,6 +471,12 @@ export interface ChatStreamParams {
      * soriku web app's global setting.
      */
     routingStrategy?: RoutingStrategy;
+    /**
+     * Per-request cloud spend cap in EUR (sent as `cloud_cost_cap_eur`, not
+     * persisted). Local is free, so this caps cloud usage; 0 blocks any paid
+     * plan. Omitted → engine's saved/default cap.
+     */
+    cloudCostCapEur?: number;
 }
 
 export interface EngineClientConfig {

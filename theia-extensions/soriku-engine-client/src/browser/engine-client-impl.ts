@@ -132,6 +132,7 @@ export class EngineClientImpl implements EngineClient {
             context: params.context && params.context.length > 0 ? params.context : undefined,
             plan_auto_execute: params.mode === 'plan' ? false : params.planAutoExecute,
             routing_strategy: params.routingStrategy,
+            cloud_cost_cap_eur: params.cloudCostCapEur,
         };
         const transport = this.createTransport();
         for await (const event of transport.postSse('/api/worker', body, signal)) {

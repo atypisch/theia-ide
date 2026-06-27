@@ -42,6 +42,8 @@ import {
 const ACTIVE_CHAT_STORAGE_KEY = 'soriku.chat.active';
 /** User-configurable term for a head agent's spawned sub-agents (Fase F). */
 const SUBAGENT_LABEL_PREF = 'soriku.ui.subagentLabel';
+/** Per-plan cloud spend cap (EUR); negative = no IDE cap (engine default). */
+const CLOUD_COST_CAP_PREF = 'soriku.routing.cloudCostCapEur';
 interface ActiveChatState { conversationId: string; agentId?: string; agentName?: string; }
 
 /** How the agent works (Cursor-style behaviour), independent of model choice. */
@@ -495,7 +497,18 @@ export class SorikuChatWidget extends ReactWidget {
             workerModels: ensemble ? this.workerModels : undefined,
             planAutoExecute: this.behavior === 'plan' ? false : undefined,
             routingStrategy: this.routingStrategy,
+            cloudCostCapEur: this.getCloudCostCap(),
         };
+    }
+
+    /**
+     * Per-request cloud spend cap (EUR) from preferences. A negative pref means
+     * "no IDE cap" → undefined, so the engine keeps its own default. 0 blocks
+     * any paid (cloud) plan, making cloud usage capped from Soriku IDE.
+     */
+    protected getCloudCostCap(): number | undefined {
+        const cap = this.preferences.get<number>(CLOUD_COST_CAP_PREF, -1);
+        return typeof cap === 'number' && cap >= 0 ? cap : undefined;
     }
 
     /** @file mentions + open editor tabs as engine context items. */
