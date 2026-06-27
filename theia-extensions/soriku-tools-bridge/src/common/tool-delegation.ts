@@ -135,3 +135,24 @@ export function formatSearchResults(hits: { path: string; line: number; text: st
 export function errorResult(error: string): ToolExecResult {
     return { error };
 }
+
+/**
+ * Cumulative reveal frames for the live-growing diff (Fase 1B). Splits `content`
+ * into up to `maxFrames` cumulative prefixes ending at the full content, so a
+ * diff editor can grow the proposed file "typewriter"-style. Reveals by line so
+ * code appears in readable chunks; an empty leading frame starts from blank.
+ */
+export function progressiveRevealFrames(content: string, maxFrames = 24): string[] {
+    if (!content) {
+        return [''];
+    }
+    const lines = content.split('\n');
+    const total = lines.length;
+    const step = Math.max(1, Math.ceil(total / Math.max(1, maxFrames)));
+    const frames: string[] = [''];
+    for (let upto = step; upto < total; upto += step) {
+        frames.push(lines.slice(0, upto).join('\n'));
+    }
+    frames.push(content); // always end on the complete content
+    return frames;
+}

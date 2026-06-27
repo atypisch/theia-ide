@@ -18,6 +18,7 @@ import URI from '@theia/core/lib/common/uri';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
+import { progressiveRevealFrames } from '../common/tool-delegation';
 
 @injectable()
 export class SorikuDiffReviewService {
@@ -40,6 +41,9 @@ export class SorikuDiffReviewService {
     /** Monotonic id so each review gets unique in-memory URIs (no collisions). */
     protected reviewCounter = 0;
 
+    /** Delay between live-reveal frames (ms). 0 disables the animation. */
+    protected revealDelayMs = 35;
+
     /**
      * Show a diff of the current file (or empty for a new file) against the
      * proposed content and ask the user to Accept or Reject.
@@ -52,9 +56,11 @@ export class SorikuDiffReviewService {
         const exists = await this.safeExists(targetUri);
         const id = ++this.reviewCounter;
 
-        // Proposed (right) side — always in-memory; never touches disk.
+        // Proposed (right) side — always in-memory; never touches disk. Start
+        // blank and grow it live (Fase 1B) so the code appears "typewriter"-style.
         const proposedUri = this.memoryUri(`proposed-${id}`, base);
-        this.inMemory.add(proposedUri, proposedContent);
+        const frames = progressiveRevealFrames(proposedContent);
+        this.inMemory.add(proposedUri, frames[0]);
 
         // Original (left) side — the real file when it exists, else an
         // in-memory empty doc so a brand-new file diffs against nothing.
@@ -72,6 +78,9 @@ export class SorikuDiffReviewService {
         try {
             const diffUri = DiffUris.encode(originalUri, proposedUri, label);
             await open(this.openerService, diffUri, { mode: 'activate' });
+
+            // Grow the proposed side live so the diff fills in as if typed.
+            await this.revealProgressively(proposedUri, frames);
 
             const verb = exists ? 'changes to' : 'creation of';
             const action = await this.messages.info(
@@ -96,6 +105,26 @@ export class SorikuDiffReviewService {
             if (originalMem) {
                 this.dispose(originalMem);
             }
+        }
+    }
+
+    /**
+     * Update the proposed in-memory resource through its reveal frames so the
+     * open Monaco diff grows live. InMemoryResources.update fires the resource's
+     * onDidChangeContents, which the editor model reloads from.
+     */
+    protected async revealProgressively(uri: URI, frames: string[]): Promise<void> {
+        if (this.revealDelayMs <= 0 || frames.length <= 1) {
+            this.inMemory.update(uri, frames[frames.length - 1] ?? '');
+            return;
+        }
+        for (let i = 1; i < frames.length; i++) {
+            try {
+                this.inMemory.update(uri, frames[i]);
+            } catch {
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, this.revealDelayMs));
         }
     }
 

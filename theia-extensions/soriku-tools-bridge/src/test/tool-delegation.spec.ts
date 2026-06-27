@@ -7,7 +7,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind, truncateToMaxLines,
+    DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind,
+    progressiveRevealFrames, truncateToMaxLines,
 } from '../common/tool-delegation';
 
 describe('parseToolRequestEvent', () => {
@@ -82,5 +83,24 @@ describe('truncateToMaxLines', () => {
     it('truncates and annotates long content', () => {
         const out = truncateToMaxLines('a\nb\nc\nd', 2);
         assert.equal(out, 'a\nb\n\n[... truncated, 2 more lines]');
+    });
+});
+
+describe('progressiveRevealFrames', () => {
+    it('starts empty, grows cumulatively, ends with full content', () => {
+        const content = Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n');
+        const frames = progressiveRevealFrames(content, 4);
+        assert.equal(frames[0], '');
+        assert.equal(frames[frames.length - 1], content);
+        // each frame is a prefix of the final content and non-decreasing in length
+        for (let i = 1; i < frames.length; i++) {
+            assert.ok(content.startsWith(frames[i]) || frames[i] === content);
+            assert.ok(frames[i].length >= frames[i - 1].length);
+        }
+        assert.ok(frames.length <= 6); // ~maxFrames + endpoints
+    });
+
+    it('handles empty content', () => {
+        assert.deepEqual(progressiveRevealFrames(''), ['']);
     });
 });
