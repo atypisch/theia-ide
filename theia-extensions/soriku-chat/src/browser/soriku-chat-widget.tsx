@@ -24,6 +24,7 @@ import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/s
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { ChatMarkdown } from './chat-markdown-view';
 import {
+    AgentInsights,
     AssistantTurn,
     ChatMessage,
     ChatToolCall,
@@ -33,6 +34,7 @@ import {
     formatToolCallSummary,
     fromEngineMessages,
     reduceSseEvent,
+    summarizeAgentInsights,
 } from '../common/chat-model';
 
 /** Persisted (across reloads) pointer to the chat the user was last in. */
@@ -145,6 +147,11 @@ export class SorikuChatWidget extends ReactWidget {
 
     protected conversation: ChatMessage[] = [];
     protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
+    /** Fase E insights panel: what the active agent has learned. */
+    protected insightsOpen = false;
+    protected insights?: AgentInsights;
+    protected insightsAgentId?: string;
+    protected insightsLoading = false;
     protected conversationId: string | undefined;
     protected conversationTitle?: string;
     protected streaming = false;
@@ -353,6 +360,8 @@ export class SorikuChatWidget extends ReactWidget {
         this.abortController?.abort();
         this.conversation = [];
         this.feedbackByTurn.clear();
+        this.insights = undefined;
+        this.insightsAgentId = undefined;
         this.conversationId = undefined;
         this.conversationTitle = undefined;
         this.streaming = false;
@@ -596,6 +605,67 @@ export class SorikuChatWidget extends ReactWidget {
         }
     }
 
+    /** Toggle the insights panel; (re)load the active agent's learnings on open. */
+    protected async toggleInsights(): Promise<void> {
+        this.insightsOpen = !this.insightsOpen;
+        const agentId = this.selection.getActiveId();
+        this.update();
+        if (!this.insightsOpen || !agentId) {
+            return;
+        }
+        if (this.insights && this.insightsAgentId === agentId) {
+            return; // cached for this agent
+        }
+        this.insightsLoading = true;
+        this.update();
+        try {
+            const res = await this.engineClient.getAgent(agentId);
+            this.insights = summarizeAgentInsights(res.data);
+            this.insightsAgentId = agentId;
+        } catch (e) {
+            this.insights = undefined;
+            this.messages.error(`Could not load insights: ${(e as Error).message}`);
+        } finally {
+            this.insightsLoading = false;
+            this.update();
+        }
+    }
+
+    protected renderInsights(): React.ReactNode {
+        const ins = this.insights;
+        return <div className='soriku-insights'>
+            {this.insightsLoading && <div className='soriku-insights-loading'>Loading what this agent learned…</div>}
+            {!this.insightsLoading && ins && <>
+                {typeof ins.interactions === 'number' && <div className='soriku-insights-stat'>
+                    {ins.interactions} interaction{ins.interactions === 1 ? '' : 's'} learned from
+                </div>}
+                {ins.topPatterns.length > 0 && <div className='soriku-insights-section'>
+                    <div className='soriku-insights-label'>Focus areas (learned)</div>
+                    <div className='soriku-insights-chips'>
+                        {ins.topPatterns.map(p => <span key={p.keyword} className='soriku-insights-chip'
+                            title={`weight ${p.weight.toFixed(2)}`}>{p.keyword}</span>)}
+                    </div>
+                </div>}
+                {ins.domainRules.length > 0 && <div className='soriku-insights-section'>
+                    <div className='soriku-insights-label'>Domain rules</div>
+                    <ul className='soriku-insights-list'>{ins.domainRules.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                </div>}
+                {ins.antiPatterns.length > 0 && <div className='soriku-insights-section'>
+                    <div className='soriku-insights-label'>Anti-patterns</div>
+                    <ul className='soriku-insights-list soriku-insights-anti'>{ins.antiPatterns.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                </div>}
+                {ins.specializations.length > 0 && <div className='soriku-insights-section'>
+                    <div className='soriku-insights-label'>Specializations</div>
+                    <div className='soriku-insights-chips'>
+                        {ins.specializations.map(s => <span key={s} className='soriku-insights-chip'>{s}</span>)}
+                    </div>
+                </div>}
+                {ins.topPatterns.length === 0 && ins.domainRules.length === 0 && ins.antiPatterns.length === 0
+                    && <div className='soriku-insights-empty'>This agent hasn't learned anything specific yet — use it and give feedback.</div>}
+            </>}
+        </div>;
+    }
+
     protected render(): React.ReactNode {
         const agentId = this.selection.getActiveId();
         const agentName = this.selection.getActiveName();
@@ -607,11 +677,18 @@ export class SorikuChatWidget extends ReactWidget {
                         : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
                     {this.conversationTitle && <span className='soriku-chat-conv-title' title={this.conversationTitle}>{this.conversationTitle}</span>}
                 </div>
-                <button className='theia-button secondary soriku-chat-new' title='Start a new conversation'
-                    disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
-                    New chat
-                </button>
+                <div className='soriku-chat-header-actions'>
+                    {agentId && <button className='theia-button secondary soriku-chat-insights-toggle'
+                        title='What this agent has learned' onClick={() => this.toggleInsights()}>
+                        <span className='codicon codicon-lightbulb' /> Insights
+                    </button>}
+                    <button className='theia-button secondary soriku-chat-new' title='Start a new conversation'
+                        disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
+                        New chat
+                    </button>
+                </div>
             </div>
+            {agentId && this.insightsOpen && this.renderInsights()}
             {agentId && this.renderControls()}
             <div className='soriku-chat-messages'>
                 {this.conversation.length === 0

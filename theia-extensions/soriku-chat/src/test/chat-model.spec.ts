@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent } from '../common/chat-model';
+import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent, summarizeAgentInsights } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
     return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
@@ -317,5 +317,35 @@ describe('worker_chunk and timing', () => {
         turn = reduceSseEvent(turn, { type: 'synthesis_start' });
         assert.equal(turn.text, 'worker output');
         assert.equal(turn.phase, 'Merging answers…');
+    });
+});
+
+describe('summarizeAgentInsights', () => {
+    it('extracts top patterns, rules, anti-patterns, specializations, interactions', () => {
+        const persona = {
+            specializations: [{ name: 'php' }, { name: 'frontend' }],
+            memory: { decision_patterns: { patterns: { php: 0.9, react: 0.3, mysql: 0.6 } } },
+            intelligence: { domain_rules: ['always validate input', { rule: 'use PDO' }], anti_patterns: ['no eval'] },
+            stats: { interactions: 42 },
+        } as unknown as Parameters<typeof summarizeAgentInsights>[0];
+        const ins = summarizeAgentInsights(persona);
+        assert.deepEqual(ins.topPatterns.map(p => p.keyword), ['php', 'mysql', 'react']);
+        assert.deepEqual(ins.domainRules, ['always validate input', 'use PDO']);
+        assert.deepEqual(ins.antiPatterns, ['no eval']);
+        assert.deepEqual(ins.specializations, ['php', 'frontend']);
+        assert.equal(ins.interactions, 42);
+    });
+
+    it('handles a flat decision_patterns map and missing fields', () => {
+        const persona = {
+            specializations: [],
+            memory: { decision_patterns: { php: 0.5, js: 0.7 } },
+            intelligence: {},
+            stats: {},
+        } as unknown as Parameters<typeof summarizeAgentInsights>[0];
+        const ins = summarizeAgentInsights(persona);
+        assert.deepEqual(ins.topPatterns.map(p => p.keyword), ['js', 'php']);
+        assert.deepEqual(ins.domainRules, []);
+        assert.equal(ins.interactions, undefined);
     });
 });

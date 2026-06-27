@@ -511,6 +511,69 @@
     font-size: 0.85em;
 }
 
+/* Insights panel — what the active agent has learned (Fase E). */
+.soriku-chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.soriku-insights {
+    border: 1px solid var(--theia-editorGroup-border);
+    border-radius: 6px;
+    margin: 6px 10px 0;
+    padding: 8px 10px;
+    background: var(--theia-editorWidget-background);
+    max-height: 220px;
+    overflow: auto;
+}
+
+.soriku-insights-loading,
+.soriku-insights-empty {
+    color: var(--theia-descriptionForeground);
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-insights-stat {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    margin-bottom: 6px;
+}
+
+.soriku-insights-section {
+    margin-top: 6px;
+}
+
+.soriku-insights-label {
+    font-weight: 600;
+    font-size: var(--theia-ui-font-size0);
+    margin-bottom: 3px;
+}
+
+.soriku-insights-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.soriku-insights-chip {
+    font-size: var(--theia-ui-font-size0);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--theia-textLink-foreground) 14%, transparent);
+    color: var(--theia-textLink-foreground);
+}
+
+.soriku-insights-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-insights-anti li {
+    color: var(--theia-errorForeground);
+}
+
 .soriku-chat-input {
     border-top: 1px solid var(--theia-sideBarSectionHeader-border);
     padding: 8px 10px;

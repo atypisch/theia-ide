@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { ConversationMessage, SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { AgentPersona, ConversationMessage, SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 
 export type ToolOutcome = 'ok' | 'blocked' | 'salvaged' | 'denied' | 'error';
 
@@ -599,4 +599,57 @@ export function busyPhase(turn: AssistantTurn): string {
         return turn.phase;
     }
     return turn.text ? 'Writing…' : 'Thinking…';
+}
+
+/** Distilled, render-ready view of what an agent has learned (Fase E insights). */
+export interface AgentInsights {
+    topPatterns: { keyword: string; weight: number }[];
+    domainRules: string[];
+    antiPatterns: string[];
+    specializations: string[];
+    interactions?: number;
+}
+
+/** Coerce a domain-rule entry (string, or {rule, ...}) to a display string. */
+function ruleText(entry: unknown): string | undefined {
+    if (typeof entry === 'string') {
+        return entry;
+    }
+    if (entry && typeof entry === 'object') {
+        const r = (entry as Record<string, unknown>).rule;
+        if (typeof r === 'string') {
+            return r;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Summarise an agent persona into the insights the IDE panel shows: the top
+ * learned decision keywords, promoted domain rules / anti-patterns,
+ * specializations, and interaction count. Pure + defensive — the engine's
+ * memory shape varies (decision_patterns may be a flat map or {patterns: {…}}).
+ */
+export function summarizeAgentInsights(persona: AgentPersona): AgentInsights {
+    const memory = (persona.memory ?? {}) as Record<string, unknown>;
+    const dpRaw = (memory.decision_patterns ?? {}) as Record<string, unknown>;
+    const patternMap = (dpRaw.patterns && typeof dpRaw.patterns === 'object'
+        ? dpRaw.patterns
+        : dpRaw) as Record<string, unknown>;
+    const topPatterns = Object.entries(patternMap)
+        .filter(([, w]) => typeof w === 'number')
+        .map(([keyword, w]) => ({ keyword, weight: w as number }))
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 8);
+
+    const intelligence = (persona.intelligence ?? {}) as { domain_rules?: unknown[]; anti_patterns?: unknown[] };
+    const domainRules = (intelligence.domain_rules ?? []).map(ruleText).filter((r): r is string => !!r);
+    const antiPatterns = (intelligence.anti_patterns ?? []).map(ruleText).filter((r): r is string => !!r);
+    const specializations = (persona.specializations ?? []).map(s => s?.name).filter((n): n is string => !!n);
+
+    const stats = (persona.stats ?? {}) as Record<string, unknown>;
+    const interactionsRaw = stats.interactions ?? stats.interaction_count ?? stats.total_interactions;
+    const interactions = typeof interactionsRaw === 'number' ? interactionsRaw : undefined;
+
+    return { topPatterns, domainRules, antiPatterns, specializations, interactions };
 }
