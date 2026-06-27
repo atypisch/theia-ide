@@ -635,6 +635,10 @@ export class SorikuChatWidget extends ReactWidget {
                 {turn.workers.length > 0 && <span className='soriku-msg-workers' title='Models that collaborated on this answer'>
                     {turn.workers.length} workers: {turn.workers.join(', ')}
                 </span>}
+                {turn.escalation && <span
+                    className='soriku-msg-escalation'
+                    title={`Escalated${turn.escalation.from ? ` from ${turn.escalation.from}` : ''}${turn.escalation.reason ? ` (${turn.escalation.reason})` : ''}`}
+                >⤴ escalated → {turn.escalation.to ?? 'another model'}</span>}
                 {typeof turn.ttftMs === 'number' && <span className='soriku-msg-timing' title='Time to first token'>
                     {turn.ttftMs < 1000 ? `${turn.ttftMs}ms` : `${(turn.ttftMs / 1000).toFixed(1)}s`} TTFT
                 </span>}

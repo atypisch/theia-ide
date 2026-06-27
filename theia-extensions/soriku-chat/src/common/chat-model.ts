@@ -83,6 +83,8 @@ export interface AssistantTurn {
     planNeedsApproval?: boolean;
     /** Latest progress message from the engine (status / plan / worker events). */
     phase?: string;
+    /** Set when the engine escalated to another model (e.g. timed-out local → cloud). */
+    escalation?: { from?: string; to?: string; reason?: string };
     /** Time to first token (ms) — from SSE `timing` event. */
     ttftMs?: number;
     /** Total stream duration (ms) — from SSE `done` event. */
@@ -316,6 +318,15 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
                     next.generatedFiles.push(f);
                 }
             });
+            break;
+        }
+        case 'escalation': {
+            next.escalation = {
+                from: asString(event.from),
+                to: asString(event.to),
+                reason: asString(event.reason),
+            };
+            next.phase = `Escalated to ${asString(event.to) ?? 'another model'}`;
             break;
         }
         case 'review_verdict': {

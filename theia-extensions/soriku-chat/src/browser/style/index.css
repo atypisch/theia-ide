@@ -97,6 +97,15 @@
     opacity: 0.85;
 }
 
+.soriku-msg-escalation {
+    font-size: var(--theia-ui-font-size0);
+    font-weight: 600;
+    color: var(--theia-editorWarning-foreground, #b58900);
+    background: color-mix(in srgb, var(--theia-editorWarning-foreground, #b58900) 14%, transparent);
+    padding: 0 6px;
+    border-radius: 999px;
+}
+
 /* ─── Orchestration toolbar ─────────────────────────────────────────── */
 
 .soriku-chat-orchestration {

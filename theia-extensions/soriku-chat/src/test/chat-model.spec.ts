@@ -119,6 +119,15 @@ describe('reduceSseEvent', () => {
         assert.equal(turn.agents.find(a => a.workerId === 'w2')?.status, 'running');
     });
 
+    it('captures an escalation event for the chip', () => {
+        const turn = fold([
+            { type: 'escalation', from: 'ollama:qwen2.5-coder:7b', to: 'groq:kimi-k2', reason: 'conductor_fallback' },
+        ]);
+        assert.equal(turn.escalation?.from, 'ollama:qwen2.5-coder:7b');
+        assert.equal(turn.escalation?.to, 'groq:kimi-k2');
+        assert.equal(turn.escalation?.reason, 'conductor_fallback');
+    });
+
     it('marks confirm_tool calls as requested', () => {
         const turn = fold([
             { type: 'confirm_tool', tool: 'file_write', confirmation_id: 'c9', args: { path: 'b.ts' } },
