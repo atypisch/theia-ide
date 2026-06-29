@@ -6,7 +6,7 @@
 
 import { AgentPersona, ConversationMessage, SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 
-export type ToolOutcome = 'ok' | 'blocked' | 'salvaged' | 'denied' | 'error';
+export type ToolOutcome = 'ok' | 'blocked' | 'salvaged' | 'denied' | 'error' | 'verify_failed' | 'verified';
 
 export interface ChatToolCall {
     callId?: string;
@@ -370,7 +370,7 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             if (callWorkerId) {
                 const existing = next.agents.find(a => a.workerId === callWorkerId);
                 const isWrite = !failed && toolPath && (event.tool === 'file_write' || event.tool === 'apply_patch');
-                const corrected = outcome === 'blocked' || outcome === 'salvaged';
+                const corrected = outcome === 'blocked' || outcome === 'salvaged' || outcome === 'verify_failed';
                 upsertAgent(next.agents, callWorkerId, {
                     files: isWrite ? mergeFilePaths(existing?.files, [toolPath]) : (existing?.files ?? []),
                     corrections: (existing?.corrections ?? 0) + (corrected ? 1 : 0),

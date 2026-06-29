@@ -61,6 +61,8 @@ const OUTCOME_LABELS: Record<string, string> = {
     salvaged: 'recovered',
     denied: 'denied',
     error: 'error',
+    verify_failed: 'fixing',
+    verified: 'verified ✓',
 };
 
 const BEHAVIOR_OPTIONS: BehaviorOption[] = [

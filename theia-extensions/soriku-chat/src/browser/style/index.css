@@ -393,12 +393,25 @@
     background: color-mix(in srgb, var(--theia-descriptionForeground) 16%, transparent);
 }
 
+/* Code Reasoning Layer: the engine ran lint/type/test on the edit. "fixing" =
+   diagnostics found + fed back to correct; "verified ✓" = passed clean. */
+.soriku-tool-outcome-verify_failed {
+    color: var(--theia-editorWarning-foreground, #b58900);
+    background: color-mix(in srgb, var(--theia-editorWarning-foreground, #b58900) 16%, transparent);
+}
+
+.soriku-tool-outcome-verified {
+    color: var(--theia-successBackground, #2ea043);
+    background: color-mix(in srgb, var(--theia-successBackground, #2ea043) 16%, transparent);
+}
+
 .soriku-tool-call.soriku-tool-blocked,
 .soriku-tool-call.soriku-tool-error {
     border-color: var(--theia-errorForeground);
 }
 
-.soriku-tool-call.soriku-tool-salvaged {
+.soriku-tool-call.soriku-tool-salvaged,
+.soriku-tool-call.soriku-tool-verify_failed {
     border-color: var(--theia-editorWarning-foreground, #b58900);
 }
 
