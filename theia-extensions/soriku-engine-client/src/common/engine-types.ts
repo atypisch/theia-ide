@@ -498,3 +498,33 @@ export interface EngineClientConfig {
     /** Timeout in milliseconds applied to non-streaming requests. SSE streams are never timed out. */
     timeoutMs?: number;
 }
+
+// ── External MCP servers (client) ──
+export interface McpServer {
+    name: string;
+    transport?: string;            // 'stdio' | 'sse'
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    url?: string;
+    enabled?: boolean;
+    allowlist?: string[];
+    requires_confirmation?: boolean;
+}
+
+export interface McpServersResponse {
+    enabled?: boolean;
+    servers: McpServer[];
+    health?: Record<string, string>;   // server name → 'ok' | error
+}
+
+export interface McpPutResponse {
+    saved: number;
+    health: Record<string, string>;
+}
+
+export interface McpTestResponse {
+    ok: boolean;
+    tools: string[];
+    error?: string | null;
+}

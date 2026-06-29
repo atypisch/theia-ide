@@ -1,0 +1,134 @@
+/* Soriku IDE — MCP servers widget */
+
+.soriku-mcp {
+    padding: 12px 16px;
+    overflow: auto;
+    height: 100%;
+}
+
+.soriku-mcp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.soriku-mcp-title {
+    font-size: var(--theia-ui-font-size2);
+    font-weight: 600;
+}
+
+.soriku-mcp-note {
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.soriku-mcp-note code {
+    font-family: var(--theia-code-font-family);
+    background: var(--theia-textCodeBlock-background);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+.soriku-mcp-add {
+    border: 1px solid var(--theia-editorWidget-border);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.soriku-mcp-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.soriku-mcp-add-row .theia-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-mcp-url {
+    width: 100%;
+}
+
+.soriku-mcp-add-actions {
+    margin-top: 2px;
+}
+
+.soriku-mcp-confirm {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-mcp-spacer {
+    flex: 1;
+}
+
+.soriku-mcp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--theia-ui-font-size1);
+}
+
+.soriku-mcp-table th,
+.soriku-mcp-table td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--theia-editorWidget-border);
+    vertical-align: middle;
+}
+
+.soriku-mcp-table th {
+    font-size: var(--theia-ui-font-size0);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-mcp-target {
+    font-family: var(--theia-code-font-family);
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-mcp-health {
+    font-size: var(--theia-ui-font-size0);
+    font-weight: 600;
+}
+
+.soriku-mcp-health.ok {
+    color: var(--theia-successBackground, #2ea043);
+}
+
+.soriku-mcp-health.bad {
+    color: var(--theia-editorWarning-foreground, #b58900);
+}
+
+.soriku-mcp-message {
+    padding: 16px 4px;
+    color: var(--theia-descriptionForeground);
+}
+
+.soriku-mcp-error {
+    color: var(--theia-errorForeground);
+}
+
+.soriku-mcp-error-detail {
+    font-family: var(--theia-code-font-family);
+    font-size: var(--theia-ui-font-size0);
+    margin: 6px 0;
+    word-break: break-word;
+}

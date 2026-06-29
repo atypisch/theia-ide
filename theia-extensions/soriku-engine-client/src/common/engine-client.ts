@@ -33,6 +33,10 @@ import {
     PlanSignalResponse,
     ProviderPresetsResponse,
     ProvidersResponse,
+    McpServersResponse,
+    McpPutResponse,
+    McpServer,
+    McpTestResponse,
     RecommendedRoutingResponse,
     RenameConversationResponse,
     RoutingGapsResponse,
@@ -79,6 +83,11 @@ export interface EngineClient {
     listModels(): Promise<V1ModelsResponse>;
     /** Providers with live health (key valid, credits, reachable) for availability checks. */
     listProviders(): Promise<ProvidersResponse>;
+
+    // ── External MCP servers (client) ──
+    listMcpServers(): Promise<McpServersResponse>;
+    putMcpServers(servers: McpServer[], enabled?: boolean): Promise<McpPutResponse>;
+    testMcpServer(server: McpServer): Promise<McpTestResponse>;
 
     // ── Model management (mirrors the Soriku install) ──
     listInstalledModels(): Promise<InstalledModelsResponse>;

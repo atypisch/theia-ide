@@ -40,6 +40,10 @@ import {
     PlanSignalResponse,
     ProviderPresetsResponse,
     ProvidersResponse,
+    McpServersResponse,
+    McpPutResponse,
+    McpServer,
+    McpTestResponse,
     RecommendedRoutingResponse,
     RenameConversationResponse,
     RoutingGapsResponse,
@@ -181,6 +185,22 @@ export class EngineClientImpl implements EngineClient {
         return this.createTransport().deleteJson<DeleteRoutingOverrideResponse>(
             `/api/routing/overrides/${encodeURIComponent(category)}`
         );
+    }
+
+    async listMcpServers(): Promise<McpServersResponse> {
+        return this.createTransport().getJson<McpServersResponse>('/api/mcp/servers');
+    }
+
+    async putMcpServers(servers: McpServer[], enabled?: boolean): Promise<McpPutResponse> {
+        const body: { servers: McpServer[]; enabled?: boolean } = { servers };
+        if (enabled !== undefined) {
+            body.enabled = enabled;
+        }
+        return this.createTransport().requestJson<McpPutResponse>('PUT', '/api/mcp/servers', body);
+    }
+
+    async testMcpServer(server: McpServer): Promise<McpTestResponse> {
+        return this.createTransport().postJson<McpTestResponse>('/api/mcp/test', server);
     }
 
     async getRecommendedRouting(): Promise<RecommendedRoutingResponse> {
