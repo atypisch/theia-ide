@@ -36,5 +36,12 @@ export const sorikuEnginePreferenceSchema: PreferenceSchema = {
             minimum: 0,
             scope: PreferenceScope.User,
         },
+        'soriku.completion.inlineEnabled': {
+            type: 'boolean',
+            description: 'Show inline (ghost-text) code completions as you type, '
+                + 'from the local code model. Press Tab to accept. Off disables them.',
+            default: true,
+            scope: PreferenceScope.User,
+        },
     },
 };

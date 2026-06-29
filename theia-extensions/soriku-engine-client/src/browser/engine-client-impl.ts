@@ -21,6 +21,8 @@ import {
     AgentUpdateRequest,
     AuthModeResponse,
     BrowseModelsResponse,
+    CompleteRequest,
+    CompleteResponse,
     CapabilityMapResponse,
     ChatRequest,
     ChatStreamParams,
@@ -142,6 +144,10 @@ export class EngineClientImpl implements EngineClient {
 
     async confirmTool(body: ConfirmRequest): Promise<ConfirmResponse> {
         return this.createTransport().postJson<ConfirmResponse>('/api/worker/confirm', body);
+    }
+
+    async complete(body: CompleteRequest): Promise<CompleteResponse> {
+        return this.createTransport().postJson<CompleteResponse>('/api/complete', body);
     }
 
     async executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse> {

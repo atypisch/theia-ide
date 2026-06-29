@@ -18,6 +18,8 @@ import {
     BrowseModelsResponse,
     CapabilityMapResponse,
     ChatStreamParams,
+    CompleteRequest,
+    CompleteResponse,
     ConfirmRequest,
     ConfirmResponse,
     ConversationDetail,
@@ -61,6 +63,8 @@ export interface EngineClient {
 
     chatStream(params: ChatStreamParams, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent>;
     confirmTool(body: ConfirmRequest): Promise<ConfirmResponse>;
+    /** Inline (fill-in-the-middle) code completion for editor ghost-text. */
+    complete(body: CompleteRequest): Promise<CompleteResponse>;
     /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
     executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */

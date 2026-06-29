@@ -12,6 +12,7 @@
   ],
   "dependencies": {
     "@theia/core": "1.73.0-next.2",
+    "@theia/monaco-editor-core": "1.108.201",
     "inversify": "^6.2.2"
   },
   "devDependencies": {

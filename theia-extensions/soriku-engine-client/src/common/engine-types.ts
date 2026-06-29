@@ -158,6 +158,19 @@ export interface ConfirmResponse {
     ok: boolean;
 }
 
+/** Inline (fill-in-the-middle) code-completion request for editor ghost-text. */
+export interface CompleteRequest {
+    prefix: string;
+    suffix?: string;
+    language?: string;
+    path?: string;
+    max_tokens?: number;
+}
+
+export interface CompleteResponse {
+    completion: string;
+}
+
 export interface PlanTaskEdit {
     id: string;
     goal: string;
