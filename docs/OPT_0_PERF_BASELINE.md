@@ -2,19 +2,25 @@
 
 **Date:** 2026-06-30 · **Rule:** measured, not "feels" — every Phase-3 claim is re-measured against these tables with the *exact same commands*. Zero code changes in Phase 0 (browser-side observation + the existing `@theia/metrics` endpoint).
 
+## ⛔ Measurement status: BLOCKED — host not idle (2026-06-30)
+
+Pre-flight failed: a **launchd-scheduled "deepseek full benchmark"** (PID 8631, parent = launchd, running ~4h) holds Ollama (`deepseek-r1:7b` loaded) and saturates the 16 GB host. Per the protocol and risk #2, perf measurement **and** the fresh prod build are deferred until this job finishes — measuring/building now would produce invalid numbers and thrash the host alongside a legit job (which is Marten's, not to be killed). Environment snapshot captured below for the record; measurement tables to be filled in the next idle window.
+
 ## Environment fingerprint (record before every session)
 
 | Field | Value |
 |-------|-------|
-| Date/time | _(fill)_ |
-| git SHA (IDE) | _(fill)_ |
-| Build mode | prod (`theia build --app-target=browser`, no `--mode development`) |
-| macOS / Node | _(fill)_ |
-| `sysctl hw.memsize` | _(fill)_ |
-| `uptime` load (1/5/15) | _(fill)_ |
-| Ollama idle? (`curl -s localhost:11434/api/ps`) | must be empty models list |
-| Engine benchmark running? | must be NONE — the 45-task rerun is **forbidden** during any measurement window |
-| Test workspace | fixed, same every run: `_(pick, e.g. /Users/martentiman/Sites/simezu)_` |
+| Date/time | 2026-06-30 (pre-flight; measurement deferred) |
+| git SHA (IDE) | `bd80407` |
+| Build mode | prod (`theia build --app-target=browser`, no `--mode development`) — **not yet rebuilt** |
+| macOS / Node | 15.7.3 / v24.11.1 (yarn 1.22.22) |
+| `sysctl hw.memsize` | 16 GB |
+| `uptime` load (1/5/15) | 4.82 / 3.35 / 3.45 (contended — launchd benchmark) |
+| Ollama idle? (`curl -s localhost:11434/api/ps`) | **NO** — `deepseek-r1:7b` loaded |
+| Engine benchmark running? | **YES** — launchd "deepseek full benchmark", PID 8631, ~4h in |
+| Test workspace | fixed, same every run: _(pick, e.g. `/Users/martentiman/Sites/simezu`)_ |
+
+**Reference only (current build, mode unknown — NOT the baseline; rebuild required):** `bundle.js` 32,366,325 B · `secondary-window.js` 25,806,095 B · `plugin-worker.js` 7,141,918 B · `editor.worker.js` 3,164,861 B.
 
 **Session teardown (RAM discipline):** `browser_close` the MCP browser, kill the Theia backend, confirm with `ps`. Never leave `yarn watch` running during measurement.
 
