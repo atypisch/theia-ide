@@ -17,7 +17,8 @@ import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/com
 import { describeToolConfirmation, parseConfirmToolEvent } from '../common/tool-confirmation';
 import {
     DELEGATED_TOOLS, ToolRequest, applyUnifiedPatch, errorResult, formatDirectoryListing, formatSearchResults,
-    formatWriteResult, getNumberArg, getStringArg, okResult, parseToolRequestEvent, pathKind, truncateToMaxLines,
+    formatWriteResult, getNumberArg, getStringArg, isPathWithinRoot, okResult, parseToolRequestEvent, pathKind,
+    sessionAllowKey, truncateToMaxLines,
 } from '../common/tool-delegation';
 import { SorikuEditorRevealService } from './soriku-editor-reveal-service';
 import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
@@ -73,7 +74,7 @@ export class SorikuToolConfirmationService {
         }
         const { approved, rememberSession } = await this.promptUser(request.tool, view, request.confirmationId);
         if (approved && rememberSession) {
-            SESSION_ALLOW.add(request.tool);
+            SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
         }
         await this.engineClient.confirmTool({
             confirmation_id: request.confirmationId,
@@ -117,7 +118,7 @@ export class SorikuToolConfirmationService {
     }
 
     protected async confirmDestructive(request: ToolRequest): Promise<boolean> {
-        if (SESSION_ALLOW.has(request.tool)) {
+        if (SESSION_ALLOW.has(sessionAllowKey(request.tool, request.args))) {
             return true;
         }
         // File writes get a diff review (see proposed changes, then accept/reject)
@@ -133,7 +134,7 @@ export class SorikuToolConfirmationService {
         });
         const { approved, rememberSession } = await this.promptUser(request.tool, view, request.requestId);
         if (approved && rememberSession) {
-            SESSION_ALLOW.add(request.tool);
+            SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
         }
         return approved;
     }
@@ -216,18 +217,27 @@ export class SorikuToolConfirmationService {
         return errorResult(`Unsupported tool: ${request.tool}`);
     }
 
-    /** Resolve a tool path argument against the workspace root (absolute paths used as-is). */
+    /**
+     * Resolve a tool path argument against the workspace root, CONTAINED to it (#11):
+     * an absolute path outside the root or a relative path that climbs out via `..` is
+     * refused rather than silently reaching the host filesystem.
+     */
     protected async resolveUri(path: string): Promise<URI> {
         const roots = await this.workspaceService.roots;
         const root = roots[0]?.resource;
         if (!root) {
             throw new Error('No workspace folder is open — open a folder to let agents use file tools.');
         }
+        let candidate: URI;
         switch (pathKind(path)) {
             case 'root': return root;
-            case 'absolute': return root.withPath(path);
-            default: return root.resolve(path);
+            case 'absolute': candidate = root.withPath(path); break;
+            default: candidate = root.resolve(path); break;
         }
+        if (!isPathWithinRoot(root.path.toString(), candidate.path.toString())) {
+            throw new Error(`Refused: "${path}" resolves outside the workspace folder.`);
+        }
+        return candidate;
     }
 
     /** Fast workspace search via ripgrep; falls back to a shallow walk when rg is unavailable. */
@@ -240,7 +250,9 @@ export class SorikuToolConfirmationService {
         if (!root) {
             return [];
         }
-        const base = subpath ? root.resolve(subpath) : root;
+        const requested = subpath ? root.resolve(subpath) : root;
+        // Contain the search to the workspace: a subpath that climbs out (#11) falls back to root.
+        const base = isPathWithinRoot(root.path.toString(), requested.path.toString()) ? requested : root;
         const basePath = base.path.toString();
         try {
             const { execFile } = await import('child_process');
@@ -277,7 +289,9 @@ export class SorikuToolConfirmationService {
         if (!root) {
             return [];
         }
-        const base = subpath ? root.resolve(subpath) : root;
+        const requested = subpath ? root.resolve(subpath) : root;
+        // Contain the search to the workspace: a subpath that climbs out (#11) falls back to root.
+        const base = isPathWithinRoot(root.path.toString(), requested.path.toString()) ? requested : root;
         const hits: { path: string; line: number; text: string }[] = [];
         const needle = query.toLowerCase();
         const walk = async (uri: URI): Promise<void> => {

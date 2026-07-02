@@ -85,6 +85,50 @@ export function pathKind(path: string): PathKind {
     return path.startsWith('/') ? 'absolute' : 'relative';
 }
 
+/** Normalize a POSIX path — resolve `.`/`..`, collapse empty segments. Pure, no FS. */
+export function normalizePosixPath(path: string): string {
+    const out: string[] = [];
+    for (const seg of path.split('/')) {
+        if (seg === '' || seg === '.') {
+            continue;
+        }
+        if (seg === '..') {
+            out.pop();
+            continue;
+        }
+        out.push(seg);
+    }
+    return '/' + out.join('/');
+}
+
+/**
+ * True when `candidate` is the workspace root itself or a descendant of it, after
+ * normalizing away `..`/`.` — the containment check that keeps tool paths inside the
+ * workspace (rejects `/etc/passwd`, `../../x`, etc.). See {@link isPathWithinRoot} #11.
+ */
+export function isPathWithinRoot(rootPath: string, candidate: string): boolean {
+    const root = normalizePosixPath(rootPath);
+    const cand = normalizePosixPath(candidate);
+    if (cand === root) {
+        return true;
+    }
+    return cand.startsWith(root === '/' ? '/' : root + '/');
+}
+
+/**
+ * Key for the session "allow always" set (#12). `shell_exec` is remembered by its
+ * exact normalized command so remembering never green-lights a *different* command;
+ * every other tool is remembered by name (their args are reviewed elsewhere).
+ */
+export function sessionAllowKey(tool: string, args: unknown): string {
+    if (tool === 'shell_exec') {
+        const bag = (args && typeof args === 'object') ? args as Record<string, unknown> : {};
+        const cmd = (getStringArg(bag, 'command') ?? getStringArg(bag, 'cmd') ?? '').trim().replace(/\s+/g, ' ');
+        return `shell_exec\n${cmd}`;
+    }
+    return tool;
+}
+
 export function okResult(result: string): ToolExecResult {
     return { result };
 }

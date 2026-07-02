@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind,
-    progressiveRevealFrames, truncateToMaxLines,
+    progressiveRevealFrames, truncateToMaxLines, normalizePosixPath, isPathWithinRoot, sessionAllowKey,
 } from '../common/tool-delegation';
 
 describe('parseToolRequestEvent', () => {
@@ -102,5 +102,50 @@ describe('progressiveRevealFrames', () => {
 
     it('handles empty content', () => {
         assert.deepEqual(progressiveRevealFrames(''), ['']);
+    });
+});
+
+// ── Security: workspace path containment (#11) ──
+describe('normalizePosixPath', () => {
+    it('resolves . and .. and collapses slashes', () => {
+        assert.equal(normalizePosixPath('/ws/./a//b/../c'), '/ws/a/c');
+        assert.equal(normalizePosixPath('/ws/a/../..'), '/');
+        assert.equal(normalizePosixPath('/ws/'), '/ws');
+    });
+});
+
+describe('isPathWithinRoot (#11)', () => {
+    const root = '/Users/m/Sites/app';
+    it('allows the root itself and descendants', () => {
+        assert.equal(isPathWithinRoot(root, root), true);
+        assert.equal(isPathWithinRoot(root, root + '/src/index.ts'), true);
+        assert.equal(isPathWithinRoot(root, root + '/a/../b.ts'), true);
+    });
+    it('rejects absolute paths outside the root', () => {
+        assert.equal(isPathWithinRoot(root, '/etc/passwd'), false);
+        assert.equal(isPathWithinRoot(root, '/Users/m/Sites/app-evil/x'), false); // prefix-but-not-descendant
+    });
+    it('rejects .. climbs out of the root', () => {
+        assert.equal(isPathWithinRoot(root, root + '/../../secrets'), false);
+        assert.equal(isPathWithinRoot(root, root + '/../app2/x'), false);
+    });
+});
+
+// ── Security: session "allow always" key scoping (#12) ──
+describe('sessionAllowKey (#12)', () => {
+    it('scopes shell_exec by exact normalized command', () => {
+        const k1 = sessionAllowKey('shell_exec', { command: 'ls -la' });
+        const k2 = sessionAllowKey('shell_exec', { command: 'ls   -la' }); // whitespace-normalized → same
+        const k3 = sessionAllowKey('shell_exec', { command: 'rm -rf /' }); // different command → different key
+        assert.equal(k1, k2);
+        assert.notEqual(k1, k3);
+        assert.ok(k1.startsWith('shell_exec\n'));
+    });
+    it('accepts the cmd alias and tolerates missing/!object args', () => {
+        assert.equal(sessionAllowKey('shell_exec', { cmd: 'pwd' }), sessionAllowKey('shell_exec', { command: 'pwd' }));
+        assert.equal(sessionAllowKey('shell_exec', undefined), 'shell_exec\n');
+    });
+    it('keys other tools by name', () => {
+        assert.equal(sessionAllowKey('file_write', { path: 'a.ts' }), 'file_write');
     });
 });
