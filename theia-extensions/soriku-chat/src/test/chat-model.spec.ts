@@ -364,3 +364,25 @@ describe('summarizeAgentInsights', () => {
         assert.equal(ins.interactions, undefined);
     });
 });
+
+describe('reduceSseEvent — transport_error is non-terminal (#3)', () => {
+    it('skips a malformed frame and keeps streaming', () => {
+        const turn = [
+            { type: 'chunk', content: 'hello ' },
+            { type: 'transport_error', code: 'malformed_sse', message: 'Invalid SSE JSON' },
+            { type: 'chunk', content: 'world' },
+            { type: 'done' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.status, 'done');            // NOT flipped to error by the bad frame
+        assert.equal(turn.text, 'hello world');       // both chunks survived
+        assert.equal(turn.error, undefined);
+    });
+    it('keeps real engine errors terminal', () => {
+        const turn = [
+            { type: 'chunk', content: 'x' },
+            { type: 'error', message: 'model exploded' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.status, 'error');
+        assert.equal(turn.error, 'model exploded');
+    });
+});

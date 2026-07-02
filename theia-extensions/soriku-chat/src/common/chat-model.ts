@@ -91,7 +91,11 @@ export interface AssistantTurn {
     ttftMs?: number;
     /** Total stream duration (ms) — from SSE `done` event. */
     totalMs?: number;
-    status: 'streaming' | 'done' | 'error';
+    /**
+     * `interrupted` = the transport dropped mid-turn (#5): the partial answer is
+     * kept and labeled retryable — distinct from `error` (engine-reported failure).
+     */
+    status: 'streaming' | 'done' | 'error' | 'interrupted';
     error?: string;
 }
 
@@ -462,6 +466,11 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
         case 'error':
             next.status = 'error';
             next.error = asString(event.content) ?? asString(event.message) ?? 'Stream error';
+            break;
+        case 'transport_error':
+            // A malformed SSE frame is transport noise, not an engine answer (#3):
+            // skip the frame and keep streaming — flipping the whole turn to a
+            // permanent error here is exactly the bug this case fixes.
             break;
         case 'done': {
             const total = event.total_ms;

@@ -17,6 +17,7 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -476,13 +477,34 @@ export class SorikuChatWidget extends ReactWidget {
                 this.conversation[turnIndex] = turn;
             }
         } catch (e) {
-            turn = { ...turn, status: 'error', error: (e as Error).message };
+            // Typed error handling (#3/#5): an intentional stop is not a failure, and a
+            // transport drop keeps the partial answer + a retry affordance — only real
+            // engine-reported problems render as an error.
+            if (e instanceof EngineError && e.code === 'aborted') {
+                turn = { ...turn, status: 'done', phase: 'stopped' };
+            } else if (e instanceof StreamInterruptedError) {
+                turn = { ...turn, status: 'interrupted', error: (e as Error).message };
+            } else {
+                turn = { ...turn, status: 'error', error: (e as Error).message };
+            }
             this.conversation[turnIndex] = turn;
         } finally {
             this.streaming = false;
             this.abortController = undefined;
             this.conversationLink.notifyChanged();
             this.scheduleUpdate(true);
+        }
+    }
+
+    /** Re-send the user message that produced an interrupted turn (#5, manual retry). */
+    protected retryTurn(turnId: string): void {
+        const turnIndex = this.conversation.findIndex(entry => entry.id === turnId);
+        for (let i = turnIndex - 1; i >= 0; i--) {
+            const entry = this.conversation[i];
+            if (entry.role === 'user') {
+                void this.send(entry.text);
+                return;
+            }
         }
     }
 
@@ -797,6 +819,10 @@ export class SorikuChatWidget extends ReactWidget {
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
             {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
+            {turn.status === 'interrupted' && <div className='soriku-msg-interrupted'>
+                <span>Connection interrupted — partial answer kept.</span>
+                <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+            </div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
         </div>;
     }

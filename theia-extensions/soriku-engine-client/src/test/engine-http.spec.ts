@@ -242,14 +242,52 @@ describe('EngineHttpTransport — SSE streaming', () => {
         assert.equal(events[0].content, 'partial');
     });
 
-    it('surfaces a malformed frame as an error event and continues the stream', async () => {
+    it('surfaces a malformed frame as a transport_error event (not engine error) and continues (#3)', async () => {
         const body = 'data: {bad json}\n\ndata: {"type":"chunk","content":"ok"}\n\n';
         const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => sseResponse(body)));
         const events = await collect(transport.postSse('/api/worker', {}));
         assert.equal(events.length, 2);
-        assert.equal(events[0].type, 'error');
+        assert.equal(events[0].type, 'transport_error');
         assert.equal(events[0].code, 'malformed_sse');
         assert.equal(events[1].type, 'chunk');
+    });
+
+    it('aborts a byte-silent stream via the idle watchdog (#4)', async () => {
+        // A stream that sends one chunk then goes silent forever (no close, no bytes).
+        const transport = new EngineHttpTransport(
+            { ...BASE_CONFIG, sseIdleTimeoutMs: 50 },
+            mockFetch(() => sseResponse(new ReadableStream<Uint8Array>({
+                start(controller): void {
+                    controller.enqueue(new TextEncoder().encode('data: {"type":"chunk","content":"a"}\n\n'));
+                    // never enqueue again, never close — a hung engine
+                },
+            }))),
+        );
+        const received: string[] = [];
+        await assert.rejects(async () => {
+            for await (const event of transport.postSse('/api/worker', {})) {
+                received.push(event.type);
+            }
+        }, (e: EngineError) => e instanceof StreamInterruptedError && /idle/.test(e.message));
+        assert.deepEqual(received, ['chunk']);   // the pre-hang chunk still arrived
+    });
+
+    it('cancels the response body when the consumer exits early (#6)', async () => {
+        let cancelled = false;
+        const stream = new ReadableStream<Uint8Array>({
+            start(controller): void {
+                controller.enqueue(new TextEncoder().encode('data: {"type":"chunk","content":"a"}\n\n'));
+                controller.enqueue(new TextEncoder().encode('data: {"type":"chunk","content":"b"}\n\n'));
+            },
+            cancel(): void {
+                cancelled = true;
+            },
+        });
+        const transport = new EngineHttpTransport(BASE_CONFIG, mockFetch(() => sseResponse(stream)));
+        const iterator = transport.postSse('/api/worker', {});
+        await iterator.next();               // consume one event…
+        await iterator.return(undefined);    // …then bail out (widget closed)
+        assert.equal(cancelled, true);       // the HTTP body was cancelled, not just unlocked
     });
 
     it('throws StreamInterruptedError when the response has no body', async () => {

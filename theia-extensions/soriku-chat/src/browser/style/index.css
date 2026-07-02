@@ -298,6 +298,16 @@
     margin-top: 4px;
 }
 
+/* Transport drop (#5): partial answer kept, turn is retryable — amber, not error-red. */
+.soriku-msg-interrupted {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    color: var(--theia-editorWarning-foreground, #b58900);
+    font-size: var(--theia-ui-font-size0);
+}
+
 .soriku-tool-call {
     margin-top: 6px;
     border: 1px solid var(--theia-editorGroup-border);
