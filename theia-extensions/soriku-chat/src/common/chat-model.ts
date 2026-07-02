@@ -10,6 +10,8 @@ export type ToolOutcome = 'ok' | 'blocked' | 'salvaged' | 'denied' | 'error' | '
 
 export interface ChatToolCall {
     callId?: string;
+    /** Owning worker (multi-agent runs) — scopes result/outcome matching (#7). */
+    workerId?: string;
     tool: string;
     args?: unknown;
     status: 'requested' | 'running' | 'done';
@@ -143,11 +145,26 @@ function callIdOf(event: SorikuSseEvent): string | undefined {
     return asString(event.request_id) ?? asString(event.confirmation_id) ?? asString(event.call_id) ?? asString(event.id);
 }
 
-/** Index of the last tool call that has not completed yet (for matching results without an id). */
-function lastUnfinished(calls: ChatToolCall[], tool?: string): number {
+/**
+ * Index of the last tool call that has not completed yet (for matching results without an id).
+ * Scoped per worker (#7): pass 1 only matches entries with the SAME owner (both-undefined =
+ * the single-agent path); pass 2 lets a worker event ADOPT an unowned entry — a delegated
+ * `tool_request` carries no worker_id, so its entry is unowned until the worker claims it (#8) —
+ * but an event can never bind to an entry owned by a DIFFERENT worker.
+ */
+function lastUnfinished(calls: ChatToolCall[], tool?: string, workerId?: string): number {
     for (let i = calls.length - 1; i >= 0; i--) {
-        if (calls[i].status !== 'done' && (tool === undefined || calls[i].tool === tool)) {
+        const c = calls[i];
+        if (c.status !== 'done' && (tool === undefined || c.tool === tool) && c.workerId === workerId) {
             return i;
+        }
+    }
+    if (workerId !== undefined) {
+        for (let i = calls.length - 1; i >= 0; i--) {
+            const c = calls[i];
+            if (c.status !== 'done' && (tool === undefined || c.tool === tool) && c.workerId === undefined) {
+                return i;
+            }
         }
     }
     return -1;
@@ -174,8 +191,12 @@ function upsertAgent(agents: AgentActivity[], workerId: string, patch: Partial<A
     }
 }
 
-/** Find a tool call by callId, falling back to the most recent entry with a matching tool. */
-function findToolCallIndex(calls: ChatToolCall[], callId?: string, tool?: string): number {
+/**
+ * Find a tool call by callId, falling back to the most recent entry with a matching tool —
+ * scoped to the event's worker (#7): same-owner first, then unowned entries (adoptable),
+ * never another worker's.
+ */
+function findToolCallIndex(calls: ChatToolCall[], callId?: string, tool?: string, workerId?: string): number {
     if (callId) {
         const byId = calls.findIndex(c => c.callId === callId);
         if (byId >= 0) {
@@ -183,8 +204,15 @@ function findToolCallIndex(calls: ChatToolCall[], callId?: string, tool?: string
         }
     }
     for (let i = calls.length - 1; i >= 0; i--) {
-        if (tool === undefined || calls[i].tool === tool) {
+        if ((tool === undefined || calls[i].tool === tool) && calls[i].workerId === workerId) {
             return i;
+        }
+    }
+    if (workerId !== undefined) {
+        for (let i = calls.length - 1; i >= 0; i--) {
+            if ((tool === undefined || calls[i].tool === tool) && calls[i].workerId === undefined) {
+                return i;
+            }
         }
     }
     return -1;
@@ -193,18 +221,25 @@ function findToolCallIndex(calls: ChatToolCall[], callId?: string, tool?: string
 /**
  * Upsert a tool call: reuse the matching/last-unfinished entry so an engine event and its
  * delegated `tool_request` don't show as duplicates, then resolve it on `tool_result`.
+ * Worker events stamp their workerId on the entry they claim (#7/#8).
  */
 function upsertToolCall(calls: ChatToolCall[], event: SorikuSseEvent, status: ChatToolCall['status']): void {
     const callId = callIdOf(event);
     const tool = asString(event.tool) ?? 'tool';
+    const workerId = asString(event.worker_id);
     let idx = callId ? calls.findIndex(c => c.callId === callId) : -1;
     if (idx < 0) {
-        idx = lastUnfinished(calls, tool);
+        idx = lastUnfinished(calls, tool, workerId);
     }
     if (idx >= 0) {
-        calls[idx] = { ...calls[idx], status, tool, args: event.args ?? calls[idx].args, callId: callId ?? calls[idx].callId };
+        calls[idx] = {
+            ...calls[idx], status, tool,
+            args: event.args ?? calls[idx].args,
+            callId: callId ?? calls[idx].callId,
+            workerId: workerId ?? calls[idx].workerId,
+        };
     } else {
-        calls.push({ callId, tool, args: event.args, status });
+        calls.push({ callId, tool, args: event.args, status, workerId });
     }
 }
 
@@ -353,7 +388,7 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             if (outcome && outcome !== 'ok') {
                 const callId = callIdOf(event);
                 const tool = asString(event.tool);
-                const idx = findToolCallIndex(next.toolCalls, callId, tool);
+                const idx = findToolCallIndex(next.toolCalls, callId, tool, asString(event.worker_id));
                 if (idx >= 0) {
                     next.toolCalls[idx] = {
                         ...next.toolCalls[idx],
@@ -456,7 +491,9 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             const callId = callIdOf(event);
             let idx = callId ? next.toolCalls.findIndex(t => t.callId === callId) : -1;
             if (idx < 0) {
-                idx = lastUnfinished(next.toolCalls, asString(event.tool));
+                // Scoped per worker (#7): a result may only resolve its own worker's
+                // (or an unowned) pending call, never another worker's.
+                idx = lastUnfinished(next.toolCalls, asString(event.tool), asString(event.worker_id));
             }
             if (idx >= 0) {
                 next.toolCalls[idx] = { ...next.toolCalls[idx], status: 'done', result: event.result ?? event.output };
