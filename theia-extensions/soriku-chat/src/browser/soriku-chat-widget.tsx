@@ -189,6 +189,9 @@ export class SorikuChatWidget extends ReactWidget {
     protected updateScheduled = false;
 
     protected scheduleUpdate(immediate = false): void {
+        if (this.isDisposed) {
+            return;
+        }
         if (immediate) {
             this.updateScheduled = false;
             this.update();
@@ -200,6 +203,10 @@ export class SorikuChatWidget extends ReactWidget {
         this.updateScheduled = true;
         requestAnimationFrame(() => {
             this.updateScheduled = false;
+            // The widget may have been closed between scheduling and this frame (#17).
+            if (this.isDisposed) {
+                return;
+            }
             this.update();
         });
     }
@@ -235,6 +242,16 @@ export class SorikuChatWidget extends ReactWidget {
             void this.ingestLivePlanEvent(event);
         }));
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
+        // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
+        // no longer mutates state / executes delegated tools / writes files) and flush
+        // any pending approvals so the engine stream isn't left blocked (#2/#1).
+        this.toDispose.push({
+            dispose: () => {
+                this.streaming = false;
+                this.abortController?.abort();
+                this.toolApproval.cancelAll();
+            },
+        });
         this.loadModels();
         this.loadProviders();
         this.restoreActiveChat();
@@ -421,6 +438,11 @@ export class SorikuChatWidget extends ReactWidget {
         try {
             const stream = this.engineClient.chatStream(params, this.abortController.signal);
             for await (const event of stream) {
+                // Stop touching state the instant the widget is torn down (#2) — the
+                // abort also ends the fetch, this just guarantees no mutation races it.
+                if (this.isDisposed) {
+                    break;
+                }
                 turn = reduceSseEvent(turn, event);
                 if (event.type === 'plan_awaiting_execution' && needsApproval) {
                     turn = { ...turn, planNeedsApproval: true };
