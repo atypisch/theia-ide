@@ -368,6 +368,9 @@ export class SorikuChatWidget extends ReactWidget {
             return;
         }
         this.abortController?.abort();
+        // Flush any pending tool approvals from the previous agent so they can't
+        // resolve into the new context or strand the engine stream (#16/#1).
+        this.toolApproval.cancelAll();
         this.conversation = [];
         this.feedbackByTurn.clear();
         this.insights = undefined;
