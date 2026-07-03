@@ -7,6 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    applyUnifiedPatch,
     DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind,
     progressiveRevealFrames, truncateToMaxLines, normalizePosixPath, isPathWithinRoot, sessionAllowKey,
 } from '../common/tool-delegation';
@@ -147,5 +148,55 @@ describe('sessionAllowKey (#12)', () => {
     });
     it('keys other tools by name', () => {
         assert.equal(sessionAllowKey('file_write', { path: 'a.ts' }), 'file_write');
+    });
+});
+
+describe('applyUnifiedPatch — strict validation (C-D)', () => {
+    const original = 'alpha\nbeta\ngamma\ndelta';
+
+    it('applies a correct patch (replace one line)', () => {
+        const patch = '@@ -2,1 +2,1 @@\n-beta\n+BETA';
+        assert.equal(applyUnifiedPatch(original, patch), 'alpha\nBETA\ngamma\ndelta');
+    });
+
+    it('applies a multi-hunk patch in order', () => {
+        const patch = '@@ -1,2 +1,2 @@\n alpha\n-beta\n+B\n@@ -4,1 +4,1 @@\n-delta\n+D';
+        assert.equal(applyUnifiedPatch(original, patch), 'alpha\nB\ngamma\nD');
+    });
+
+    it('THROWS on an offset hunk instead of silently corrupting (the old bug)', () => {
+        // hunk says line 3, but the content there is 'gamma', not 'beta'
+        const patch = '@@ -3,1 +3,1 @@\n-beta\n+BETA';
+        assert.throws(() => applyUnifiedPatch(original, patch), /deletion mismatch at line 3/);
+    });
+
+    it('THROWS on a context mismatch', () => {
+        const patch = '@@ -1,2 +1,2 @@\n WRONG\n-beta\n+B';
+        assert.throws(() => applyUnifiedPatch(original, patch), /context mismatch at line 1/);
+    });
+
+    it('THROWS on out-of-order/overlapping hunks', () => {
+        const patch = '@@ -3,1 +3,1 @@\n-gamma\n+G\n@@ -2,1 +2,1 @@\n-beta\n+B';
+        assert.throws(() => applyUnifiedPatch(original, patch), /out-of-order/);
+    });
+
+    it('THROWS when a hunk starts beyond the end of the file', () => {
+        const patch = '@@ -99,1 +99,1 @@\n-nope\n+x';
+        assert.throws(() => applyUnifiedPatch(original, patch), /beyond end of file/);
+    });
+
+    it('THROWS on a patch without hunks (garbage in, loud error out)', () => {
+        assert.throws(() => applyUnifiedPatch(original, 'just some prose'), /no @@ hunks/);
+    });
+
+    it('tolerates file headers, empty context lines and the no-newline marker', () => {
+        const src = 'a\n\nb';
+        const patch = '--- a/f\n+++ b/f\n@@ -1,3 +1,3 @@\n a\n\n-b\n+B\n\\ No newline at end of file';
+        assert.equal(applyUnifiedPatch(src, patch), 'a\n\nB');
+    });
+
+    it('supports pure insertion via a -0,0 hunk into an empty file', () => {
+        const patch = '@@ -0,0 +1,2 @@\n+first\n+second';
+        assert.equal(applyUnifiedPatch('', patch), 'first\nsecond\n');
     });
 });
