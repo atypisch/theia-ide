@@ -8,7 +8,7 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { Message } from '@theia/core/lib/browser/widgets/widget';
-import { CommandService, MessageService } from '@theia/core/lib/common';
+import { CommandService, Disposable, MessageService } from '@theia/core/lib/common';
 import { QuickInputService } from '@theia/core/lib/browser';
 import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
@@ -58,6 +58,13 @@ export class SorikuConversationsWidget extends ReactWidget {
         this.addClass('soriku-conversations-widget');
         this.toDispose.push(this.link.onDidChange(() => this.refresh()));
         this.toDispose.push(this.link.onDidRequestOpen(id => { this.activeConversationId = id; this.update(); }));
+        // #18: a pending 3s refresh-retry must not fire on a disposed widget.
+        this.toDispose.push(Disposable.create(() => {
+            if (this.refreshRetryTimer !== undefined) {
+                clearTimeout(this.refreshRetryTimer);
+                this.refreshRetryTimer = undefined;
+            }
+        }));
         this.update();
         this.refresh();
     }
