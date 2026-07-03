@@ -298,6 +298,13 @@
     margin-top: 4px;
 }
 
+.soriku-msg-error-actions {
+    display: inline-flex;
+    gap: 8px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
 /* Transport drop (#5): partial answer kept, turn is retryable — amber, not error-red. */
 .soriku-msg-interrupted {
     display: flex;

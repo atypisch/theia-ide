@@ -99,6 +99,8 @@ export interface AssistantTurn {
      */
     status: 'streaming' | 'done' | 'error' | 'interrupted';
     error?: string;
+    /** The turn failed on authentication (#14): the UI offers sign-in + retry. */
+    authRequired?: boolean;
 }
 
 export interface UserMessage {

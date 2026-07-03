@@ -17,7 +17,7 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
+import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -484,6 +484,10 @@ export class SorikuChatWidget extends ReactWidget {
                 turn = { ...turn, status: 'done', phase: 'stopped' };
             } else if (e instanceof StreamInterruptedError) {
                 turn = { ...turn, status: 'interrupted', error: (e as Error).message };
+            } else if (e instanceof AuthError) {
+                // #14: an auth failure is actionable, not a dead end — the render
+                // offers sign-in (soriku.auth.connect) + retry.
+                turn = { ...turn, status: 'error', authRequired: true, error: 'Authentication required — sign in and retry.' };
             } else {
                 turn = { ...turn, status: 'error', error: (e as Error).message };
             }
@@ -818,7 +822,13 @@ export class SorikuChatWidget extends ReactWidget {
             {turn.status === 'streaming' && !turn.text && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
-            {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
+            {turn.status === 'error' && <div className='soriku-msg-error'>
+                {turn.error}
+                {turn.authRequired && <span className='soriku-msg-error-actions'>
+                    <button className='theia-button secondary' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</button>
+                    <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+                </span>}
+            </div>}
             {turn.status === 'interrupted' && <div className='soriku-msg-interrupted'>
                 <span>Connection interrupted — partial answer kept.</span>
                 <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
