@@ -11,6 +11,7 @@ import { CommandRegistry, MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { AgentItem, toAgentItems } from '../common/agent-view';
 import { SorikuAgentSelectionService } from './soriku-agent-selection';
+import { SorikuAgentCatalog } from './soriku-agent-catalog';
 
 /** Command the chat extension (Phase 2.4) registers to open a chat for an agent id. */
 export const SORIKU_CHAT_OPEN_COMMAND = 'soriku.chat.open';
@@ -32,6 +33,9 @@ export class SorikuAgentsWidget extends ReactWidget {
 
     @inject(EngineClient)
     protected readonly engineClient: EngineClient;
+
+    @inject(SorikuAgentCatalog)
+    protected readonly catalog: SorikuAgentCatalog;
 
     @inject(SorikuAgentSelectionService)
     protected readonly selection: SorikuAgentSelectionService;
@@ -58,12 +62,14 @@ export class SorikuAgentsWidget extends ReactWidget {
         this.refresh();
     }
 
-    async refresh(): Promise<void> {
+    async refresh(force = false): Promise<void> {
         this.state = { status: 'loading', items: this.state.items };
         this.update();
         try {
-            const response = await this.engineClient.listAgents();
-            this.state = { status: 'ready', items: toAgentItems(response.data ?? []) };
+            // P3-c2: served from the startup-prefetched catalog — instant on a warm
+            // memo; force=true (the Refresh button) bypasses it.
+            const agents = await this.catalog.getAgents(force);
+            this.state = { status: 'ready', items: toAgentItems(agents) };
         } catch (e) {
             this.state = { status: 'error', items: [], error: (e as Error).message };
         }
@@ -92,7 +98,7 @@ export class SorikuAgentsWidget extends ReactWidget {
                 <button
                     className='theia-button secondary'
                     title='Refresh'
-                    onClick={() => this.refresh()}
+                    onClick={() => this.refresh(true)}
                 >
                     <span className='codicon codicon-refresh' /> Refresh
                 </button>

@@ -10,6 +10,7 @@ import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/brow
 import { QuickInputService } from '@theia/core/lib/browser';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
+import { SorikuAgentCatalog } from 'soriku-agents-ext/lib/browser/soriku-agent-catalog';
 import { buildAgentPickItems } from '../common/agent-pick';
 
 export namespace SorikuWorkbenchCommands {
@@ -30,6 +31,9 @@ export class SorikuWorkbenchContribution implements CommandContribution, Keybind
 
     @inject(SorikuAgentSelectionService)
     protected readonly selection: SorikuAgentSelectionService;
+
+    @inject(SorikuAgentCatalog)
+    protected readonly agentCatalog: SorikuAgentCatalog;
 
     @inject(QuickInputService)
     protected readonly quickInput: QuickInputService;
@@ -62,8 +66,8 @@ export class SorikuWorkbenchContribution implements CommandContribution, Keybind
     protected async switchActiveAgent(): Promise<void> {
         let items;
         try {
-            const response = await this.engineClient.listAgents();
-            items = buildAgentPickItems(response.data ?? []);
+            // P3-c2: shared memoized catalog — no duplicate fetch next to the agents view.
+            items = buildAgentPickItems(await this.agentCatalog.getAgents());
         } catch (e) {
             this.messages.error(`Could not load agents: ${(e as Error).message}`);
             return;
