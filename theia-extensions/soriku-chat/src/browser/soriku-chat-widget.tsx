@@ -37,6 +37,7 @@ import {
     fromEngineMessages,
     reduceSseEvent,
     summarizeAgentInsights,
+    withWorkspacePrefix,
 } from '../common/chat-model';
 
 /** Persisted (across reloads) pointer to the chat the user was last in. */
@@ -536,8 +537,14 @@ export class SorikuChatWidget extends ReactWidget {
             this.buildEditorContext(text),
         ]);
 
+        // C-B: the engine's guard/learnings extractors read the USER prompt, not the
+        // context items — carry the workspace line there so per-project learnings,
+        // soriku.md guidelines and the write-guard actually engage for IDE chats.
+        const roots = await this.workspaceService.roots;
+        const wirePrompt = withWorkspacePrefix(text, roots[0]?.resource.path.toString());
+
         return {
-            prompt: text,
+            prompt: wirePrompt,
             personaId: agentId,
             conversationId: this.conversationId,
             projectId,
@@ -564,13 +571,14 @@ export class SorikuChatWidget extends ReactWidget {
         return typeof cap === 'number' && cap >= 0 ? cap : undefined;
     }
 
-    /** @file mentions + open editor tabs as engine context items. */
+    /** @file mentions + the workspace root as engine context items (no editor tabs yet — that is Fix A). */
     protected async buildEditorContext(prompt: string): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[]> {
         const items: import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[] = [];
         const roots = await this.workspaceService.roots;
         const root = roots[0]?.resource;
         if (root) {
-            items.push({ type: 'text', value: `Workspace root: ${root.path.toString()}` });
+            // Exact `Workspace:` wording — the engine greps /workspace:\s*/i (C-B).
+            items.push({ type: 'text', value: `Workspace: ${root.path.toString()}` });
         }
         const mentionRe = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
         let match: RegExpExecArray | null;

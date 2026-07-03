@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent, summarizeAgentInsights } from '../common/chat-model';
+import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent, summarizeAgentInsights, withWorkspacePrefix } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
     return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
@@ -429,5 +429,24 @@ describe('reduceSseEvent — worker-scoped tool attribution (#7/#8)', () => {
         assert.equal(turn.toolCalls.length, 1);
         assert.equal(turn.toolCalls[0].status, 'done');
         assert.equal(turn.toolCalls[0].result, 'content');
+    });
+});
+
+describe('withWorkspacePrefix (C-B workspace format fix)', () => {
+    it('prefixes the exact Workspace: line the engine extractors grep', () => {
+        const out = withWorkspacePrefix('fix the bug', '/Users/x/proj');
+        assert.equal(out, 'Workspace: /Users/x/proj\n\nfix the bug');
+        // the engine-side patterns (workspace_learnings/file_write_guard/agent_loop)
+        assert.match(out, /workspace:\s*([^\s\n]+)/i);
+    });
+
+    it('is a no-op without a workspace root', () => {
+        assert.equal(withWorkspacePrefix('hello', undefined), 'hello');
+        assert.equal(withWorkspacePrefix('hello', '   '), 'hello');
+    });
+
+    it('does not double-prefix an already-prefixed prompt (retry of stored text)', () => {
+        const once = withWorkspacePrefix('do it', '/ws');
+        assert.equal(withWorkspacePrefix(once, '/ws'), once);
     });
 });

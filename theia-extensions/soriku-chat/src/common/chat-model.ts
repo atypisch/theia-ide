@@ -143,6 +143,27 @@ function asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Prefix the outgoing prompt with the exact `Workspace: /path` line the engine's
+ * extractors grep for — workspace-learnings, soriku.md guidelines and the
+ * write-guard all match the case-insensitive pattern `workspace:` followed by a
+ * path, and they read the USER prompt (context items land in the system prompt and
+ * never reach them). The previous `Workspace root:` wording silently matched
+ * nothing (audit C-B). Local UI keeps the user's raw text; only the wire prompt is
+ * prefixed. Removable once the engine threads structured context into its guard
+ * extractors (B-ENGINE work order).
+ */
+export function withWorkspacePrefix(prompt: string, workspaceRoot: string | undefined): string {
+    const root = workspaceRoot?.trim();
+    if (!root) {
+        return prompt;
+    }
+    if (/^workspace:\s*\S/i.test(prompt)) {
+        return prompt;   // already carries one (e.g. retry of an engine-stored prompt)
+    }
+    return `Workspace: ${root}\n\n${prompt}`;
+}
+
 function callIdOf(event: SorikuSseEvent): string | undefined {
     return asString(event.request_id) ?? asString(event.confirmation_id) ?? asString(event.call_id) ?? asString(event.id);
 }
