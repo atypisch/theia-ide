@@ -1116,6 +1116,14 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Attach to a plan conversation broadcast from the engine (CLI/API runs). */
     protected async followExternalPlan(convId: string): Promise<void> {
+        // #15: never wholesale-replace an UNSAVED local chat with the external plan's
+        // conversation — that silently wiped it. Only hijack an empty widget, the same
+        // conversation, or a persisted one (reloadable from the engine).
+        const unsavedLocalChat = this.conversationId === undefined && this.conversation.length > 0;
+        if (unsavedLocalChat) {
+            this.messages.info('Live plan gestart in een andere conversatie — open die via Conversations om mee te kijken (je huidige chat blijft staan).');
+            return;
+        }
         this.externalFollowConvId = convId;
         try {
             const conv = await this.engineClient.getConversation(convId);
