@@ -18,6 +18,8 @@ import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/sor
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
+import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
+import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -153,6 +155,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(PreferenceService)
     protected readonly preferences: PreferenceService;
+
+    @inject(SorikuEditorContextCollector)
+    protected readonly editorContext: SorikuEditorContextCollector;
 
     /** When restoring/loading a saved chat, suppress the agent-change reset. */
     protected restoring = false;
@@ -577,8 +582,13 @@ export class SorikuChatWidget extends ReactWidget {
         const roots = await this.workspaceService.roots;
         const root = roots[0]?.resource;
         if (root) {
-            // Exact `Workspace:` wording — the engine greps /workspace:\s*/i (C-B).
+            // Exact `Workspace:` wording — the engine greps for `workspace:` (C-B).
             items.push({ type: 'text', value: `Workspace: ${root.path.toString()}` });
+        }
+        // Fix A (C-A): live editor context — active file, selection or cursor
+        // window, open tabs — so "explain this" has a referent. Preference-gated.
+        if (this.preferences.get<boolean>('soriku.context.editorEnabled', true) !== false) {
+            items.push(...buildEditorContextItems(this.editorContext.collect()));
         }
         const mentionRe = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
         let match: RegExpExecArray | null;

@@ -14,6 +14,7 @@ import { SorikuModelCatalog } from './soriku-model-catalog';
 import { SorikuConversationLink } from './soriku-conversation-link';
 import { SorikuPlanLiveBridge } from './soriku-plan-live-bridge';
 import { SorikuInlineCompletionContribution } from './soriku-inline-completion';
+import { SorikuEditorContextCollector } from './soriku-editor-context-collector';
 import { sorikuEnginePreferenceSchema } from './soriku-engine-preferences';
 
 export default new ContainerModule(bind => {
@@ -24,6 +25,7 @@ export default new ContainerModule(bind => {
     bind(SorikuConversationLink).toSelf().inSingletonScope();
     bind(SorikuPlanLiveBridge).toSelf().inSingletonScope();
     bind(SorikuInlineCompletionContribution).toSelf().inSingletonScope();
+    bind(SorikuEditorContextCollector).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuInlineCompletionContribution);
     bind(PreferenceContribution).toConstantValue({ schema: sorikuEnginePreferenceSchema });
 });
