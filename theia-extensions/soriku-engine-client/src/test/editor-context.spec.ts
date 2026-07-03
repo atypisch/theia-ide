@@ -10,6 +10,7 @@ import {
     MAX_OPEN_TABS,
     MAX_SELECTION_CHARS,
     buildEditorContextItems,
+    sliceCursorAffixes,
 } from '../common/editor-context';
 
 describe('buildEditorContextItems', () => {
@@ -62,5 +63,33 @@ describe('buildEditorContextItems', () => {
         const tabItem = items.find(i => i.value.startsWith('Open editor tabs'));
         assert.ok(tabItem);
         assert.match(tabItem.value, /\(\+3 more\)/);
+    });
+});
+
+describe('sliceCursorAffixes (Fix E — line-aware FIM window)', () => {
+    it('passes short prefix/suffix through untouched', () => {
+        const { prefix, suffix } = sliceCursorAffixes('abc\ndef', 'ghi\njkl', 100, 100);
+        assert.equal(prefix, 'abc\ndef');
+        assert.equal(suffix, 'ghi\njkl');
+    });
+
+    it('snaps an oversized prefix forward to the next line start (no mid-token first line)', () => {
+        const full = 'longfirstline\nsecond\nthird';
+        const { prefix } = sliceCursorAffixes(full, '', 15, 100);   // cut lands mid "longfirstline"
+        assert.equal(prefix, 'second\nthird');                       // partial first line dropped
+        assert.ok(prefix.length <= 15);
+    });
+
+    it('snaps an oversized suffix back to the last full line', () => {
+        const full = 'first\nsecond\nverylonglastline';
+        const { suffix } = sliceCursorAffixes('', full, 100, 16);   // cut lands mid "verylonglastline"
+        assert.equal(suffix, 'first\nsecond');
+        assert.ok(suffix.length <= 16);
+    });
+
+    it('keeps a single long line capped even without a newline to snap to', () => {
+        const { prefix, suffix } = sliceCursorAffixes('x'.repeat(500), 'y'.repeat(500), 100, 50);
+        assert.equal(prefix.length, 100);   // no boundary available — hard cap stands
+        assert.equal(suffix.length, 50);
     });
 });

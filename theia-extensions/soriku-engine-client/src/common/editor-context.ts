@@ -79,3 +79,36 @@ export function buildEditorContextItems(snap: EditorSnapshot): ChatContextItem[]
     }
     return items;
 }
+
+/**
+ * Line-aware context window for fill-in-the-middle completion (Fix E, audit C-E).
+ * Naive char slicing cut the prefix mid-token/mid-line, feeding the FIM model a
+ * broken first line (and the suffix a broken last line). The far ends now snap to
+ * line boundaries WITHIN the caps; the cursor-adjacent ends stay exact — they
+ * carry the actual completion point. Shared here so chat context and completion
+ * draw from one tested module instead of ad-hoc slicing.
+ */
+export function sliceCursorAffixes(
+    prefixFull: string,
+    suffixFull: string,
+    maxPrefix: number,
+    maxSuffix: number,
+): { prefix: string; suffix: string } {
+    let prefix = prefixFull;
+    if (prefixFull.length > maxPrefix) {
+        prefix = prefixFull.slice(-maxPrefix);
+        const nl = prefix.indexOf('\n');
+        if (nl >= 0 && nl < prefix.length - 1) {
+            prefix = prefix.slice(nl + 1);   // drop the partial first line
+        }
+    }
+    let suffix = suffixFull;
+    if (suffixFull.length > maxSuffix) {
+        suffix = suffixFull.slice(0, maxSuffix);
+        const nl = suffix.lastIndexOf('\n');
+        if (nl > 0) {
+            suffix = suffix.slice(0, nl);    // drop the partial last line
+        }
+    }
+    return { prefix, suffix };
+}
