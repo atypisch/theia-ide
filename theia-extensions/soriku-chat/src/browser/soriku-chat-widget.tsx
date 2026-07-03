@@ -17,7 +17,6 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
@@ -26,6 +25,7 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { ChatMarkdown } from './chat-markdown-view';
+import { ChatStreamController } from './chat-stream-controller';
 import {
     AgentActivity,
     AgentInsights,
@@ -129,6 +129,9 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
+    @inject(ChatStreamController)
+    protected readonly streamController: ChatStreamController;
+
     @inject(SorikuToolApprovalBridge)
     protected readonly toolApproval: SorikuToolApprovalBridge;
 
@@ -171,10 +174,13 @@ export class SorikuChatWidget extends ReactWidget {
     protected insightsLoading = false;
     protected conversationId: string | undefined;
     protected conversationTitle?: string;
-    protected streaming = false;
     protected idSeq = 0;
-    protected abortController: AbortController | undefined;
     protected inputRef = React.createRef<HTMLTextAreaElement>();
+
+    /** One stream at a time — backed by the controller (P4-a), so there is a single source of truth. */
+    protected get streaming(): boolean {
+        return this.streamController.active;
+    }
 
     /** Controls: agent behaviour (Mode) + model orchestration (Models). */
     protected behavior: AgentBehavior = 'auto';
@@ -254,8 +260,7 @@ export class SorikuChatWidget extends ReactWidget {
         // any pending approvals so the engine stream isn't left blocked (#2/#1).
         this.toDispose.push({
             dispose: () => {
-                this.streaming = false;
-                this.abortController?.abort();
+                this.streamController.abort();
                 this.toolApproval.cancelAll();
             },
         });
@@ -301,12 +306,11 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Start a fresh conversation (keeps the active agent). */
     protected startNewConversation(): void {
-        this.abortController?.abort();
+        this.streamController.abort();
         this.conversation = [];
         this.feedbackByTurn.clear();
         this.conversationId = undefined;
         this.conversationTitle = undefined;
-        this.streaming = false;
         this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
         this.update();
     }
@@ -391,7 +395,7 @@ export class SorikuChatWidget extends ReactWidget {
         if (this.restoring) {
             return;
         }
-        this.abortController?.abort();
+        this.streamController.abort();
         // Flush any pending tool approvals from the previous agent so they can't
         // resolve into the new context or strand the engine stream (#16/#1).
         this.toolApproval.cancelAll();
@@ -401,7 +405,6 @@ export class SorikuChatWidget extends ReactWidget {
         this.insightsAgentId = undefined;
         this.conversationId = undefined;
         this.conversationTitle = undefined;
-        this.streaming = false;
         // Explicit agent switch starts fresh — forget the resumed pointer.
         this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
         this.update();
@@ -434,76 +437,32 @@ export class SorikuChatWidget extends ReactWidget {
         }
         this.resolvingPlans.clear();
         this.conversation.push({ role: 'user', id: this.nextId(), text });
-        let turn = createAssistantTurn(this.nextId());
-        const turnIndex = this.conversation.push(turn) - 1;
-        this.streaming = true;
-        this.abortController = new AbortController();
+        const initialTurn = createAssistantTurn(this.nextId());
+        const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
         this.scheduleUpdate(true);
         const params = await this.buildStreamParams(text, agentId);
-        const needsApproval = params.mode === 'plan';
-        try {
-            const stream = this.engineClient.chatStream(params, this.abortController.signal);
-            for await (const event of stream) {
-                // Stop touching state the instant the widget is torn down (#2) — the
-                // abort also ends the fetch, this just guarantees no mutation races it.
-                if (this.isDisposed) {
-                    break;
-                }
-                turn = reduceSseEvent(turn, event);
-                if (event.type === 'plan_awaiting_execution' && needsApproval) {
-                    turn = { ...turn, planNeedsApproval: true };
-                }
+        // The controller owns the lifecycle (P4-a): abort, reduce, typed errors,
+        // tool/plan fan-out. This widget only renders the turns it hands back.
+        const finalTurn = await this.streamController.run({
+            params,
+            initialTurn,
+            needsApproval: params.mode === 'plan',
+            tools: this.toolConfirmation,
+            isDisposed: () => this.isDisposed,
+            onTurn: (turn, event) => {
                 this.conversation[turnIndex] = turn;
                 if (turn.conversationId && turn.conversationId !== this.conversationId) {
                     this.conversationId = turn.conversationId;
                     this.persistActiveChat();
                 }
-                if (event.type === 'confirm_tool') {
-                    // Fire-and-forget: the engine blocks until /api/worker/confirm, then the stream
-                    // resumes. Awaiting here would deadlock the loop waiting for the next event.
-                    this.toolConfirmation.confirm(event).catch(() => { /* default-deny already posted */ });
-                } else if (event.type === 'tool_request') {
-                    // Delegated tool: run it against the workspace, then POST the result. Same
-                    // fire-and-forget reasoning — the engine blocks until the result arrives.
-                    this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
-                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string') {
-                    // Plan behaviour always waits for the user — engine auto_execute is for Auto/Edit.
-                    const autoExecute = (event as { auto_execute?: boolean }).auto_execute;
-                    const shouldRun = needsApproval ? false : autoExecute !== false;
-                    if (shouldRun) {
-                        this.engineClient.executePlan(event.plan_id).catch(() => { /* stream surfaces errors */ });
-                    }
-                }
                 void this.handleLiveActivity(event);
                 this.scheduleUpdate();
-            }
-            if (turn.status === 'streaming') {
-                turn = { ...turn, status: 'done' };
-                this.conversation[turnIndex] = turn;
-            }
-        } catch (e) {
-            // Typed error handling (#3/#5): an intentional stop is not a failure, and a
-            // transport drop keeps the partial answer + a retry affordance — only real
-            // engine-reported problems render as an error.
-            if (e instanceof EngineError && e.code === 'aborted') {
-                turn = { ...turn, status: 'done', phase: 'stopped' };
-            } else if (e instanceof StreamInterruptedError) {
-                turn = { ...turn, status: 'interrupted', error: (e as Error).message };
-            } else if (e instanceof AuthError) {
-                // #14: an auth failure is actionable, not a dead end — the render
-                // offers sign-in (soriku.auth.connect) + retry.
-                turn = { ...turn, status: 'error', authRequired: true, error: 'Authentication required — sign in and retry.' };
-            } else {
-                turn = { ...turn, status: 'error', error: (e as Error).message };
-            }
-            this.conversation[turnIndex] = turn;
-        } finally {
-            this.streaming = false;
-            this.abortController = undefined;
-            this.conversationLink.notifyChanged();
-            this.scheduleUpdate(true);
-        }
+            },
+        });
+        this.conversation[turnIndex] = finalTurn;
+        this.conversationLink.notifyChanged();
+        this.scheduleUpdate(true);
     }
 
     /** Re-send the user message that produced an interrupted turn (#5, manual retry). */
@@ -651,7 +610,7 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     protected stop(): void {
-        this.abortController?.abort();
+        this.streamController.abort();
     }
 
     /** Send thumbs feedback for an assistant turn to the engine (positive/negative). */
