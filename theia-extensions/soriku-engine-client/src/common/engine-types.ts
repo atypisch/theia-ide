@@ -495,8 +495,13 @@ export interface ChatStreamParams {
 export interface EngineClientConfig {
     baseUrl: string;
     authToken?: string;
-    /** Timeout in milliseconds applied to non-streaming requests. SSE streams are never timed out. */
+    /** Timeout in milliseconds applied to non-streaming requests. SSE streams have no overall timeout. */
     timeoutMs?: number;
+    /**
+     * Idle watchdog for SSE streams (#4): abort when NO bytes arrive for this long
+     * (a hung engine would otherwise block the reader forever). Default 300 000 ms.
+     */
+    sseIdleTimeoutMs?: number;
 }
 
 // ── External MCP servers (client) ──

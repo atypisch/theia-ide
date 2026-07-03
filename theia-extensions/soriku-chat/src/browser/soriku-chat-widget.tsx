@@ -17,6 +17,7 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -189,6 +190,9 @@ export class SorikuChatWidget extends ReactWidget {
     protected updateScheduled = false;
 
     protected scheduleUpdate(immediate = false): void {
+        if (this.isDisposed) {
+            return;
+        }
         if (immediate) {
             this.updateScheduled = false;
             this.update();
@@ -200,6 +204,10 @@ export class SorikuChatWidget extends ReactWidget {
         this.updateScheduled = true;
         requestAnimationFrame(() => {
             this.updateScheduled = false;
+            // The widget may have been closed between scheduling and this frame (#17).
+            if (this.isDisposed) {
+                return;
+            }
             this.update();
         });
     }
@@ -235,6 +243,16 @@ export class SorikuChatWidget extends ReactWidget {
             void this.ingestLivePlanEvent(event);
         }));
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
+        // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
+        // no longer mutates state / executes delegated tools / writes files) and flush
+        // any pending approvals so the engine stream isn't left blocked (#2/#1).
+        this.toDispose.push({
+            dispose: () => {
+                this.streaming = false;
+                this.abortController?.abort();
+                this.toolApproval.cancelAll();
+            },
+        });
         this.loadModels();
         this.loadProviders();
         this.restoreActiveChat();
@@ -368,6 +386,9 @@ export class SorikuChatWidget extends ReactWidget {
             return;
         }
         this.abortController?.abort();
+        // Flush any pending tool approvals from the previous agent so they can't
+        // resolve into the new context or strand the engine stream (#16/#1).
+        this.toolApproval.cancelAll();
         this.conversation = [];
         this.feedbackByTurn.clear();
         this.insights = undefined;
@@ -418,6 +439,11 @@ export class SorikuChatWidget extends ReactWidget {
         try {
             const stream = this.engineClient.chatStream(params, this.abortController.signal);
             for await (const event of stream) {
+                // Stop touching state the instant the widget is torn down (#2) — the
+                // abort also ends the fetch, this just guarantees no mutation races it.
+                if (this.isDisposed) {
+                    break;
+                }
                 turn = reduceSseEvent(turn, event);
                 if (event.type === 'plan_awaiting_execution' && needsApproval) {
                     turn = { ...turn, planNeedsApproval: true };
@@ -451,13 +477,38 @@ export class SorikuChatWidget extends ReactWidget {
                 this.conversation[turnIndex] = turn;
             }
         } catch (e) {
-            turn = { ...turn, status: 'error', error: (e as Error).message };
+            // Typed error handling (#3/#5): an intentional stop is not a failure, and a
+            // transport drop keeps the partial answer + a retry affordance — only real
+            // engine-reported problems render as an error.
+            if (e instanceof EngineError && e.code === 'aborted') {
+                turn = { ...turn, status: 'done', phase: 'stopped' };
+            } else if (e instanceof StreamInterruptedError) {
+                turn = { ...turn, status: 'interrupted', error: (e as Error).message };
+            } else if (e instanceof AuthError) {
+                // #14: an auth failure is actionable, not a dead end — the render
+                // offers sign-in (soriku.auth.connect) + retry.
+                turn = { ...turn, status: 'error', authRequired: true, error: 'Authentication required — sign in and retry.' };
+            } else {
+                turn = { ...turn, status: 'error', error: (e as Error).message };
+            }
             this.conversation[turnIndex] = turn;
         } finally {
             this.streaming = false;
             this.abortController = undefined;
             this.conversationLink.notifyChanged();
             this.scheduleUpdate(true);
+        }
+    }
+
+    /** Re-send the user message that produced an interrupted turn (#5, manual retry). */
+    protected retryTurn(turnId: string): void {
+        const turnIndex = this.conversation.findIndex(entry => entry.id === turnId);
+        for (let i = turnIndex - 1; i >= 0; i--) {
+            const entry = this.conversation[i];
+            if (entry.role === 'user') {
+                void this.send(entry.text);
+                return;
+            }
         }
     }
 
@@ -771,7 +822,17 @@ export class SorikuChatWidget extends ReactWidget {
             {turn.status === 'streaming' && !turn.text && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
             {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
             {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
-            {turn.status === 'error' && <div className='soriku-msg-error'>{turn.error}</div>}
+            {turn.status === 'error' && <div className='soriku-msg-error'>
+                {turn.error}
+                {turn.authRequired && <span className='soriku-msg-error-actions'>
+                    <button className='theia-button secondary' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</button>
+                    <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+                </span>}
+            </div>}
+            {turn.status === 'interrupted' && <div className='soriku-msg-interrupted'>
+                <span>Connection interrupted — partial answer kept.</span>
+                <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+            </div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
         </div>;
     }
@@ -1055,6 +1116,14 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Attach to a plan conversation broadcast from the engine (CLI/API runs). */
     protected async followExternalPlan(convId: string): Promise<void> {
+        // #15: never wholesale-replace an UNSAVED local chat with the external plan's
+        // conversation — that silently wiped it. Only hijack an empty widget, the same
+        // conversation, or a persisted one (reloadable from the engine).
+        const unsavedLocalChat = this.conversationId === undefined && this.conversation.length > 0;
+        if (unsavedLocalChat) {
+            this.messages.info('Live plan gestart in een andere conversatie — open die via Conversations om mee te kijken (je huidige chat blijft staan).');
+            return;
+        }
         this.externalFollowConvId = convId;
         try {
             const conv = await this.engineClient.getConversation(convId);

@@ -77,6 +77,9 @@ export class EngineHttpTransport {
         }
     }
 
+    /** Default idle watchdog: a stream that stays byte-silent this long is considered hung (#4). */
+    static readonly DEFAULT_SSE_IDLE_TIMEOUT_MS = 300_000;
+
     async *postSse(path: string, body: unknown, signal?: AbortSignal): AsyncGenerator<SorikuSseEvent> {
         const response = await this.rawRequest('POST', path, body, true, signal);
         if (!response.body) {
@@ -85,14 +88,36 @@ export class EngineHttpTransport {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        // Idle watchdog (#4): SSE has no overall timeout (a long turn is legitimate),
+        // but a stream that produces NO bytes at all for idleMs means a hung engine —
+        // without this, reader.read() blocks forever. One resettable timer, re-armed
+        // on every chunk; the guarded promise only rejects while a read is racing it.
+        const idleMs = this.config.sseIdleTimeoutMs ?? EngineHttpTransport.DEFAULT_SSE_IDLE_TIMEOUT_MS;
+        let idleTimer: ReturnType<typeof setTimeout> | undefined;
+        let idleReject: ((e: Error) => void) | undefined;
+        const idleFailure = new Promise<never>((_, reject) => { idleReject = reject; });
+        idleFailure.catch(() => { /* handled via Promise.race; avoid unhandled-rejection noise */ });
+        const armIdle = () => {
+            if (idleTimer !== undefined) {
+                clearTimeout(idleTimer);
+            }
+            idleTimer = setTimeout(
+                () => idleReject?.(new StreamInterruptedError(`SSE stream idle for ${idleMs}ms on ${path} — engine hung?`)),
+                idleMs,
+            );
+        };
         try {
             while (true) {
                 let chunk: Awaited<ReturnType<typeof reader.read>>;
                 try {
-                    chunk = await reader.read();
+                    armIdle();
+                    chunk = await Promise.race([reader.read(), idleFailure]);
                 } catch (error) {
                     if ((error as Error).name === 'AbortError') {
                         throw new EngineError('aborted', `SSE stream aborted: ${path}`);
+                    }
+                    if (error instanceof StreamInterruptedError) {
+                        throw error;
                     }
                     throw new StreamInterruptedError(`SSE stream interrupted for ${path}: ${(error as Error).message}`, { cause: error as Error });
                 }
@@ -119,19 +144,32 @@ export class EngineHttpTransport {
                 }
             }
         } finally {
-            reader.releaseLock();
+            if (idleTimer !== undefined) {
+                clearTimeout(idleTimer);
+            }
+            // Cancel the body, don't just release the lock (#6): on early consumer
+            // exit (widget disposed, error thrown) releaseLock alone left the HTTP
+            // connection open and downloading. cancel() drains/aborts it.
+            try {
+                await reader.cancel();
+            } catch { /* already errored/closed — nothing to cancel */ }
+            try {
+                reader.releaseLock();
+            } catch { /* lock already released by cancel/close */ }
         }
     }
 
     /**
      * Parse one SSE frame without letting a single malformed frame abort the whole stream.
-     * Invalid JSON is surfaced as an `error` event so the UI can decide, and the stream continues.
+     * Malformed JSON is a TRANSPORT problem, not an engine answer: it is surfaced as a
+     * distinct `transport_error` event (#3) so the reducer can skip it and keep streaming —
+     * a plain `error` event remains reserved for real engine-reported failures.
      */
     private safeParseSse(rawEvent: string): SorikuSseEvent | undefined {
         try {
             return parseSseChunk(rawEvent);
         } catch (error) {
-            return { type: 'error', code: 'malformed_sse', message: (error as Error).message, raw: rawEvent };
+            return { type: 'transport_error', code: 'malformed_sse', message: (error as Error).message, raw: rawEvent };
         }
     }
 

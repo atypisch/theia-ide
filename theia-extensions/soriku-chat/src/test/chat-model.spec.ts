@@ -364,3 +364,70 @@ describe('summarizeAgentInsights', () => {
         assert.equal(ins.interactions, undefined);
     });
 });
+
+describe('reduceSseEvent — transport_error is non-terminal (#3)', () => {
+    it('skips a malformed frame and keeps streaming', () => {
+        const turn = [
+            { type: 'chunk', content: 'hello ' },
+            { type: 'transport_error', code: 'malformed_sse', message: 'Invalid SSE JSON' },
+            { type: 'chunk', content: 'world' },
+            { type: 'done' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.status, 'done');            // NOT flipped to error by the bad frame
+        assert.equal(turn.text, 'hello world');       // both chunks survived
+        assert.equal(turn.error, undefined);
+    });
+    it('keeps real engine errors terminal', () => {
+        const turn = [
+            { type: 'chunk', content: 'x' },
+            { type: 'error', message: 'model exploded' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.status, 'error');
+        assert.equal(turn.error, 'model exploded');
+    });
+});
+
+describe('reduceSseEvent — worker-scoped tool attribution (#7/#8)', () => {
+    it('binds interleaved same-name results to the right worker', () => {
+        const turn = [
+            { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'a.ts' }, outcome: 'verified' },
+            { type: 'worker_tool_call', worker_id: 'w2', tool: 'file_write', args: { path: 'b.ts' }, outcome: 'blocked', outcome_reason: 'parse_gate' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.toolCalls.length, 2);                     // no cross-worker merge
+        const w1 = turn.toolCalls.find(c => c.workerId === 'w1');
+        const w2 = turn.toolCalls.find(c => c.workerId === 'w2');
+        assert.equal(w1?.outcome, 'verified');                      // outcomes on the RIGHT cards
+        assert.equal(w2?.outcome, 'blocked');
+        assert.equal(w2?.outcomeReason, 'parse_gate');
+    });
+
+    it('a worker event adopts the unowned tool_request entry instead of duplicating (#8)', () => {
+        const turn = [
+            { type: 'tool_request', request_id: 'r1', tool: 'file_write', args: { path: 'a.ts' } },
+            { type: 'worker_tool_call', worker_id: 'w1', tool: 'file_write', args: { path: 'a.ts' } },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.toolCalls.length, 1);                     // merged, not duplicated
+        assert.equal(turn.toolCalls[0].workerId, 'w1');             // ownership claimed
+        assert.equal(turn.toolCalls[0].status, 'done');
+    });
+
+    it('a worker never claims an entry OWNED by another worker', () => {
+        const turn = [
+            { type: 'worker_tool_call', worker_id: 'w1', tool: 'shell_exec', args: { command: 'x' }, error: 'boom' },
+            { type: 'tool_result', worker_id: 'w2', tool: 'shell_exec', result: 'w2 output' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        // w2's result had no matching w2/unowned entry → it must NOT overwrite w1's card.
+        const w1 = turn.toolCalls.find(c => c.workerId === 'w1');
+        assert.notEqual(w1?.result, 'w2 output');
+    });
+
+    it('single-agent path (no worker_id anywhere) keeps matching as before', () => {
+        const turn = [
+            { type: 'tool_call', tool: 'file_read', args: { path: 'a.ts' } },
+            { type: 'tool_result', tool: 'file_read', result: 'content' },
+        ].reduce(reduceSseEvent, createAssistantTurn('t1'));
+        assert.equal(turn.toolCalls.length, 1);
+        assert.equal(turn.toolCalls[0].status, 'done');
+        assert.equal(turn.toolCalls[0].result, 'content');
+    });
+});

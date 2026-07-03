@@ -22,6 +22,14 @@ export class SorikuPlanLiveBridge {
 
     protected source?: EventSource;
     protected engineBase = 'http://127.0.0.1:8765';
+    // #19: reconnect with capped exponential backoff instead of a fixed 5s loop
+    // hammering a down engine forever; a fired timer must be a no-op after dispose.
+    protected reconnectTimer: number | undefined;
+    protected reconnectAttempts = 0;
+    protected disposed = false;
+
+    protected static readonly RECONNECT_BASE_MS = 5_000;
+    protected static readonly RECONNECT_MAX_MS = 60_000;
 
     @postConstruct()
     protected init(): void {
@@ -31,9 +39,15 @@ export class SorikuPlanLiveBridge {
     }
 
     protected connect(): void {
+        if (this.disposed) {
+            return;
+        }
         this.source?.close();
         try {
             this.source = new EventSource(`${this.engineBase}/api/events`);
+            this.source.onopen = () => {
+                this.reconnectAttempts = 0;   // link is healthy again — reset backoff
+            };
             this.source.onmessage = ev => {
                 try {
                     const data = JSON.parse(ev.data) as Record<string, unknown>;
@@ -48,14 +62,32 @@ export class SorikuPlanLiveBridge {
             };
             this.source.onerror = () => {
                 this.source?.close();
-                window.setTimeout(() => this.connect(), 5000);
+                this.scheduleReconnect();
             };
         } catch {
-            window.setTimeout(() => this.connect(), 5000);
+            this.scheduleReconnect();
         }
     }
 
+    protected scheduleReconnect(): void {
+        if (this.disposed || this.reconnectTimer !== undefined) {
+            return;
+        }
+        const exp = Math.min(this.reconnectAttempts, 10);
+        const delay = Math.min(SorikuPlanLiveBridge.RECONNECT_BASE_MS * Math.pow(2, exp), SorikuPlanLiveBridge.RECONNECT_MAX_MS);
+        this.reconnectAttempts += 1;
+        this.reconnectTimer = window.setTimeout(() => {
+            this.reconnectTimer = undefined;
+            this.connect();
+        }, delay);
+    }
+
     dispose(): void {
+        this.disposed = true;
+        if (this.reconnectTimer !== undefined) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = undefined;
+        }
         this.source?.close();
         this.onDidReceivePlanEventEmitter.dispose();
     }

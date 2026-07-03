@@ -32,8 +32,20 @@ export class SorikuInlineCompletionContribution implements FrontendApplicationCo
     @inject(PreferenceService)
     protected readonly preferences: PreferenceService;
 
+    // #20: keep the provider registration so it can be disposed and a second
+    // onStart can never double-register.
+    protected registration: monaco.IDisposable | undefined;
+
+    onStop(): void {
+        this.registration?.dispose();
+        this.registration = undefined;
+    }
+
     onStart(): void {
-        monaco.languages.registerInlineCompletionsProvider({ pattern: '**' }, {
+        if (this.registration) {
+            return;
+        }
+        this.registration = monaco.languages.registerInlineCompletionsProvider({ pattern: '**' }, {
             provideInlineCompletions: async (model, position, _context, token) => {
                 if (this.preferences.get<boolean>(SORIKU_INLINE_COMPLETION_ENABLED, true) === false) {
                     return undefined;
