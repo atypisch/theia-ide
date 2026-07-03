@@ -14,6 +14,7 @@ import { inject, injectable } from '@theia/core/shared/inversify';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { PreferenceService } from '@theia/core/lib/common';
 import { EngineClient } from '../common/engine-client';
+import { sliceCursorAffixes } from '../common/editor-context';
 
 /** Pref to toggle inline completion (default on). */
 export const SORIKU_INLINE_COMPLETION_ENABLED = 'soriku.completion.inlineEnabled';
@@ -65,8 +66,9 @@ export class SorikuInlineCompletionContribution implements FrontendApplicationCo
                 const suffixFull = model.getValueInRange(new monaco.Range(
                     position.lineNumber, position.column, lastLine, lastColumn,
                 ));
-                const prefix = prefixFull.slice(-MAX_PREFIX_CHARS);
-                const suffix = suffixFull.slice(0, MAX_SUFFIX_CHARS);
+                // Line-aware window (C-E): the far ends snap to line boundaries so the
+                // FIM model never sees a mid-token first/last line.
+                const { prefix, suffix } = sliceCursorAffixes(prefixFull, suffixFull, MAX_PREFIX_CHARS, MAX_SUFFIX_CHARS);
                 if (!prefix.trim() && !suffix.trim()) {
                     return undefined;
                 }

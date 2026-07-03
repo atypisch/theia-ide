@@ -133,37 +133,79 @@ export function okResult(result: string): ToolExecResult {
     return { result };
 }
 
-/** Apply a minimal unified-diff patch (single-file, @@ hunks). */
+/**
+ * Apply a unified-diff patch (single-file, @@ hunks) — STRICT (audit C-D).
+ *
+ * The previous implementation applied deletions/insertions at the header's line
+ * numbers without ever checking that context or deleted lines matched the
+ * original: an offset hunk (file changed since the diff was made) silently
+ * corrupted the file. Now every context (' ') and deletion ('-') line is
+ * validated against the original; any mismatch throws with the line number —
+ * the delegation layer turns that into an explicit error result, so the engine
+ * sees a loud failure it can re-patch from, never a silent mis-patch.
+ */
 export function applyUnifiedPatch(original: string, patch: string): string {
     const lines = original.split('\n');
     const patchLines = patch.split('\n');
+    const out: string[] = [];
+    let src = 0;          // next unconsumed line of the original (0-based)
+    let sawHunk = false;
     let i = 0;
     while (i < patchLines.length) {
         const header = patchLines[i];
         if (!header.startsWith('@@')) {
-            i++;
+            i++;          // file headers (---/+++), index lines, prose — skip
             continue;
         }
-        const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(header);
+        const match = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/.exec(header);
         if (!match) {
-            throw new Error('Invalid patch hunk header');
+            throw new Error(`Invalid patch hunk header: ${header}`);
         }
-        let lineNo = parseInt(match[1], 10) - 1;
+        sawHunk = true;
+        // A "-0,0" start means insertion into an empty region before line 1.
+        const hunkStart = Math.max(0, parseInt(match[1], 10) - 1);
+        if (hunkStart < src) {
+            throw new Error(`Overlapping or out-of-order hunks at line ${hunkStart + 1}`);
+        }
+        if (hunkStart > lines.length) {
+            throw new Error(`Hunk starts at line ${hunkStart + 1}, beyond end of file (${lines.length} lines)`);
+        }
+        while (src < hunkStart) {
+            out.push(lines[src++]);
+        }
         i++;
         while (i < patchLines.length && !patchLines[i].startsWith('@@')) {
             const pl = patchLines[i];
-            if (pl.startsWith(' ')) {
-                lineNo++;
+            if (pl.startsWith('+')) {
+                out.push(pl.slice(1));
+            } else if (pl.startsWith(' ') || pl === '') {
+                // '' tolerates producers that drop the leading space on empty context lines.
+                const expected = pl === '' ? '' : pl.slice(1);
+                if (lines[src] !== expected) {
+                    throw new Error(`Patch context mismatch at line ${src + 1}: expected ${JSON.stringify(expected)}, file has ${JSON.stringify(lines[src] ?? '<end of file>')}`);
+                }
+                out.push(lines[src++]);
             } else if (pl.startsWith('-')) {
-                lines.splice(lineNo, 1);
-            } else if (pl.startsWith('+')) {
-                lines.splice(lineNo, 0, pl.slice(1));
-                lineNo++;
+                const expected = pl.slice(1);
+                if (lines[src] !== expected) {
+                    throw new Error(`Patch deletion mismatch at line ${src + 1}: expected ${JSON.stringify(expected)}, file has ${JSON.stringify(lines[src] ?? '<end of file>')}`);
+                }
+                src++;    // consumed, not copied — deleted
+            } else if (pl.startsWith('\\')) {
+                // "\ No newline at end of file" — metadata, not content.
+            } else {
+                throw new Error(`Unrecognized patch line: ${JSON.stringify(pl)}`);
             }
             i++;
         }
     }
-    return lines.join('\n');
+    if (!sawHunk) {
+        throw new Error('Patch contains no @@ hunks');
+    }
+    while (src < lines.length) {
+        out.push(lines[src++]);
+    }
+    return out.join('\n');
 }
 
 /** Format project_search hits like the engine tool. */

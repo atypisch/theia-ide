@@ -36,6 +36,14 @@ export const sorikuEnginePreferenceSchema: PreferenceSchema = {
             minimum: 0,
             scope: PreferenceScope.User,
         },
+        'soriku.context.editorEnabled': {
+            type: 'boolean',
+            description: 'Send live editor context with chat messages: active file, '
+                + 'selection or code around the cursor, and open tabs. This is what '
+                + 'lets "explain this" refer to what you are looking at.',
+            default: true,
+            scope: PreferenceScope.User,
+        },
         'soriku.completion.inlineEnabled': {
             type: 'boolean',
             description: 'Show inline (ghost-text) code completions as you type, '

@@ -18,6 +18,8 @@ import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/sor
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
+import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
+import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -37,6 +39,7 @@ import {
     fromEngineMessages,
     reduceSseEvent,
     summarizeAgentInsights,
+    withWorkspacePrefix,
 } from '../common/chat-model';
 
 /** Persisted (across reloads) pointer to the chat the user was last in. */
@@ -152,6 +155,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(PreferenceService)
     protected readonly preferences: PreferenceService;
+
+    @inject(SorikuEditorContextCollector)
+    protected readonly editorContext: SorikuEditorContextCollector;
 
     /** When restoring/loading a saved chat, suppress the agent-change reset. */
     protected restoring = false;
@@ -536,8 +542,14 @@ export class SorikuChatWidget extends ReactWidget {
             this.buildEditorContext(text),
         ]);
 
+        // C-B: the engine's guard/learnings extractors read the USER prompt, not the
+        // context items — carry the workspace line there so per-project learnings,
+        // soriku.md guidelines and the write-guard actually engage for IDE chats.
+        const roots = await this.workspaceService.roots;
+        const wirePrompt = withWorkspacePrefix(text, roots[0]?.resource.path.toString());
+
         return {
-            prompt: text,
+            prompt: wirePrompt,
             personaId: agentId,
             conversationId: this.conversationId,
             projectId,
@@ -564,13 +576,19 @@ export class SorikuChatWidget extends ReactWidget {
         return typeof cap === 'number' && cap >= 0 ? cap : undefined;
     }
 
-    /** @file mentions + open editor tabs as engine context items. */
+    /** @file mentions + the workspace root as engine context items (no editor tabs yet — that is Fix A). */
     protected async buildEditorContext(prompt: string): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[]> {
         const items: import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[] = [];
         const roots = await this.workspaceService.roots;
         const root = roots[0]?.resource;
         if (root) {
-            items.push({ type: 'text', value: `Workspace root: ${root.path.toString()}` });
+            // Exact `Workspace:` wording — the engine greps for `workspace:` (C-B).
+            items.push({ type: 'text', value: `Workspace: ${root.path.toString()}` });
+        }
+        // Fix A (C-A): live editor context — active file, selection or cursor
+        // window, open tabs — so "explain this" has a referent. Preference-gated.
+        if (this.preferences.get<boolean>('soriku.context.editorEnabled', true) !== false) {
+            items.push(...buildEditorContextItems(this.editorContext.collect()));
         }
         const mentionRe = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
         let match: RegExpExecArray | null;

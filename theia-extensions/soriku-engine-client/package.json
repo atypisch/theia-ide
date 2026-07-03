@@ -1,7 +1,7 @@
 {
   "name": "soriku-engine-client-ext",
   "version": "0.1.0",
-  "description": "Soriku IDE — headless engine HTTP/SSE client",
+  "description": "Soriku IDE \u2014 headless engine HTTP/SSE client",
   "keywords": [
     "theia-extension"
   ],
@@ -12,6 +12,7 @@
   ],
   "dependencies": {
     "@theia/core": "1.73.0-next.2",
+    "@theia/editor": "1.73.0-next.2",
     "@theia/monaco-editor-core": "1.108.201",
     "inversify": "^6.2.2"
   },
