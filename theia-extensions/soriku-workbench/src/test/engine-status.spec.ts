@@ -6,7 +6,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeEngineStatusView, firstRunAction, shortHost } from '../common/engine-status';
+import { EngineConnectionState, HEALTH_POLL_MS, computeEngineStatusView, firstRunAction, nextProbeDelay, shortHost } from '../common/engine-status';
+import { SorikuEngineStatusService } from '../browser/soriku-engine-status-service';
 
 describe('shortHost', () => {
     it('extracts host:port', () => {
@@ -48,5 +49,68 @@ describe('firstRunAction', () => {
     });
     it('skip does nothing', () => {
         assert.deepEqual(firstRunAction('skip', LOCAL), { startHostedAuth: false, connect: false });
+    });
+});
+
+describe('nextProbeDelay (#9/#13)', () => {
+    it('polls steadily while connected', () => {
+        assert.equal(nextProbeDelay('connected', 0), HEALTH_POLL_MS);
+        assert.equal(nextProbeDelay('connected', 5), HEALTH_POLL_MS);   // attempts irrelevant when up
+    });
+
+    it('backs off exponentially while unreachable, capped', () => {
+        assert.equal(nextProbeDelay('unreachable', 0), 2_000);
+        assert.equal(nextProbeDelay('unreachable', 1), 4_000);
+        assert.equal(nextProbeDelay('unreachable', 2), 8_000);
+        assert.equal(nextProbeDelay('unreachable', 6), 60_000);   // hit the cap
+        assert.equal(nextProbeDelay('unreachable', 50), 60_000);  // stays capped (no overflow)
+    });
+});
+
+describe('SorikuEngineStatusService.probe (#13, timer-free)', () => {
+    // svc is returned as `any` on purpose: the assertions inspect protected monitor
+    // internals (failedAttempts/monitoring/monitorTimer) that have no public seam.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function makeService(pingImpl: () => Promise<void>): { svc: any; events: EngineConnectionState[]; setPing: (f: () => Promise<void>) => void } {
+        let ping = pingImpl;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const svc = new SorikuEngineStatusService() as any;
+        svc.engineClient = { getBaseUrl: () => 'http://e:1', ping: () => ping() };
+        svc.conversationLink = { notifyChanged: () => { /* noop */ } };
+        const events: EngineConnectionState[] = [];
+        svc.onDidChangeState((e: EngineConnectionState) => events.push(e));
+        return { svc, events, setPing: f => { ping = f; } };
+    }
+
+    it('detects down→up without a manual reconnect and fires only on transitions', async () => {
+        const { svc, events, setPing } = makeService(() => Promise.reject(new Error('refused')));
+        await svc.probe();                       // down
+        await svc.probe();                       // still down — no extra event
+        assert.deepEqual(events.map(e => e.status), ['unreachable']);
+        setPing(() => Promise.resolve());
+        await svc.probe();                       // engine came back
+        assert.deepEqual(events.map(e => e.status), ['unreachable', 'connected']);
+    });
+
+    it('resets the backoff counter on success', async () => {
+        const { svc, setPing } = makeService(() => Promise.reject(new Error('refused')));
+        await svc.probe();
+        await svc.probe();
+        assert.equal(svc.failedAttempts, 2);
+        setPing(() => Promise.resolve());
+        await svc.probe();
+        assert.equal(svc.failedAttempts, 0);
+    });
+
+    it('connect() starts monitoring exactly once and stopMonitoring clears the timer', async () => {
+        const { svc, setPing } = makeService(() => Promise.resolve());
+        await svc.connect();
+        assert.equal(svc.monitoring, true);
+        assert.notEqual(svc.monitorTimer, undefined);
+        setPing(() => Promise.resolve());
+        await svc.connect();                     // second connect stays idempotent
+        svc.stopMonitoring();
+        assert.equal(svc.monitoring, false);
+        assert.equal(svc.monitorTimer, undefined);
     });
 });

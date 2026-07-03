@@ -69,3 +69,26 @@ export function firstRunAction(choice: FirstRunChoice, localBaseUrl: string): Fi
     }
     return { startHostedAuth: false, connect: false };
 }
+
+// ── Health monitoring (#9/#13) ──────────────────────────────────────────────
+
+/** Routine health-poll interval while connected. */
+export const HEALTH_POLL_MS = 30_000;
+/** First reconnect attempt after a failure. */
+export const RECONNECT_BASE_MS = 2_000;
+/** Backoff ceiling — a permanently-down engine is probed at most this often. */
+export const RECONNECT_MAX_MS = 60_000;
+
+/**
+ * Delay until the next health probe (pure, testable): steady polling while
+ * connected; exponential backoff (base·2^attempts, capped) while unreachable —
+ * so a down engine is detected AND a recovered engine is noticed without a
+ * manual reconnect (#13), without hammering a dead host.
+ */
+export function nextProbeDelay(status: EngineConnectionStatus, failedAttempts: number): number {
+    if (status === 'connected') {
+        return HEALTH_POLL_MS;
+    }
+    const exp = Math.min(Math.max(failedAttempts, 0), 10);   // 2^10 guard against overflow
+    return Math.min(RECONNECT_BASE_MS * Math.pow(2, exp), RECONNECT_MAX_MS);
+}
