@@ -35,9 +35,22 @@ browserOptions.plugins.push(
     }
 );
 
+// Bundle attribution (OPT Phase 3): emit an esbuild metafile per build so size
+// work is measured per module, never guessed. Written OUTSIDE lib/ (build-meta/)
+// so it is never served or deployed with the app.
+browserOptions.metafile = true;
+
 const browserContext = await esbuild.context(browserOptions);
 const nodeContext = await esbuild.context(nodeOptions);
 
+function writeMetafile(result) {
+    if (!result || !result.metafile) {
+        return;
+    }
+    const outDir = path.join(__dirname, 'build-meta');
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, 'browser.meta.json'), JSON.stringify(result.metafile));
+}
 
 if (watch) {
     await Promise.all([
@@ -46,7 +59,7 @@ if (watch) {
     ]);
 } else {
     try {
-        await browserContext.rebuild();
+        writeMetafile(await browserContext.rebuild());
         await browserContext.dispose();
         await nodeContext.rebuild();
         await nodeContext.dispose();
