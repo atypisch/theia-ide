@@ -28,3 +28,11 @@
 
 ## Volgorde-advies
 E2 (kleinste, directe kwaliteitswinst voor elke chat) → E1 (haalt de prompt-prefix weg) → E3 (exacte attributie) → E5 → E4 → E6.
+
+## E7 — Per-worker cancel (uit Phase-5 orchestratie-verificatie)
+- **Nu:** alleen hele-plan `cancelPlan`; een individuele worker kan niet gestopt worden.
+- **Gewenst:** `POST /api/plan/{id}/worker/{worker_id}/cancel` (of via het bestaande control-kanaal), zodat de IDE een stop-knop per Fleet-rij kan tonen. Klein IDE-stuk, blokkeert op het endpoint.
+
+## E8 — Multi-model synthesis-attributie (uit Phase-5)
+- **Nu:** de synthese draait engine-side; de IDE toont het eindantwoord + de bijdragende modellen, maar niet "welk model deed welk deel".
+- **Gewenst:** synthesis-events die per-segment attributie dragen (welk worker/model welk deel leverde), zodat de IDE de synthese inspecteerbaar maakt (§5.2).
