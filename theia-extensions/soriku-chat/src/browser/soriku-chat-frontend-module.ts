@@ -11,9 +11,13 @@ import { WidgetFactory } from '@theia/core/lib/browser';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { bindViewContribution } from '@theia/core/lib/browser/shell/view-contribution';
 import { SorikuChatWidget } from './soriku-chat-widget';
+import { ChatStreamController } from './chat-stream-controller';
+import { ChatSessionService } from './chat-session-service';
 import { SorikuChatViewContribution } from './soriku-chat-view-contribution';
 
 export default new ContainerModule(bind => {
+    bind(ChatStreamController).toSelf().inSingletonScope();
+    bind(ChatSessionService).toSelf().inSingletonScope();
     bind(SorikuChatWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: SorikuChatWidget.ID,

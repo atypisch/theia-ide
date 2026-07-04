@@ -40,6 +40,8 @@ export interface GeneratedFileView {
     filename?: string;
 }
 
+// ── Turn construction ───────────────────────────────────────────────────────
+
 /** One worker/agent in a plan run — the unit the Fleet view renders. */
 export interface AgentActivity {
     workerId: string;
@@ -142,6 +144,10 @@ function parsePlanTasks(raw: unknown): PlanTaskView[] {
 function asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
 }
+
+// ── Tool-call correlation (#7/#8: worker-scoped matching) ──────────────────
+
+// ── Outgoing-prompt helpers (C-B workspace line) ───────────────────────────
 
 /**
  * Prefix the outgoing prompt with the exact `Workspace: /path` line the engine's
@@ -265,6 +271,8 @@ function upsertToolCall(calls: ChatToolCall[], event: SorikuSseEvent, status: Ch
         calls.push({ callId, tool, args: event.args, status, workerId });
     }
 }
+
+// ── The SSE reducer: fold engine events into a view turn ───────────────────
 
 /**
  * Fold one SSE event into the current assistant turn. Pure & immutable: returns a new turn so the
@@ -551,6 +559,8 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
     }
     return next;
 }
+
+// ── Engine-history hydration + helpers ─────────────────────────────────────
 
 /**
  * Map a stored engine conversation (user/assistant messages) into chat view

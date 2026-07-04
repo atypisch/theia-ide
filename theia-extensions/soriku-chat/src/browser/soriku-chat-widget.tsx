@@ -8,7 +8,6 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
-import { StorageService } from '@theia/core/lib/browser/storage-service';
 import { OpenerService } from '@theia/core/lib/browser/opener-service';
 import URI from '@theia/core/lib/common/uri';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
@@ -17,7 +16,6 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AuthError, EngineError, StreamInterruptedError } from 'soriku-engine-client-ext/lib/common/engine-errors';
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
@@ -26,6 +24,8 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { ChatMarkdown } from './chat-markdown-view';
+import { ChatStreamController } from './chat-stream-controller';
+import { ChatSessionService } from './chat-session-service';
 import {
     AgentActivity,
     AgentInsights,
@@ -36,19 +36,14 @@ import {
     busyPhase,
     createAssistantTurn,
     formatToolCallSummary,
-    fromEngineMessages,
-    reduceSseEvent,
     summarizeAgentInsights,
     withWorkspacePrefix,
 } from '../common/chat-model';
 
-/** Persisted (across reloads) pointer to the chat the user was last in. */
-const ACTIVE_CHAT_STORAGE_KEY = 'soriku.chat.active';
 /** User-configurable term for a head agent's spawned sub-agents (Fase F). */
 const SUBAGENT_LABEL_PREF = 'soriku.ui.subagentLabel';
 /** Per-plan cloud spend cap (EUR); negative = no IDE cap (engine default). */
 const CLOUD_COST_CAP_PREF = 'soriku.routing.cloudCostCapEur';
-interface ActiveChatState { conversationId: string; agentId?: string; agentName?: string; }
 
 /** How the agent works (Cursor-style behaviour), independent of model choice. */
 type AgentBehavior = 'auto' | 'edit' | 'plan' | 'chat';
@@ -129,6 +124,12 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
+    @inject(ChatStreamController)
+    protected readonly streamController: ChatStreamController;
+
+    @inject(ChatSessionService)
+    protected readonly session: ChatSessionService;
+
     @inject(SorikuToolApprovalBridge)
     protected readonly toolApproval: SorikuToolApprovalBridge;
 
@@ -143,9 +144,6 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(SorikuPlanLiveBridge)
     protected readonly planLiveBridge: SorikuPlanLiveBridge;
-
-    @inject(StorageService)
-    protected readonly storage: StorageService;
 
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
@@ -162,19 +160,40 @@ export class SorikuChatWidget extends ReactWidget {
     /** When restoring/loading a saved chat, suppress the agent-change reset. */
     protected restoring = false;
 
-    protected conversation: ChatMessage[] = [];
-    protected feedbackByTurn = new Map<string, 'positive' | 'negative'>();
+    // Session state lives in ChatSessionService (P4-b) — delegating accessors keep
+    // the 40+ render references unchanged while the service is the single owner.
+    protected get conversation(): ChatMessage[] {
+        return this.session.conversation;
+    }
+    protected set conversation(value: ChatMessage[]) {
+        this.session.conversation = value;
+    }
+    protected get feedbackByTurn(): Map<string, 'positive' | 'negative'> {
+        return this.session.feedbackByTurn;
+    }
     /** Fase E insights panel: what the active agent has learned. */
     protected insightsOpen = false;
     protected insights?: AgentInsights;
     protected insightsAgentId?: string;
     protected insightsLoading = false;
-    protected conversationId: string | undefined;
-    protected conversationTitle?: string;
-    protected streaming = false;
-    protected idSeq = 0;
-    protected abortController: AbortController | undefined;
+    protected get conversationId(): string | undefined {
+        return this.session.conversationId;
+    }
+    protected set conversationId(value: string | undefined) {
+        this.session.conversationId = value;
+    }
+    protected get conversationTitle(): string | undefined {
+        return this.session.conversationTitle;
+    }
+    protected set conversationTitle(value: string | undefined) {
+        this.session.conversationTitle = value;
+    }
     protected inputRef = React.createRef<HTMLTextAreaElement>();
+
+    /** One stream at a time — backed by the controller (P4-a), so there is a single source of truth. */
+    protected get streaming(): boolean {
+        return this.streamController.active;
+    }
 
     /** Controls: agent behaviour (Mode) + model orchestration (Models). */
     protected behavior: AgentBehavior = 'auto';
@@ -217,9 +236,6 @@ export class SorikuChatWidget extends ReactWidget {
             this.update();
         });
     }
-    /** Live follow of an engine plan started outside this widget (CLI/API). */
-    protected externalFollowConvId?: string;
-    protected externalTurnIndex = -1;
     protected approvalRememberSession = false;
 
     @postConstruct()
@@ -248,14 +264,14 @@ export class SorikuChatWidget extends ReactWidget {
         this.toDispose.push(this.planLiveBridge.onDidReceivePlanEvent(event => {
             void this.ingestLivePlanEvent(event);
         }));
+        this.toDispose.push(this.session.onDidChange(() => this.scheduleUpdate()));
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
         // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
         // no longer mutates state / executes delegated tools / writes files) and flush
         // any pending approvals so the engine stream isn't left blocked (#2/#1).
         this.toDispose.push({
             dispose: () => {
-                this.streaming = false;
-                this.abortController?.abort();
+                this.streamController.abort();
                 this.toolApproval.cancelAll();
             },
         });
@@ -267,12 +283,7 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Resume the last active conversation across IDE reloads. */
     protected async restoreActiveChat(): Promise<void> {
-        let state: ActiveChatState | undefined;
-        try {
-            state = await this.storage.getData<ActiveChatState | undefined>(ACTIVE_CHAT_STORAGE_KEY, undefined);
-        } catch {
-            return;
-        }
+        const state = await this.session.restoreActiveChat();
         if (state?.conversationId) {
             await this.loadConversation(state.conversationId, state.agentId, state.agentName).catch(() => { /* stale id — ignore */ });
         }
@@ -280,8 +291,10 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Load a stored conversation (messages + context) into the chat. */
     protected async loadConversation(id: string, agentIdHint?: string, agentNameHint?: string): Promise<void> {
-        const conv = await this.engineClient.getConversation(id);
-        const agentId = (conv.persona_id as string | undefined) ?? agentIdHint;
+        // Select the agent FIRST (guarded by `restoring` so it doesn't wipe the chat),
+        // then let the session load state — same order as before the P4-b extraction.
+        const personaId = await this.session.loadConversation(id);
+        const agentId = personaId ?? agentIdHint;
         this.restoring = true;
         try {
             if (agentId) {
@@ -290,24 +303,14 @@ export class SorikuChatWidget extends ReactWidget {
         } finally {
             this.restoring = false;
         }
-        this.conversation = fromEngineMessages(conv.messages ?? []);
-        this.conversationId = conv.id;
-        this.conversationTitle = conv.title;
-        this.conversationLink.notifyChanged();
-        this.feedbackByTurn.clear();
         this.persistActiveChat();
         this.update();
     }
 
     /** Start a fresh conversation (keeps the active agent). */
     protected startNewConversation(): void {
-        this.abortController?.abort();
-        this.conversation = [];
-        this.feedbackByTurn.clear();
-        this.conversationId = undefined;
-        this.conversationTitle = undefined;
-        this.streaming = false;
-        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
+        this.streamController.abort();
+        this.session.reset();
         this.update();
     }
 
@@ -320,15 +323,7 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Persist the active conversation pointer for reload-resume. */
     protected persistActiveChat(): void {
-        if (!this.conversationId) {
-            return;
-        }
-        const state: ActiveChatState = {
-            conversationId: this.conversationId,
-            agentId: this.selection.getActiveId(),
-            agentName: this.selection.getActiveName(),
-        };
-        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, state).catch(() => { /* best-effort */ });
+        this.session.persistActiveChat(this.selection.getActiveId(), this.selection.getActiveName());
     }
 
     /** Load the model list once for the Single-model picker (chat-capable models only). */
@@ -391,24 +386,19 @@ export class SorikuChatWidget extends ReactWidget {
         if (this.restoring) {
             return;
         }
-        this.abortController?.abort();
+        this.streamController.abort();
         // Flush any pending tool approvals from the previous agent so they can't
         // resolve into the new context or strand the engine stream (#16/#1).
         this.toolApproval.cancelAll();
-        this.conversation = [];
-        this.feedbackByTurn.clear();
         this.insights = undefined;
         this.insightsAgentId = undefined;
-        this.conversationId = undefined;
-        this.conversationTitle = undefined;
-        this.streaming = false;
         // Explicit agent switch starts fresh — forget the resumed pointer.
-        this.storage.setData(ACTIVE_CHAT_STORAGE_KEY, undefined).catch(() => { /* best-effort */ });
+        this.session.reset();
         this.update();
     }
 
     protected nextId(): string {
-        return `m${++this.idSeq}`;
+        return this.session.nextId();
     }
 
     protected submitFromInput(): void {
@@ -434,76 +424,32 @@ export class SorikuChatWidget extends ReactWidget {
         }
         this.resolvingPlans.clear();
         this.conversation.push({ role: 'user', id: this.nextId(), text });
-        let turn = createAssistantTurn(this.nextId());
-        const turnIndex = this.conversation.push(turn) - 1;
-        this.streaming = true;
-        this.abortController = new AbortController();
+        const initialTurn = createAssistantTurn(this.nextId());
+        const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
         this.scheduleUpdate(true);
         const params = await this.buildStreamParams(text, agentId);
-        const needsApproval = params.mode === 'plan';
-        try {
-            const stream = this.engineClient.chatStream(params, this.abortController.signal);
-            for await (const event of stream) {
-                // Stop touching state the instant the widget is torn down (#2) — the
-                // abort also ends the fetch, this just guarantees no mutation races it.
-                if (this.isDisposed) {
-                    break;
-                }
-                turn = reduceSseEvent(turn, event);
-                if (event.type === 'plan_awaiting_execution' && needsApproval) {
-                    turn = { ...turn, planNeedsApproval: true };
-                }
+        // The controller owns the lifecycle (P4-a): abort, reduce, typed errors,
+        // tool/plan fan-out. This widget only renders the turns it hands back.
+        const finalTurn = await this.streamController.run({
+            params,
+            initialTurn,
+            needsApproval: params.mode === 'plan',
+            tools: this.toolConfirmation,
+            isDisposed: () => this.isDisposed,
+            onTurn: (turn, event) => {
                 this.conversation[turnIndex] = turn;
                 if (turn.conversationId && turn.conversationId !== this.conversationId) {
                     this.conversationId = turn.conversationId;
                     this.persistActiveChat();
                 }
-                if (event.type === 'confirm_tool') {
-                    // Fire-and-forget: the engine blocks until /api/worker/confirm, then the stream
-                    // resumes. Awaiting here would deadlock the loop waiting for the next event.
-                    this.toolConfirmation.confirm(event).catch(() => { /* default-deny already posted */ });
-                } else if (event.type === 'tool_request') {
-                    // Delegated tool: run it against the workspace, then POST the result. Same
-                    // fire-and-forget reasoning — the engine blocks until the result arrives.
-                    this.toolConfirmation.executeDelegated(event).catch(() => { /* error result already posted */ });
-                } else if (event.type === 'plan_awaiting_execution' && typeof event.plan_id === 'string') {
-                    // Plan behaviour always waits for the user — engine auto_execute is for Auto/Edit.
-                    const autoExecute = (event as { auto_execute?: boolean }).auto_execute;
-                    const shouldRun = needsApproval ? false : autoExecute !== false;
-                    if (shouldRun) {
-                        this.engineClient.executePlan(event.plan_id).catch(() => { /* stream surfaces errors */ });
-                    }
-                }
                 void this.handleLiveActivity(event);
                 this.scheduleUpdate();
-            }
-            if (turn.status === 'streaming') {
-                turn = { ...turn, status: 'done' };
-                this.conversation[turnIndex] = turn;
-            }
-        } catch (e) {
-            // Typed error handling (#3/#5): an intentional stop is not a failure, and a
-            // transport drop keeps the partial answer + a retry affordance — only real
-            // engine-reported problems render as an error.
-            if (e instanceof EngineError && e.code === 'aborted') {
-                turn = { ...turn, status: 'done', phase: 'stopped' };
-            } else if (e instanceof StreamInterruptedError) {
-                turn = { ...turn, status: 'interrupted', error: (e as Error).message };
-            } else if (e instanceof AuthError) {
-                // #14: an auth failure is actionable, not a dead end — the render
-                // offers sign-in (soriku.auth.connect) + retry.
-                turn = { ...turn, status: 'error', authRequired: true, error: 'Authentication required — sign in and retry.' };
-            } else {
-                turn = { ...turn, status: 'error', error: (e as Error).message };
-            }
-            this.conversation[turnIndex] = turn;
-        } finally {
-            this.streaming = false;
-            this.abortController = undefined;
-            this.conversationLink.notifyChanged();
-            this.scheduleUpdate(true);
-        }
+            },
+        });
+        this.conversation[turnIndex] = finalTurn;
+        this.conversationLink.notifyChanged();
+        this.scheduleUpdate(true);
     }
 
     /** Re-send the user message that produced an interrupted turn (#5, manual retry). */
@@ -651,7 +597,7 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     protected stop(): void {
-        this.abortController?.abort();
+        this.streamController.abort();
     }
 
     /** Send thumbs feedback for an assistant turn to the engine (positive/negative). */
@@ -1104,67 +1050,11 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     protected async ingestLivePlanEvent(event: import('soriku-engine-client-ext/lib/common/engine-types').SorikuSseEvent): Promise<void> {
-        if (this.streaming) {
-            return;
-        }
-        const convId = typeof event.conversation_id === 'string' ? event.conversation_id : undefined;
-        if (convId && convId !== this.externalFollowConvId) {
-            await this.followExternalPlan(convId);
-        }
-        if (this.externalTurnIndex < 0) {
-            return;
-        }
-        const current = this.conversation[this.externalTurnIndex];
-        if (!current || current.role !== 'assistant') {
-            return;
-        }
-        let turn = reduceSseEvent(current, event);
-        if (event.type === 'plan_done' || event.type === 'plan_failed' || event.type === 'plan_cancelled') {
-            turn = { ...turn, status: event.type === 'plan_done' ? 'done' : 'error' };
-            this.externalFollowConvId = undefined;
-            this.externalTurnIndex = -1;
-        } else {
-            turn = { ...turn, status: 'streaming' };
-        }
-        this.conversation[this.externalTurnIndex] = turn;
-        void this.handleLiveActivity(event);
-        this.conversationLink.notifyChanged();
-        this.scheduleUpdate();
-    }
-
-    /** Attach to a plan conversation broadcast from the engine (CLI/API runs). */
-    protected async followExternalPlan(convId: string): Promise<void> {
-        // #15: never wholesale-replace an UNSAVED local chat with the external plan's
-        // conversation — that silently wiped it. Only hijack an empty widget, the same
-        // conversation, or a persisted one (reloadable from the engine).
-        const unsavedLocalChat = this.conversationId === undefined && this.conversation.length > 0;
-        if (unsavedLocalChat) {
-            this.messages.info('Live plan gestart in een andere conversatie — open die via Conversations om mee te kijken (je huidige chat blijft staan).');
-            return;
-        }
-        this.externalFollowConvId = convId;
-        try {
-            const conv = await this.engineClient.getConversation(convId);
-            this.conversation = fromEngineMessages(conv.messages ?? []);
-            this.conversationId = conv.id;
-            this.conversationTitle = conv.title;
-            let idx = this.conversation.length - 1;
-            if (idx < 0 || this.conversation[idx].role !== 'assistant') {
-                const turn = createAssistantTurn(this.nextId());
-                turn.status = 'streaming';
-                turn.phase = 'Plan running…';
-                idx = this.conversation.push(turn) - 1;
-            } else {
-                const last = this.conversation[idx] as AssistantTurn;
-                this.conversation[idx] = { ...last, status: 'streaming', phase: last.phase ?? 'Plan running…' };
-            }
-            this.externalTurnIndex = idx;
-            this.persistActiveChat();
-            this.conversationLink.requestOpen(convId);
-            this.messages.info('Live plan gestart — je ziet file writes hier en in de editor.');
-        } catch (e) {
-            this.messages.error(`Kon plan-conversatie niet openen: ${(e as Error).message}`);
-        }
+        await this.session.ingestLivePlanEvent(
+            event,
+            e => { void this.handleLiveActivity(e); },
+            { agentId: this.selection.getActiveId(), agentName: this.selection.getActiveName() },
+        );
     }
 
     protected async handleLiveActivity(event: import('soriku-engine-client-ext/lib/common/engine-types').SorikuSseEvent): Promise<void> {
