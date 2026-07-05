@@ -13,3 +13,4 @@ license-check-summary.txt*
 .prompts
 **/test-screenshots.playwright-mcp/
 applications/*/build-meta/
+design/
