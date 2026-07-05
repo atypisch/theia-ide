@@ -22,7 +22,7 @@ const SIZE_PX: Record<AgentAvatarSize, { box: number; font: number; radius: numb
     lg: { box: 52, font: 18, radius: 14 },
 };
 
-export function AgentAvatar({ initials, category, size = 'md' }: AgentAvatarProps): React.ReactNode {
+export function AgentAvatar({ initials, category, size = 'md' }: AgentAvatarProps): React.ReactElement {
     const { c, bg, line } = categoryColors(category);
     const dims = SIZE_PX[size];
     return (

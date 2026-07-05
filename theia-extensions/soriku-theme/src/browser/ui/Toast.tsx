@@ -11,9 +11,11 @@ export interface ToastProps {
     onDismiss: () => void;
 }
 
-export function Toast({ message, onDismiss }: ToastProps): React.ReactNode {
+export function Toast({ message, onDismiss }: ToastProps): React.ReactElement | null {
     if (!message) {
-        return undefined;
+        // React requires `null` (not `undefined`) for a component that renders nothing when used as a JSX tag.
+        // eslint-disable-next-line no-null/no-null
+        return null;
     }
     return (
         <div className="sk-toast" onClick={onDismiss}>

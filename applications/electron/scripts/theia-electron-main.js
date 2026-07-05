@@ -6,6 +6,15 @@ const { copyBundledPlugins } = require('./appimage-helpers');
 // Update to override the supported VS Code API version.
 // process.env.VSCODE_API_VERSION = '1.50.0'
 
+// Theia's ElectronMainApplication hardcodes the native title bar on macOS
+// (ElectronMainApplication#getTitleBarStyle) regardless of the
+// window.titleBarStyle preference — this documented env var is the
+// supported override so the Soriku shell's frameless titlebar (see
+// soriku-shell-ext) applies on macOS too, not just Windows/Linux.
+if (process.platform === 'darwin') {
+    process.env.THEIA_ELECTRON_DISABLE_NATIVE_ELEMENTS = '1';
+}
+
 // Detect if running as AppImage
 const isAppImage = !!process.env.APPIMAGE;
 

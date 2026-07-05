@@ -1,0 +1,117 @@
+/*
+ * Soriku IDE — custom titlebar, 1:1 from the mockup's 42px titlebar row.
+ */
+
+#theia-top-panel {
+    background: var(--bg-sunk);
+    border-bottom: 1px solid var(--line);
+}
+
+.soriku-titlebar {
+    height: 42px;
+    width: 100%;
+}
+
+.soriku-titlebar-row {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    -webkit-app-region: drag;
+    font-family: var(--font-s);
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Reserves space for the native macOS traffic lights (trafficLightPosition
+   in applications/electron/package.json). Only rendered as fake dots when
+   NOT running in Electron (browser dev preview has no native equivalent). */
+.soriku-titlebar-traffic-spacer {
+    flex: 0 0 auto;
+    width: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.soriku-titlebar-fake-dot {
+    display: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.soriku-titlebar-fake-controls .soriku-titlebar-traffic-spacer {
+    width: 62px;
+}
+
+.soriku-titlebar-fake-controls .soriku-titlebar-fake-dot {
+    display: inline-block;
+}
+
+.soriku-titlebar-fake-dot-close { background: #FF5F57; }
+.soriku-titlebar-fake-dot-min { background: #FEBC2E; }
+.soriku-titlebar-fake-dot-max { background: #28C840; }
+
+.soriku-titlebar-logo {
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+}
+
+.soriku-titlebar-word {
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.soriku-titlebar-word-accent {
+    color: var(--acc);
+}
+
+.soriku-titlebar-breadcrumb {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink3);
+    margin-left: 6px;
+}
+
+.soriku-titlebar-spacer {
+    flex: 1 1 auto;
+}
+
+.soriku-titlebar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block;
+}
+
+.soriku-titlebar-icon-btn {
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: var(--rs);
+    background: transparent;
+    border: none;
+    color: var(--ink2);
+    font-family: var(--font-m);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.soriku-titlebar-icon-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+}

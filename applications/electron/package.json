@@ -28,6 +28,7 @@
         "preferences": {
           "toolbar.showToolbar": true,
           "workbench.colorTheme": "soriku-dark",
+          "window.titleBarStyle": "custom",
           "editor.fontSize": 13,
           "editor.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
           "editor.minimap.enabled": true,
@@ -45,6 +46,13 @@
             "content": "resources/TheiaIDESplash.svg",
             "height": 276,
             "width": 446
+          },
+          "windowOptions": {
+            "titleBarStyle": "hiddenInset",
+            "trafficLightPosition": {
+              "x": 14,
+              "y": 15
+            }
           }
         }
       }
@@ -126,6 +134,7 @@
     "soriku-mcp-ext": "0.1.0",
     "soriku-models-ext": "0.1.0",
     "soriku-routing-overrides-ext": "0.1.0",
+    "soriku-shell-ext": "0.1.0",
     "soriku-theme-ext": "0.1.0",
     "soriku-tools-bridge-ext": "0.1.0",
     "soriku-workbench-ext": "0.1.0",

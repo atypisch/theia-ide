@@ -11,7 +11,7 @@ import * as React from '@theia/core/shared/react';
 export function Pill({ children, tone = 'default' }: {
     children: React.ReactNode;
     tone?: 'default' | 'ok' | 'warn' | 'danger' | 'acc';
-}): React.ReactNode {
+}): React.ReactElement {
     return <span className={`sk-pill sk-pill-${tone}`}>{children}</span>;
 }
 
@@ -19,12 +19,12 @@ export function Pill({ children, tone = 'default' }: {
 export function Badge({ children, tone = 'default' }: {
     children: React.ReactNode;
     tone?: 'default' | 'ok' | 'warn' | 'danger' | 'acc';
-}): React.ReactNode {
+}): React.ReactElement {
     return <span className={`sk-badge sk-badge-${tone}`}>{children}</span>;
 }
 
 /** Read-only value shown as a filled pill, e.g. "http://127.0.0.1:8765" in Settings. */
-export function PillValue({ children }: { children: React.ReactNode }): React.ReactNode {
+export function PillValue({ children }: { children: React.ReactNode }): React.ReactElement {
     return <span className="sk-pill-value">{children}</span>;
 }
 
@@ -33,7 +33,7 @@ export function Toggle({ on, locked, onChange }: {
     on: boolean;
     locked?: boolean;
     onChange?: (next: boolean) => void;
-}): React.ReactNode {
+}): React.ReactElement {
     if (locked) {
         return (
             <span className="sk-toggle-locked">
@@ -66,7 +66,7 @@ export function SegmentedPicker<T extends string>({ options, value, onChange }: 
     options: ReadonlyArray<SegmentedOption<T>>;
     value: T;
     onChange: (next: T) => void;
-}): React.ReactNode {
+}): React.ReactElement {
     return (
         <span className="sk-segmented">
             {options.map(opt => (
@@ -88,7 +88,7 @@ export function Btn({ children, variant = 'primary', onClick, disabled }: {
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
     onClick?: () => void;
     disabled?: boolean;
-}): React.ReactNode {
+}): React.ReactElement {
     return (
         <button className={`sk-btn sk-btn-${variant}`} onClick={onClick} disabled={disabled}>
             {children}
@@ -97,12 +97,12 @@ export function Btn({ children, variant = 'primary', onClick, disabled }: {
 }
 
 /** Worker/fleet status dot — pulses while running. */
-export function StatusDot({ status }: { status: 'running' | 'done' | 'error' | 'idle' }): React.ReactNode {
+export function StatusDot({ status }: { status: 'running' | 'done' | 'error' | 'idle' }): React.ReactElement {
     return <span className={`sk-dot sk-dot-${status}`} />;
 }
 
 /** The "verified ✓" / "fixing" pill on tool calls and minion rows. */
-export function VerifyPill({ state }: { state: 'verified' | 'fixing' | 'blocked' | 'denied' }): React.ReactNode {
+export function VerifyPill({ state }: { state: 'verified' | 'fixing' | 'blocked' | 'denied' }): React.ReactElement {
     const labels: Record<typeof state, string> = {
         verified: 'verified ✓',
         fixing: 'fixing',
@@ -113,7 +113,7 @@ export function VerifyPill({ state }: { state: 'verified' | 'fixing' | 'blocked'
 }
 
 /** Additions/deletions bar for a generated file row, e.g. router.py +18 −2. */
-export function DiffBar({ added, removed }: { added: number; removed: number }): React.ReactNode {
+export function DiffBar({ added, removed }: { added: number; removed: number }): React.ReactElement {
     const total = Math.max(added + removed, 1);
     const addPct = (added / total) * 100;
     return (
@@ -125,6 +125,6 @@ export function DiffBar({ added, removed }: { added: number; removed: number }):
 }
 
 /** Generic bordered card container (plan-approval, fleet, tool-call, insights, …). */
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }): React.ReactNode {
+export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }): React.ReactElement {
     return <div className={`sk-card ${className}`}>{children}</div>;
 }

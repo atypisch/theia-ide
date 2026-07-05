@@ -1,0 +1,15 @@
+/*
+ * Soriku IDE — command palette (quick input) shape/polish to match the
+ * mockup's overlay aesthetic (rounded, elevated, warm tokens).
+ */
+
+.quick-input-widget {
+    border: 1px solid var(--line2) !important;
+    border-radius: var(--r) !important;
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .7) !important;
+    font-family: var(--font-s) !important;
+}
+
+.quick-input-widget .monaco-inputbox {
+    border-radius: var(--rs) !important;
+}

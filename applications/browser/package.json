@@ -117,6 +117,7 @@
     "soriku-mcp-ext": "0.1.0",
     "soriku-models-ext": "0.1.0",
     "soriku-routing-overrides-ext": "0.1.0",
+    "soriku-shell-ext": "0.1.0",
     "soriku-theme-ext": "0.1.0",
     "soriku-tools-bridge-ext": "0.1.0",
     "soriku-workbench-ext": "0.1.0"

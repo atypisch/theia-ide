@@ -132,6 +132,14 @@ body.soriku-light {
     --theia-terminal-ansiCyan: var(--cat-general) !important;
     --theia-terminal-ansiWhite: var(--ink) !important;
 
+    /* ── Quick input / command palette ───────────────────────────────── */
+    --theia-quickInput-background: var(--raise) !important;
+    --theia-quickInput-foreground: var(--ink) !important;
+    --theia-quickInputList-focusBackground: var(--acc-soft) !important;
+    --theia-quickInputList-focusForeground: var(--ink) !important;
+    --theia-pickerGroup-foreground: var(--acc) !important;
+    --theia-pickerGroup-border: var(--line2) !important;
+
     /* ── Scrollbars ───────────────────────────────────────────────────── */
     --theia-scrollbarSlider-background: var(--line2) !important;
     --theia-scrollbarSlider-hoverBackground: var(--ink3) !important;

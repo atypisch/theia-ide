@@ -1,0 +1,23 @@
+/*
+ * Soriku IDE — statusbar retheme, 1:1 from the mockup (26px, mono font).
+ */
+
+:root {
+    --theia-statusBar-height: 26px;
+    --theia-statusBar-font-size: 10.5px;
+}
+
+#theia-statusBar {
+    border-top: 1px solid var(--line);
+}
+
+/* Theia's own stylesheet sets a hardcoded system-font-stack on `.element`
+   (higher specificity than a bare #theia-statusBar rule), so match that
+   specificity here rather than relying on cascade order. */
+#theia-statusBar .element {
+    font-family: var(--font-m);
+}
+
+#theia-statusBar .area .element:hover {
+    background: var(--hover);
+}

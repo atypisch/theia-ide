@@ -14,7 +14,7 @@ export interface OverlayProps {
     frameStyle?: React.CSSProperties;
 }
 
-export function Overlay({ onClose, children, frameStyle }: OverlayProps): React.ReactNode {
+export function Overlay({ onClose, children, frameStyle }: OverlayProps): React.ReactElement {
     const stop = (e: React.MouseEvent): void => e.stopPropagation();
     return (
         <div className="sk-overlay-backdrop" onClick={onClose}>

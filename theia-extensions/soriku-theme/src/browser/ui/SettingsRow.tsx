@@ -7,7 +7,7 @@
 
 import * as React from '@theia/core/shared/react';
 
-export function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }): React.ReactNode {
+export function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }): React.ReactElement {
     return (
         <div className="sk-settings-group">
             <div className="sk-settings-group-title">{title}</div>
@@ -20,7 +20,7 @@ export function SettingsRow({ label, description, control }: {
     label: string;
     description: string;
     control: React.ReactNode;
-}): React.ReactNode {
+}): React.ReactElement {
     return (
         <div className="sk-settings-row">
             <div className="sk-settings-row-label">
