@@ -1,0 +1,94 @@
+/*
+ * Soriku IDE — design tokens (1:1 from the Claude Design mockup, "Soriku IDE.dc.html").
+ * Dark is the default (:root); .soriku-light / body.soriku-light overrides to light.
+ * Do not hand-edit values here without checking the mockup — this file is the source
+ * of truth other stylesheets (soriku-ui, soriku-chat, soriku-shell, …) build on.
+ */
+
+:root {
+    --font-d: 'Newsreader', Georgia, serif;
+    --font-s: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-m: 'Geist Mono', ui-monospace, Menlo, monospace;
+
+    --bg: #0E0C09;
+    --bg-el: #181510;
+    --bg-sunk: #060503;
+    --hover: #221E18;
+    --raise: #211C16;
+
+    --ink: #F2EDDF;
+    --ink2: #BFB8A6;
+    --ink3: #7A7468;
+
+    --line: #2A2520;
+    --line2: #3A342B;
+
+    --acc: #FF8A3D;
+    --acc2: #FFB066;
+    --acc-soft: rgba(255, 138, 61, .10);
+    --acc-line: rgba(255, 138, 61, .32);
+    --acc-glow: rgba(255, 138, 61, .22);
+    --on-acc: #15120E;
+
+    --ok: #5BC388;
+    --ok-soft: rgba(91, 195, 136, .13);
+    --ok-line: rgba(91, 195, 136, .32);
+
+    --warn: #E8A53F;
+    --warn-soft: rgba(232, 165, 63, .13);
+
+    --danger: #E8704D;
+    --danger-soft: rgba(232, 112, 77, .13);
+
+    --cat-code: #FF8A3D;
+    --cat-reason: #8C8CF0;
+    --cat-general: #54C2A8;
+
+    --add: #5BC388;
+    --add-soft: rgba(91, 195, 136, .11);
+    --del-soft: rgba(232, 112, 77, .10);
+
+    --r: 10px;
+    --rs: 6px;
+}
+
+:root.soriku-light,
+body.soriku-light {
+    --bg: #FBFAF6;
+    --bg-el: #FFFFFF;
+    --bg-sunk: #F3EFE6;
+    --hover: #F1ECE0;
+    --raise: #FFFFFF;
+
+    --ink: #15120E;
+    --ink2: #4A463D;
+    --ink3: #847E70;
+
+    --line: #E8E2D3;
+    --line2: #D5CDB9;
+
+    --acc: #E85D1F;
+    --acc2: #FF8A3D;
+    --acc-soft: rgba(232, 93, 31, .08);
+    --acc-line: rgba(232, 93, 31, .28);
+    --acc-glow: rgba(232, 93, 31, .16);
+    --on-acc: #FFFFFF;
+
+    --ok: #2F7F4F;
+    --ok-soft: rgba(47, 127, 79, .10);
+    --ok-line: rgba(47, 127, 79, .26);
+
+    --warn: #B97C0F;
+    --warn-soft: rgba(185, 124, 15, .10);
+
+    --danger: #B7331F;
+    --danger-soft: rgba(183, 51, 31, .08);
+
+    --cat-code: #E85D1F;
+    --cat-reason: #6E4FE8;
+    --cat-general: #2F8F73;
+
+    --add: #2F7F4F;
+    --add-soft: rgba(47, 127, 79, .09);
+    --del-soft: rgba(183, 51, 31, .07);
+}

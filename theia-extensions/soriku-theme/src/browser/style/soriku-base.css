@@ -1,0 +1,61 @@
+/*
+ * Soriku IDE — base utility classes and keyframes, 1:1 from the mockup's
+ * global <style> block. Anything using .sk-scroll / .sk-em / the sk-* motion
+ * keyframes below must match the mockup's timing and easing exactly.
+ */
+
+.sk-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.sk-scroll::-webkit-scrollbar-thumb {
+    background: var(--line2);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.sk-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--ink3);
+    background-clip: padding-box;
+}
+
+/* Display/italic heading style (Newsreader), used for empty-states and emphasis. */
+.sk-em {
+    font-family: var(--font-d);
+    font-style: italic;
+    font-weight: 500;
+}
+
+@keyframes sk-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--ok-line); }
+    50% { box-shadow: 0 0 0 5px transparent; }
+}
+
+@keyframes sk-blink {
+    0%, 45% { opacity: 1; }
+    55%, 100% { opacity: 0; }
+}
+
+@keyframes sk-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes sk-work {
+    0%, 100% { opacity: .35; }
+    50% { opacity: 1; }
+}
+
+@keyframes sk-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Root application shell typography (mirrors the mockup's root <div> inline styles). */
+body {
+    font-family: var(--font-s);
+    font-size: 13px;
+    letter-spacing: -0.003em;
+    -webkit-font-smoothing: antialiased;
+}

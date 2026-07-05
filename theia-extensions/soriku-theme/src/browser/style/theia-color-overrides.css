@@ -1,0 +1,144 @@
+/*
+ * Soriku IDE — maps Soriku's design tokens onto Theia's `--theia-*` semantic
+ * color variables, so Monaco, the terminal and every stock Theia widget pick
+ * up the Soriku palette without a full custom ColorContribution/Monaco theme.
+ *
+ * Theia's ColorApplicationContribution sets these variables as INLINE styles
+ * on <html> (`style.setProperty(name, value)`, no `!important`). A stylesheet
+ * rule with `!important` wins over a non-important inline style in the CSS
+ * cascade, so scoping this block to the active theme's body class lets us
+ * override the resolved value everywhere `var(--theia-...)` is consumed,
+ * without touching Theia's ColorRegistry/Monaco theme machinery.
+ *
+ * Both `body.soriku-dark` and `body.soriku-light` reference the same token
+ * names (e.g. `var(--bg-el)`) — soriku-tokens.css already flips the token
+ * values per theme, so one rule set below serves both.
+ */
+
+body.soriku-dark,
+body.soriku-light {
+    /* ── Base / editor ───────────────────────────────────────────────── */
+    --theia-foreground: var(--ink) !important;
+    --theia-descriptionForeground: var(--ink3) !important;
+    --theia-errorForeground: var(--danger) !important;
+    --theia-focusBorder: var(--acc) !important;
+    --theia-textLink-foreground: var(--acc) !important;
+    --theia-textLink-activeForeground: var(--acc2) !important;
+    --theia-icon-foreground: var(--ink2) !important;
+    --theia-successBackground: var(--ok) !important;
+    --theia-progressBar-background: var(--acc) !important;
+
+    --theia-editor-background: var(--bg-el) !important;
+    --theia-editor-foreground: var(--ink) !important;
+    --theia-editor-inactiveSelectionBackground: var(--acc-soft) !important;
+    --theia-editor-selectionBackground: var(--acc-soft) !important;
+    --theia-editorWarning-foreground: var(--warn) !important;
+    --theia-editorError-foreground: var(--danger) !important;
+    --theia-editorGroup-border: var(--line) !important;
+    --theia-editorGroupHeader-tabsBackground: var(--bg-sunk) !important;
+    --theia-editorWidget-background: var(--raise) !important;
+    --theia-editorWidget-border: var(--line2) !important;
+    --theia-editorGutter-addedBackground: var(--add) !important;
+    --theia-editorGutter-deletedBackground: var(--danger) !important;
+    --theia-editorGutter-modifiedBackground: var(--warn) !important;
+    --theia-gitDecoration-addedResourceForeground: var(--add) !important;
+    --theia-gitDecoration-modifiedResourceForeground: var(--warn) !important;
+    --theia-gitDecoration-deletedResourceForeground: var(--danger) !important;
+
+    /* ── Chrome: sidebar / activity bar / panels ─────────────────────── */
+    --theia-sideBar-background: var(--bg) !important;
+    --theia-sideBar-foreground: var(--ink) !important;
+    --theia-sideBar-border: var(--line) !important;
+    --theia-sideBarSectionHeader-background: var(--bg) !important;
+    --theia-sideBarSectionHeader-border: var(--line) !important;
+    --theia-sideBarTitle-foreground: var(--ink2) !important;
+    --theia-activityBar-background: var(--bg-sunk) !important;
+    --theia-activityBar-foreground: var(--ink) !important;
+    --theia-activityBar-inactiveForeground: var(--ink3) !important;
+    --theia-activityBarBadge-background: var(--acc) !important;
+    --theia-activityBarBadge-foreground: var(--on-acc) !important;
+    --theia-panel-background: var(--bg-el) !important;
+    --theia-panel-border: var(--line) !important;
+    --theia-panelTitle-activeForeground: var(--ink) !important;
+    --theia-panelTitle-inactiveForeground: var(--ink3) !important;
+    --theia-panelTitle-activeBorder: var(--acc) !important;
+
+    /* ── Title bar / menu ─────────────────────────────────────────────── */
+    --theia-titleBar-activeBackground: var(--bg-sunk) !important;
+    --theia-titleBar-activeForeground: var(--ink) !important;
+    --theia-titleBar-inactiveBackground: var(--bg-sunk) !important;
+    --theia-titleBar-inactiveForeground: var(--ink3) !important;
+    --theia-titleBar-border: var(--line) !important;
+    --theia-menu-background: var(--raise) !important;
+    --theia-menu-foreground: var(--ink) !important;
+    --theia-menu-border: var(--line2) !important;
+    --theia-menu-selectionBackground: var(--hover) !important;
+    --theia-menu-selectionForeground: var(--ink) !important;
+    --theia-menubar-selectionBackground: var(--hover) !important;
+
+    /* ── Status bar ───────────────────────────────────────────────────── */
+    --theia-statusBar-background: var(--bg-sunk) !important;
+    --theia-statusBar-foreground: var(--ink2) !important;
+    --theia-statusBar-border: var(--line) !important;
+    --theia-statusBarItem-hoverBackground: var(--hover) !important;
+    --theia-statusBarItem-remoteBackground: var(--acc) !important;
+    --theia-statusBarItem-remoteForeground: var(--on-acc) !important;
+
+    /* ── Lists / trees ────────────────────────────────────────────────── */
+    --theia-list-activeSelectionBackground: var(--acc-soft) !important;
+    --theia-list-activeSelectionForeground: var(--ink) !important;
+    --theia-list-inactiveSelectionBackground: var(--hover) !important;
+    --theia-list-hoverBackground: var(--hover) !important;
+    --theia-list-focusBackground: var(--acc-soft) !important;
+    --theia-tree-indentGuidesStroke: var(--line2) !important;
+
+    /* ── Inputs / buttons / dropdowns ─────────────────────────────────── */
+    --theia-input-background: var(--bg-sunk) !important;
+    --theia-input-foreground: var(--ink) !important;
+    --theia-input-border: var(--line2) !important;
+    --theia-input-placeholderForeground: var(--ink3) !important;
+    --theia-inputValidation-warningBorder: var(--warn) !important;
+    --theia-inputValidation-errorBorder: var(--danger) !important;
+    --theia-dropdown-background: var(--bg-sunk) !important;
+    --theia-dropdown-border: var(--line2) !important;
+    --theia-button-background: var(--acc) !important;
+    --theia-button-foreground: var(--on-acc) !important;
+    --theia-button-hoverBackground: var(--acc2) !important;
+    --theia-button-secondaryBackground: var(--raise) !important;
+    --theia-button-secondaryForeground: var(--ink) !important;
+    --theia-button-border: var(--line2) !important;
+    --theia-badge-background: var(--acc-soft) !important;
+    --theia-badge-foreground: var(--acc) !important;
+    --theia-checkbox-background: var(--bg-sunk) !important;
+    --theia-checkbox-border: var(--line2) !important;
+
+    /* ── Tabs ─────────────────────────────────────────────────────────── */
+    --theia-tab-activeBackground: var(--bg-el) !important;
+    --theia-tab-inactiveBackground: var(--bg-sunk) !important;
+    --theia-tab-activeForeground: var(--ink) !important;
+    --theia-tab-inactiveForeground: var(--ink3) !important;
+    --theia-tab-border: var(--line) !important;
+    --theia-tab-activeBorderTop: var(--acc) !important;
+
+    /* ── Terminal ─────────────────────────────────────────────────────── */
+    --theia-terminal-background: var(--bg-el) !important;
+    --theia-terminal-foreground: var(--ink) !important;
+    --theia-terminal-ansiBlack: var(--bg-sunk) !important;
+    --theia-terminal-ansiRed: var(--danger) !important;
+    --theia-terminal-ansiGreen: var(--ok) !important;
+    --theia-terminal-ansiYellow: var(--warn) !important;
+    --theia-terminal-ansiBlue: var(--cat-reason) !important;
+    --theia-terminal-ansiMagenta: var(--acc) !important;
+    --theia-terminal-ansiCyan: var(--cat-general) !important;
+    --theia-terminal-ansiWhite: var(--ink) !important;
+
+    /* ── Scrollbars ───────────────────────────────────────────────────── */
+    --theia-scrollbarSlider-background: var(--line2) !important;
+    --theia-scrollbarSlider-hoverBackground: var(--ink3) !important;
+    --theia-scrollbarSlider-activeBackground: var(--ink3) !important;
+
+    /* ── Fonts ────────────────────────────────────────────────────────── */
+    --theia-monospace-font-family: var(--font-m) !important;
+    --theia-code-font-family: var(--font-m) !important;
+    --theia-ui-font-family: var(--font-s) !important;
+}

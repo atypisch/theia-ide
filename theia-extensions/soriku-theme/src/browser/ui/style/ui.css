@@ -1,0 +1,312 @@
+/*
+ * Soriku IDE — styles for the shared soriku-ui component kit (primitives.tsx,
+ * AgentAvatar.tsx, Overlay.tsx, Toast.tsx, SettingsRow.tsx). 1:1 from the mockup.
+ */
+
+/* ── Pill ─────────────────────────────────────────────────────────────── */
+
+.sk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: var(--font-m);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    color: var(--ink2);
+}
+
+.sk-pill-ok { color: var(--ok); border-color: var(--ok-line); background: var(--ok-soft); }
+.sk-pill-warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.sk-pill-danger { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.sk-pill-acc { color: var(--acc); border-color: var(--acc-line); background: var(--acc-soft); }
+
+/* ── Badge ────────────────────────────────────────────────────────────── */
+
+.sk-badge {
+    display: inline-block;
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--bg-sunk);
+    color: var(--ink2);
+}
+
+.sk-badge-ok { color: var(--ok); background: var(--ok-soft); }
+.sk-badge-warn { color: var(--warn); background: var(--warn-soft); }
+.sk-badge-danger { color: var(--danger); background: var(--danger-soft); }
+.sk-badge-acc { color: var(--acc); background: var(--acc-soft); }
+
+/* ── PillValue ────────────────────────────────────────────────────────── */
+
+.sk-pill-value {
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink2);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line2);
+    border-radius: var(--rs);
+    padding: 4px 11px;
+}
+
+/* ── Toggle ───────────────────────────────────────────────────────────── */
+
+.sk-toggle {
+    width: 34px;
+    height: 19px;
+    border-radius: 999px;
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.sk-toggle-on { background: var(--acc); }
+.sk-toggle-off { background: var(--line2); }
+.sk-toggle-disabled { opacity: 0.6; cursor: not-allowed; }
+
+.sk-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left 0.15s ease;
+}
+
+.sk-toggle-on .sk-toggle-knob { left: 17px; }
+
+.sk-toggle-locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.sk-toggle-locked-label {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    color: var(--ok);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* ── Segmented picker (DO / MODEL / ROUTE) ──────────────────────────────── */
+
+.sk-segmented {
+    display: inline-flex;
+    background: var(--bg-sunk);
+    border: 1px solid var(--line2);
+    border-radius: var(--rs);
+    padding: 2px;
+    gap: 2px;
+}
+
+.sk-segmented-item {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    color: var(--ink3);
+    cursor: pointer;
+}
+
+.sk-segmented-item-active {
+    background: var(--acc);
+    color: var(--on-acc);
+    font-weight: 600;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.sk-btn {
+    font-family: var(--font-s);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--rs);
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.sk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sk-btn-primary { background: var(--acc); color: var(--on-acc); }
+.sk-btn-primary:hover:not(:disabled) { background: var(--acc2); }
+.sk-btn-secondary { background: var(--raise); color: var(--ink); border-color: var(--line2); }
+.sk-btn-secondary:hover:not(:disabled) { background: var(--hover); }
+.sk-btn-ghost { background: transparent; color: var(--ink2); }
+.sk-btn-ghost:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.sk-btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.sk-btn-danger:hover:not(:disabled) { background: var(--danger-soft); }
+
+/* ── Status dot (fleet/worker) ───────────────────────────────────────── */
+
+.sk-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    display: inline-block;
+    background: var(--ink3);
+}
+
+.sk-dot-running { background: var(--acc); animation: sk-work 1.2s ease-in-out infinite; }
+.sk-dot-done { background: var(--ok); }
+.sk-dot-error { background: var(--danger); }
+
+/* ── Verify pill ──────────────────────────────────────────────────────── */
+
+.sk-verify-pill {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.sk-verify-pill-verified { color: var(--ok); background: var(--ok-soft); }
+.sk-verify-pill-fixing { color: var(--warn); background: var(--warn-soft); animation: sk-work 1.2s ease-in-out infinite; }
+.sk-verify-pill-blocked,
+.sk-verify-pill-denied { color: var(--danger); background: var(--danger-soft); }
+
+/* ── Diff bar (generated files list) ─────────────────────────────────── */
+
+.sk-diffbar {
+    display: inline-flex;
+    width: 64px;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--line2);
+}
+
+.sk-diffbar-add { background: var(--add); }
+.sk-diffbar-del { background: var(--danger); }
+
+/* ── Card ─────────────────────────────────────────────────────────────── */
+
+.sk-card {
+    border: 1px solid var(--line2);
+    border-radius: var(--r);
+    background: var(--raise);
+    padding: 8px 10px;
+}
+
+/* ── Agent avatar ─────────────────────────────────────────────────────── */
+
+.sk-avatar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-m);
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+/* ── Overlay (modal backdrop + frame) ─────────────────────────────────── */
+
+.sk-overlay-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    background: rgba(0, 0, 0, .46);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 70px 24px 24px;
+}
+
+.sk-overlay-frame {
+    background: var(--bg-el);
+    border: 1px solid var(--line2);
+    border-radius: 14px;
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .7);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: sk-rise .18s ease;
+}
+
+/* ── Toast ────────────────────────────────────────────────────────────── */
+
+.sk-toast {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 38px;
+    padding: 0 16px;
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: 999px;
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .6);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    animation: sk-rise .2s ease;
+}
+
+.sk-toast-icon { display: flex; color: var(--acc); }
+
+/* ── Settings groups ──────────────────────────────────────────────────── */
+
+.sk-settings-group {
+    margin-bottom: 20px;
+}
+
+.sk-settings-group-title {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    padding: 0 16px 8px;
+}
+
+.sk-settings-group-body {
+    border: 1px solid var(--line2);
+    border-radius: var(--r);
+    background: var(--raise);
+    overflow: hidden;
+}
+
+.sk-settings-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.sk-settings-row:last-child { border-bottom: none; }
+
+.sk-settings-row-label {
+    flex: 1;
+    min-width: 0;
+}
+
+.sk-settings-row-title {
+    font-size: 13px;
+    color: var(--ink);
+}
+
+.sk-settings-row-desc {
+    font-size: 11.5px;
+    color: var(--ink3);
+    margin-top: 2px;
+}
