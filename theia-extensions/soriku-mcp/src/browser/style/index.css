@@ -1,42 +1,29 @@
-/* Soriku IDE — MCP servers widget */
+/* Soriku IDE — MCP Servers full-page view, 1:1 cards from the mockup. */
 
-.soriku-mcp {
-    padding: 12px 16px;
-    overflow: auto;
-    height: 100%;
-}
-
-.soriku-mcp-header {
+.soriku-mcp-body {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.soriku-mcp-title {
-    font-size: var(--theia-ui-font-size2);
-    font-weight: 600;
+    flex-direction: column;
+    gap: 22px;
 }
 
 .soriku-mcp-note {
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-descriptionForeground);
-    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--ink3);
     line-height: 1.5;
 }
 
 .soriku-mcp-note code {
-    font-family: var(--theia-code-font-family);
-    background: var(--theia-textCodeBlock-background);
+    font-family: var(--font-m);
+    background: var(--bg-sunk);
     padding: 0 4px;
     border-radius: 3px;
 }
 
 .soriku-mcp-add {
-    border: 1px solid var(--theia-editorWidget-border);
-    border-radius: 6px;
-    padding: 10px;
-    margin-bottom: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--bg-el);
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -65,70 +52,102 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-descriptionForeground);
+    font-size: 12px;
+    color: var(--ink3);
 }
 
 .soriku-mcp-spacer {
     flex: 1;
 }
 
-.soriku-mcp-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--theia-ui-font-size1);
+.soriku-mcp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
 }
 
-.soriku-mcp-table th,
-.soriku-mcp-table td {
-    text-align: left;
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--theia-editorWidget-border);
-    vertical-align: middle;
+.soriku-mcp-card {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--bg-el);
+    padding: 14px 16px;
 }
 
-.soriku-mcp-table th {
-    font-size: var(--theia-ui-font-size0);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--theia-descriptionForeground);
+.soriku-mcp-card-icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--acc-soft);
+    color: var(--acc);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.soriku-mcp-target {
-    font-family: var(--theia-code-font-family);
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-descriptionForeground);
-    max-width: 260px;
+.soriku-mcp-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-mcp-card-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.soriku-mcp-card-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.soriku-mcp-card-target {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink3);
+    margin-top: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .soriku-mcp-health {
-    font-size: var(--theia-ui-font-size0);
+    font-family: var(--font-m);
+    font-size: 9.5px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 999px;
+    padding: 1px 8px;
 }
 
 .soriku-mcp-health.ok {
-    color: var(--theia-successBackground, #2ea043);
+    color: var(--ok);
+    background: var(--ok-soft);
+    border: 1px solid var(--ok-line);
 }
 
 .soriku-mcp-health.bad {
-    color: var(--theia-editorWarning-foreground, #b58900);
+    color: var(--warn);
+    background: var(--warn-soft);
 }
 
 .soriku-mcp-message {
     padding: 16px 4px;
-    color: var(--theia-descriptionForeground);
+    color: var(--ink3);
 }
 
 .soriku-mcp-error {
-    color: var(--theia-errorForeground);
+    color: var(--danger);
 }
 
 .soriku-mcp-error-detail {
-    font-family: var(--theia-code-font-family);
-    font-size: var(--theia-ui-font-size0);
+    font-family: var(--font-m);
+    font-size: 11px;
     margin: 6px 0;
     word-break: break-word;
 }

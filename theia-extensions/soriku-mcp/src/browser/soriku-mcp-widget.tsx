@@ -13,6 +13,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { McpServer } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
 import {
     ServerDraft, Transport, emptyDraft, validateDraft, draftToServer, healthLabel, isHealthy,
 } from '../common/mcp-servers';
@@ -39,6 +40,7 @@ export class SorikuMcpWidget extends ReactWidget {
     protected state: McpState = { status: 'loading', servers: [], health: {} };
     protected draft: ServerDraft = emptyDraft();
     protected busy = false;
+    protected readonly nameInputRef = React.createRef<HTMLInputElement>();
 
     @postConstruct()
     protected init(): void {
@@ -138,21 +140,33 @@ export class SorikuMcpWidget extends ReactWidget {
         }
     }
 
+    protected focusAddForm = (): void => {
+        this.nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.nameInputRef.current?.focus();
+    };
+
     protected render(): React.ReactNode {
-        return <div className='soriku-mcp'>
-            <div className='soriku-mcp-header'>
-                <span className='soriku-mcp-title'>MCP Servers</span>
-                <button className='theia-button secondary' onClick={() => this.refresh()}>
-                    <span className='codicon codicon-refresh' /> Refresh
-                </button>
+        return <div className='sk-page soriku-mcp'>
+            <PageHeader
+                eyebrow='Model Context Protocol'
+                heading='Tool'
+                emphasis='servers'
+                subhead='External servers whose tools flow to agents and workers. Connect once, every agent can call them.'
+                actions={<>
+                    <Btn variant='primary' onClick={this.focusAddForm}>Add server</Btn>
+                    <Btn variant='secondary' onClick={() => this.refresh()}>
+                        <span className='codicon codicon-refresh' />
+                    </Btn>
+                </>}
+            />
+            <div className='sk-page-body sk-page-body-narrow soriku-mcp-body'>
+                <div className='soriku-mcp-note'>
+                    Their tools become available to your workers, agents and models (namespaced{' '}
+                    <code>mcp__server__tool</code>), and require confirmation by default.
+                </div>
+                {this.renderAddForm()}
+                {this.renderBody()}
             </div>
-            <div className='soriku-mcp-note'>
-                External MCP servers Soriku connects to. Their tools become available to your
-                workers, agents and models (namespaced <code>mcp__server__tool</code>), and
-                require confirmation by default.
-            </div>
-            {this.renderAddForm()}
-            {this.renderBody()}
         </div>;
     }
 
@@ -161,6 +175,7 @@ export class SorikuMcpWidget extends ReactWidget {
         return <div className='soriku-mcp-add'>
             <div className='soriku-mcp-add-row'>
                 <input
+                    ref={this.nameInputRef}
                     className='theia-input'
                     type='text'
                     placeholder='name (e.g. github)'
@@ -232,27 +247,31 @@ export class SorikuMcpWidget extends ReactWidget {
         if (servers.length === 0) {
             return <div className='soriku-mcp-message'>No MCP servers configured. Add one above.</div>;
         }
-        return <table className='soriku-mcp-table'>
-            <thead><tr><th>Name</th><th>Transport</th><th>Target</th><th>Health</th><th /></tr></thead>
-            <tbody>
-                {servers.map(s => <tr key={s.name}>
-                    <td>{s.name}</td>
-                    <td>{s.transport ?? 'stdio'}</td>
-                    <td className='soriku-mcp-target'>{s.transport === 'sse' ? s.url : `${s.command ?? ''} ${(s.args ?? []).join(' ')}`.trim()}</td>
-                    <td>
-                        <span className={`soriku-mcp-health ${isHealthy(health, s.name) ? 'ok' : 'bad'}`}>
-                            {healthLabel(health, s.name)}
-                        </span>
-                    </td>
-                    <td>
-                        <button
-                            className='theia-button secondary'
-                            disabled={this.busy}
-                            onClick={() => this.remove(s.name)}
-                        >Remove</button>
-                    </td>
-                </tr>)}
-            </tbody>
-        </table>;
+        return <div className='soriku-mcp-list'>
+            {servers.map(s => this.renderServer(s, health))}
+        </div>;
+    }
+
+    protected renderServer(s: McpServer, health: Record<string, string>): React.ReactNode {
+        const target = s.transport === 'sse' ? (s.url ?? '') : `${s.command ?? ''} ${(s.args ?? []).join(' ')}`.trim();
+        return <div key={s.name} className='soriku-mcp-card'>
+            <div className='soriku-mcp-card-icon'>
+                <span className='codicon codicon-plug' />
+            </div>
+            <div className='soriku-mcp-card-body'>
+                <div className='soriku-mcp-card-head'>
+                    <span className='soriku-mcp-card-name'>{s.name}</span>
+                    <span className={`soriku-mcp-health ${isHealthy(health, s.name) ? 'ok' : 'bad'}`}>
+                        {healthLabel(health, s.name)}
+                    </span>
+                </div>
+                <div className='soriku-mcp-card-target'>{s.transport ?? 'stdio'} · {target}</div>
+            </div>
+            <button
+                className='theia-button secondary'
+                disabled={this.busy}
+                onClick={() => this.remove(s.name)}
+            >Remove</button>
+        </div>;
     }
 }
