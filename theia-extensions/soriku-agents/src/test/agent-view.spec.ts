@@ -57,7 +57,22 @@ describe('toAgentItem', () => {
             description: 'Leads multi-step tasks',
             avatarText: 'PI',
             avatarColor: '#abc',
+            category: '',
+            skills: [],
+            preferredModel: undefined,
         });
+    });
+
+    it('maps category, specialization names and preferred model', () => {
+        const item = toAgentItem(persona({
+            id: 'a3',
+            category: 'coding',
+            preferred_model: 'qwen2.5-coder:7b',
+            specializations: [{ name: 'SemVer' }, { name: 'CVEs', level: 'expert' }],
+        }));
+        assert.equal(item.category, 'coding');
+        assert.equal(item.preferredModel, 'qwen2.5-coder:7b');
+        assert.deepEqual(item.skills, ['SemVer', 'CVEs']);
     });
 
     it('falls back to id when name is blank', () => {

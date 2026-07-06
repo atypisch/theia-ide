@@ -15,6 +15,11 @@ export interface AgentItem {
     avatarText: string;
     /** Optional avatar background color supplied by the engine persona config. */
     avatarColor?: string;
+    /** Engine-assigned category (coding/reasoning/general/…), free-text. */
+    category: string;
+    /** Specialization names (e.g. "SemVer", "CVEs") — the mockup's skill chips. */
+    skills: string[];
+    preferredModel?: string;
 }
 
 /** Derive a short avatar label (initials) from a display name. */
@@ -39,6 +44,9 @@ export function toAgentItem(persona: AgentPersona): AgentItem {
         description: persona.persona?.description?.trim() ?? '',
         avatarText: initials(name),
         avatarColor: persona.persona?.avatar_color,
+        category: persona.category ?? '',
+        skills: (persona.specializations ?? []).map(s => s.name).filter(Boolean),
+        preferredModel: persona.preferred_model ?? undefined,
     };
 }
 
