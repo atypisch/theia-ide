@@ -23,6 +23,7 @@ import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/brows
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
+import { SegmentedPicker } from 'soriku-theme-ext/lib/browser/ui';
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
 import { ChatSessionService } from './chat-session-service';
@@ -66,9 +67,9 @@ const OUTCOME_LABELS: Record<string, string> = {
 
 const BEHAVIOR_OPTIONS: BehaviorOption[] = [
     { value: 'auto', label: 'Auto', hint: 'Soriku decides per task whether to plan or act directly.' },
-    { value: 'edit', label: 'Edit automatically', hint: 'The agent acts and edits files directly.' },
+    { value: 'edit', label: 'Edit', hint: 'Edit automatically — the agent acts and edits files directly.' },
     { value: 'plan', label: 'Plan', hint: 'Soriku drafts a plan you approve before anything runs.' },
-    { value: 'chat', label: 'Chat only', hint: 'Answer and discuss only — no file edits.' },
+    { value: 'chat', label: 'Chat', hint: 'Chat only — answer and discuss only, no file edits.' },
 ];
 
 /** Which model(s) answer, independent of behaviour. */
@@ -81,8 +82,8 @@ interface OrchestrationOption {
 }
 
 const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
-    { value: 'auto', label: 'Auto model', hint: 'Soriku routes to the best model via the capability map.' },
-    { value: 'single', label: 'Single model', hint: 'Use one specific model.' },
+    { value: 'auto', label: 'Auto', hint: 'Auto model — Soriku routes to the best model via the capability map.' },
+    { value: 'single', label: 'Single', hint: 'Single model — use one specific model.' },
     { value: 'ensemble', label: 'Ensemble', hint: 'Several models you pick collaborate into one answer.' },
 ];
 
@@ -100,7 +101,7 @@ const ROUTING_OPTIONS: RoutingOption[] = [
     { value: 'prefer_local', label: 'Local-first', hint: 'Local models only — nothing leaves this machine. Default.' },
     { value: 'local_with_remote_conductor', label: 'Hybrid', hint: 'Local workers do the work; a stronger remote model may plan.' },
     { value: 'balanced', label: 'Balanced', hint: 'Cost-aware mix of local and cloud models.' },
-    { value: 'prefer_quality', label: 'Best quality', hint: 'Pick the best model regardless of locality or cost (cloud allowed).' },
+    { value: 'prefer_quality', label: 'Best', hint: 'Best quality — pick the best model regardless of locality or cost (cloud allowed).' },
 ];
 
 @injectable()
@@ -875,33 +876,30 @@ export class SorikuChatWidget extends ReactWidget {
         const routing = ROUTING_OPTIONS.find(o => o.value === this.routingStrategy) ?? ROUTING_OPTIONS[0];
         return <div className='soriku-chat-orchestration'>
             <div className='soriku-control-row'>
-                <select
-                    className='theia-select soriku-mode-select'
+                <SegmentedPicker
+                    label='Do'
                     title={behavior.hint}
+                    options={BEHAVIOR_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
                     value={this.behavior}
                     disabled={this.streaming}
-                    onChange={e => { this.behavior = e.target.value as AgentBehavior; this.update(); }}
-                >
-                    {BEHAVIOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <select
-                    className='theia-select soriku-routing-select'
-                    title={`Where compute runs · ${routing.hint}`}
-                    value={this.routingStrategy}
-                    disabled={this.streaming}
-                    onChange={e => { this.routingStrategy = e.target.value as RoutingStrategy; this.update(); }}
-                >
-                    {ROUTING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <select
-                    className='theia-select soriku-models-select'
+                    onChange={next => { this.behavior = next; this.update(); }}
+                />
+                <SegmentedPicker
+                    label='Model'
                     title={orchestration.hint}
+                    options={ORCHESTRATION_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
                     value={this.orchestration}
                     disabled={this.streaming}
-                    onChange={e => { this.orchestration = e.target.value as Orchestration; this.warmSelectedModel(); this.update(); }}
-                >
-                    {ORCHESTRATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                    onChange={next => { this.orchestration = next; this.warmSelectedModel(); this.update(); }}
+                />
+                <SegmentedPicker
+                    label='Route'
+                    title={`Where compute runs · ${routing.hint}`}
+                    options={ROUTING_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                    value={this.routingStrategy}
+                    disabled={this.streaming}
+                    onChange={next => { this.routingStrategy = next; this.update(); }}
+                />
                 <button
                     className='soriku-manage-models'
                     title='Add or manage models'

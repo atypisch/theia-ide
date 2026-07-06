@@ -116,20 +116,12 @@
     border-bottom: 1px solid var(--theia-sideBarSectionHeader-border);
 }
 
-.soriku-chat-orchestration .theia-select {
-    font-size: var(--theia-ui-font-size0);
-    max-width: 100%;
-}
-
 .soriku-control-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     width: 100%;
-}
-
-.soriku-control-row .theia-select {
-    flex: 1 1 0;
-    min-width: 0;
+    align-items: center;
 }
 
 .soriku-manage-models {

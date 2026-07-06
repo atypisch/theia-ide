@@ -103,11 +103,21 @@
 
 .sk-segmented {
     display: inline-flex;
-    background: var(--bg-sunk);
-    border: 1px solid var(--line2);
+    align-items: center;
+    background: var(--bg-el);
+    border: 1px solid var(--line);
     border-radius: var(--rs);
     padding: 2px;
-    gap: 2px;
+    gap: 1px;
+}
+
+.sk-segmented-label {
+    font-family: var(--font-m);
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    padding: 0 6px;
 }
 
 .sk-segmented-item {
@@ -119,10 +129,20 @@
     cursor: pointer;
 }
 
+.sk-segmented-item:hover:not(.sk-segmented-item-active):not(.sk-segmented-item-disabled) {
+    background: var(--hover);
+    color: var(--ink);
+}
+
 .sk-segmented-item-active {
     background: var(--acc);
     color: var(--on-acc);
     font-weight: 600;
+}
+
+.sk-segmented-item-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */

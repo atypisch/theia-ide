@@ -61,19 +61,23 @@ export interface SegmentedOption<T extends string> {
     label: string;
 }
 
-/** The DO / MODEL / ROUTE pickers under the chat input. */
-export function SegmentedPicker<T extends string>({ options, value, onChange }: {
+/** The DO / MODEL / ROUTE pickers under the chat input, each an optionally-labeled capsule. */
+export function SegmentedPicker<T extends string>({ label, options, value, onChange, disabled, title }: {
+    label?: string;
     options: ReadonlyArray<SegmentedOption<T>>;
     value: T;
     onChange: (next: T) => void;
+    disabled?: boolean;
+    title?: string;
 }): React.ReactElement {
     return (
-        <span className="sk-segmented">
+        <span className="sk-segmented" title={title}>
+            {label && <span className="sk-segmented-label">{label}</span>}
             {options.map(opt => (
                 <span
                     key={opt.value}
-                    className={`sk-segmented-item ${opt.value === value ? 'sk-segmented-item-active' : ''}`}
-                    onClick={() => onChange(opt.value)}
+                    className={`sk-segmented-item ${opt.value === value ? 'sk-segmented-item-active' : ''}${disabled ? ' sk-segmented-item-disabled' : ''}`}
+                    onClick={() => !disabled && onChange(opt.value)}
                 >
                     {opt.label}
                 </span>
