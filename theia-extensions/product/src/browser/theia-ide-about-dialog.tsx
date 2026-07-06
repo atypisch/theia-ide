@@ -10,29 +10,21 @@
 import * as React from 'react';
 import { AboutDialog, AboutDialogProps, ABOUT_CONTENT_CLASS } from '@theia/core/lib/browser/about-dialog';
 import { injectable, inject } from '@theia/core/shared/inversify';
-import { renderAboutTagline, renderDocumentation, renderDownloads, renderProductName, renderSourceCode, renderSupport, renderTickets, renderWhatIs } from './branding-util';
-import { VSXEnvironment } from '@theia/vsx-registry/lib/common/vsx-environment';
-import { WindowService } from '@theia/core/lib/browser/window/window-service';
+import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
+import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { SORIKU_ENGINE_BASE_URL } from 'soriku-engine-client-ext/lib/browser/soriku-engine-preferences';
+import { shortHost } from 'soriku-workbench-ext/lib/common/engine-status';
+
 @injectable()
 export class TheiaIDEAboutDialog extends AboutDialog {
 
-    @inject(VSXEnvironment)
-    protected readonly environment: VSXEnvironment;
-
-    @inject(WindowService)
-    protected readonly windowService: WindowService;
-
-    protected vscodeApiVersion: string;
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
 
     constructor(
         @inject(AboutDialogProps) protected readonly props: AboutDialogProps
     ) {
         super(props);
-    }
-
-    protected async doInit(): Promise<void> {
-        this.vscodeApiVersion = await this.environment.getVscodeApiVersion();
-        super.doInit();
     }
 
     protected render(): React.ReactNode {
@@ -41,66 +33,17 @@ export class TheiaIDEAboutDialog extends AboutDialog {
         </div>;
     }
 
+    /** 1:1 from the mockup's ABOUT overlay: mark, wordmark, version/engine line, tagline, Close. */
     protected renderContent(): React.ReactNode {
-        return <div className='ad-container'>
-            <div className='ad-float'>
-                <div className='ad-logo'>
-                </div>
-                {this.renderExtensions()}
+        const baseUrl = this.preferences.get<string>(SORIKU_ENGINE_BASE_URL, 'http://127.0.0.1:8765');
+        const version = this.applicationInfo?.version;
+        return <div className='soriku-about'>
+            <SorikuMark size={48} />
+            <div className='soriku-about-wordmark'>Soriku <span className='sk-em'>IDE</span></div>
+            <div className='soriku-about-meta'>{['IDE', version && `v${version}`, `engine ${shortHost(baseUrl)}`].filter(Boolean).join(' · ')}</div>
+            <div className='soriku-about-tagline'>
+                A local-first AI IDE. Your code and models stay on your machine. Cloud is opt-in and capped in EUR.
             </div>
-            {this.renderTitle()}
-            <hr className='gs-hr' />
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderWhatIs(this.windowService)}
-                </div>
-            </div>
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderSupport(this.windowService)}
-                </div>
-            </div>
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderTickets(this.windowService)}
-                </div>
-            </div>
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderSourceCode(this.windowService)}
-                </div>
-            </div>
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderDocumentation(this.windowService)}
-                </div>
-            </div>
-            <div className='flex-grid'>
-                <div className='col'>
-                    {renderDownloads()}
-                </div>
-            </div>
-        </div>;
-
-    }
-
-    protected renderTitle(): React.ReactNode {
-        return <div className='gs-header'>
-            {renderProductName()}
-            {renderAboutTagline()}
-            {this.renderVersion()}
-        </div>;
-    }
-
-    protected renderVersion(): React.ReactNode {
-        return <div>
-            <p className='gs-sub-header' >
-                {this.applicationInfo ? 'Version ' + this.applicationInfo.version : '-'}
-            </p>
-
-            <p className='gs-sub-header' >
-                {'VS Code API Version: ' + this.vscodeApiVersion}
-            </p>
         </div>;
     }
 }

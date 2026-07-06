@@ -15,6 +15,7 @@ import {
     BrowseModel, InstalledModel, ProviderInfo, ProviderPreset, UserProvider,
 } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
+import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { formatModelSize, isValidOllamaName, parsePullEvent } from '../common/models-view';
 
 @injectable()
@@ -31,6 +32,9 @@ export class SorikuModelsWidget extends ReactWidget {
 
     @inject(SorikuModelCatalog)
     protected readonly catalog: SorikuModelCatalog;
+
+    @inject(SorikuToastService)
+    protected readonly toast: SorikuToastService;
 
     protected providers: ProviderInfo[] = [];
     protected userProviders: UserProvider[] = [];
@@ -149,7 +153,7 @@ export class SorikuModelsWidget extends ReactWidget {
                 await this.engineClient.deactivateModel(model.id);
             }
             await this.mutated();
-            this.messages.info(`${model.id} ${active ? 'activated' : 'deactivated'}.`);
+            this.toast.show(`${model.id} ${active ? 'activated' : 'deactivated'}`);
         } catch (e) {
             this.messages.error(`Could not update ${model.id}: ${(e as Error).message}`);
         } finally {

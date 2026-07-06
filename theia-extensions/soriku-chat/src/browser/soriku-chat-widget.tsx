@@ -5,6 +5,7 @@
  ********************************************************************************/
 
 import * as React from '@theia/core/shared/react';
+import { createRoot, Root } from '@theia/core/shared/react-dom/client';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
@@ -23,7 +24,7 @@ import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/brows
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
-import { SegmentedPicker } from 'soriku-theme-ext/lib/browser/ui';
+import { Overlay, SegmentedPicker } from 'soriku-theme-ext/lib/browser/ui';
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
 import { ChatSessionService } from './chat-session-service';
@@ -33,6 +34,7 @@ import {
     AssistantTurn,
     ChatMessage,
     ChatToolCall,
+    PendingPlan,
     PlanTaskView,
     busyPhase,
     createAssistantTurn,
@@ -212,6 +214,11 @@ export class SorikuChatWidget extends ReactWidget {
     protected resolvingPlans = new Set<string>();
     /** User-edited task goals keyed by plan id, then task id. */
     protected planTaskEdits = new Map<string, Map<string, string>>();
+    /** Plan id currently expanded into the full-size "Plan detail" overlay, if any. */
+    protected expandedPlanId: string | undefined;
+    /** Root-level mount for the Plan detail overlay (needs a full-viewport backdrop, not the docked chat panel's own box). */
+    protected planDetailHost: HTMLDivElement | undefined;
+    protected planDetailRoot: Root | undefined;
     /** Coalesce React re-renders during SSE streaming (Cursor-style ~60fps cap). */
     protected updateScheduled = false;
 
@@ -274,6 +281,16 @@ export class SorikuChatWidget extends ReactWidget {
             dispose: () => {
                 this.streamController.abort();
                 this.toolApproval.cancelAll();
+            },
+        });
+        this.planDetailHost = document.createElement('div');
+        this.planDetailHost.className = 'soriku-plan-detail-host';
+        document.body.appendChild(this.planDetailHost);
+        this.planDetailRoot = createRoot(this.planDetailHost);
+        this.toDispose.push({
+            dispose: () => {
+                this.planDetailRoot?.unmount();
+                this.planDetailHost?.remove();
             },
         });
         this.loadModels();
@@ -704,6 +721,7 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
+        this.renderPlanDetailPortal();
         const agentId = this.selection.getActiveId();
         const agentName = this.selection.getActiveName();
         return <div className='soriku-chat'>
@@ -830,34 +848,92 @@ export class SorikuChatWidget extends ReactWidget {
             <div className='soriku-plan-title'>
                 <span className='codicon codicon-checklist' /> Plan — review before it runs
                 {typeof plan.costEur === 'number' && <span className='soriku-plan-cost'>est. €{plan.costEur.toFixed(2)}</span>}
-            </div>
-            <ol className='soriku-plan-tasks'>
-                {plan.tasks.map(t => <li key={t.id}>
-                    <div className='soriku-plan-task-head'>
-                        <span className='soriku-plan-role'>{t.role}</span>
-                        {t.model && <span className='soriku-plan-model'>{t.model}</span>}
-                    </div>
-                    <textarea
-                        className='theia-input soriku-plan-goal-edit'
-                        rows={2}
-                        disabled={resolving}
-                        value={this.getPlanTaskGoal(plan.planId, t.id, t.goal)}
-                        onChange={e => {
-                            this.setPlanTaskGoal(plan.planId, t.id, e.target.value);
-                            this.scheduleUpdate(true);
-                        }}
-                    />
-                </li>)}
-            </ol>
-            <div className='soriku-plan-actions'>
-                <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
-                    {resolving ? 'Starting…' : 'Approve & run'}
-                </button>
-                <button className='theia-button secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
-                    Cancel
+                <button className='soriku-plan-expand' title='Expand plan detail'
+                    onClick={() => { this.expandedPlanId = plan.planId; this.update(); }}>
+                    <span className='codicon codicon-screen-full' />
                 </button>
             </div>
+            {this.renderPlanTaskList(plan, resolving)}
+            {this.renderPlanActions(plan, resolving)}
         </div>;
+    }
+
+    /** Shared with the full-size Plan detail overlay — same real data, same edit affordance. */
+    protected renderPlanTaskList(plan: PendingPlan, resolving: boolean): React.ReactNode {
+        return <ol className='soriku-plan-tasks'>
+            {plan.tasks.map(t => <li key={t.id}>
+                <div className='soriku-plan-task-head'>
+                    <span className='soriku-plan-role'>{t.role}</span>
+                    {t.model && <span className='soriku-plan-model'>{t.model}</span>}
+                </div>
+                <textarea
+                    className='theia-input soriku-plan-goal-edit'
+                    rows={2}
+                    disabled={resolving}
+                    value={this.getPlanTaskGoal(plan.planId, t.id, t.goal)}
+                    onChange={e => {
+                        this.setPlanTaskGoal(plan.planId, t.id, e.target.value);
+                        this.scheduleUpdate(true);
+                    }}
+                />
+            </li>)}
+        </ol>;
+    }
+
+    protected renderPlanActions(plan: PendingPlan, resolving: boolean): React.ReactNode {
+        return <div className='soriku-plan-actions'>
+            <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
+                {resolving ? 'Starting…' : 'Approve & run'}
+            </button>
+            <button className='theia-button secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
+                Cancel
+            </button>
+        </div>;
+    }
+
+    /** The turn (if any) still carrying the plan the user chose to expand. */
+    protected findExpandedPlan(): AssistantTurn | undefined {
+        if (!this.expandedPlanId) {
+            return undefined;
+        }
+        return this.conversation.find(
+            (m): m is AssistantTurn => m.role === 'assistant' && (m as AssistantTurn).pendingPlan?.planId === this.expandedPlanId,
+        );
+    }
+
+    /**
+     * Renders the Plan detail overlay into its own document-root React root — a
+     * modal backdrop needs `position:absolute;inset:0` against the whole viewport,
+     * which a node nested inside the docked chat panel cannot give it.
+     */
+    protected renderPlanDetailPortal(): void {
+        const turn = this.findExpandedPlan();
+        if (!turn?.pendingPlan) {
+            this.expandedPlanId = undefined;
+            // eslint-disable-next-line no-null/no-null
+            this.planDetailRoot?.render(null);
+            return;
+        }
+        const plan = turn.pendingPlan;
+        const resolving = this.resolvingPlans.has(plan.planId);
+        const close = (): void => { this.expandedPlanId = undefined; this.update(); };
+        this.planDetailRoot?.render(
+            <Overlay onClose={close} frameStyle={{ width: 680, maxWidth: '92vw', maxHeight: 'calc(100vh - 140px)' }}>
+                <div className='soriku-plan-detail'>
+                    <div className='soriku-plan-detail-header'>
+                        <span className='soriku-plan-detail-title sk-em'>Execution plan</span>
+                        {typeof plan.costEur === 'number' && <span className='soriku-plan-cost'>est. €{plan.costEur.toFixed(2)}</span>}
+                        <button className='soriku-plan-detail-close' onClick={close} title='Close'>
+                            <span className='codicon codicon-close' />
+                        </button>
+                    </div>
+                    <div className='soriku-plan-detail-body sk-scroll'>
+                        {this.renderPlanTaskList(plan, resolving)}
+                    </div>
+                    {this.renderPlanActions(plan, resolving)}
+                </div>
+            </Overlay>,
+        );
     }
 
     /** Animated busy indicator shown while a turn streams (spinner + current phase). */

@@ -15,6 +15,7 @@ import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client'
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
 
 /** Chat view command (registered by soriku-chat) used to reveal the chat. */
@@ -40,6 +41,9 @@ export class SorikuConversationsWidget extends ReactWidget {
 
     @inject(QuickInputService)
     protected readonly quickInput: QuickInputService;
+
+    @inject(SorikuToastService)
+    protected readonly toast: SorikuToastService;
 
     protected items: ConversationSummary[] = [];
     protected loading = true;
@@ -126,6 +130,7 @@ export class SorikuConversationsWidget extends ReactWidget {
         try {
             await this.engineClient.renameConversation(item.id, title.trim());
             await this.refresh();
+            this.toast.show(`Renamed to "${title.trim()}"`);
         } catch (e) {
             this.messages.error(`Could not rename: ${(e as Error).message}`);
         } finally {
@@ -149,6 +154,7 @@ export class SorikuConversationsWidget extends ReactWidget {
         try {
             await this.engineClient.deleteConversation(item.id);
             await this.refresh();
+            this.toast.show(`Deleted "${cleanTitle(item.title)}"`);
         } catch (e) {
             this.messages.error(`Could not delete: ${(e as Error).message}`);
         } finally {

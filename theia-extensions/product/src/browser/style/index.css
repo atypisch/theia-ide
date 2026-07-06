@@ -55,31 +55,33 @@ body[data-theia-branding="next"] .theia-icon {
     padding: 20px;
 }
 
-.ad-logo {
-    background-image: var(--theia-branding-logo);
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: contain;
-    width: 250px;
-    height: 118px;
-    padding: 20px;
+/* ── About dialog, 1:1 from the mockup's ABOUT overlay ──────────────────── */
+
+.soriku-about {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 10px 8px 4px;
 }
 
-.ad-float {
-    float: right;
+.soriku-about-wordmark {
+    font-family: var(--font-d, 'Newsreader', serif);
+    font-size: 21px;
+    font-weight: 500;
 }
 
-.ad-container {
-    padding: 20px;
-    width: 1150px;
-    height: 700;
+.soriku-about-meta {
+    font-family: var(--font-m, monospace);
+    font-size: 11px;
+    color: var(--ink3, var(--theia-descriptionForeground));
 }
 
-ul.theia-aboutExtensions {
-    height: 450px;
-    overflow: hidden;
-    overflow-y: scroll;
-    list-style-type: none;
-    padding: 0;
-    margin-left: 10px;
+.soriku-about-tagline {
+    font-size: 12.5px;
+    color: var(--ink2, var(--theia-foreground));
+    line-height: 1.55;
+    max-width: 300px;
+    margin-top: 4px;
 }
