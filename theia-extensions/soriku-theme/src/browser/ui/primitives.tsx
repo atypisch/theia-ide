@@ -28,6 +28,15 @@ export function PillValue({ children }: { children: React.ReactNode }): React.Re
     return <span className="sk-pill-value">{children}</span>;
 }
 
+/** Clickable variant of {@link PillValue} for Settings rows that edit a value in place. */
+export function PillValueButton({ children, onClick, title }: {
+    children: React.ReactNode;
+    onClick: () => void;
+    title?: string;
+}): React.ReactElement {
+    return <button className="sk-pill-value sk-pill-value-btn" onClick={onClick} title={title}>{children}</button>;
+}
+
 /** On/off toggle. `locked` renders the always-off "locked off" telemetry-style variant. */
 export function Toggle({ on, locked, onChange }: {
     on: boolean;

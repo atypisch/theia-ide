@@ -154,6 +154,16 @@
     padding: 4px 11px;
 }
 
+.sk-pill-value-btn {
+    cursor: pointer;
+}
+
+.sk-pill-value-btn:hover {
+    color: var(--ink);
+    border-color: var(--line2);
+    background: var(--hover);
+}
+
 /* ── Toggle ───────────────────────────────────────────────────────────── */
 
 .sk-toggle {

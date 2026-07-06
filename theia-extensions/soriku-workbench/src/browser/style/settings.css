@@ -1,0 +1,20 @@
+/* Soriku IDE — Settings page, 1:1 from the mockup's settingsGroups. */
+
+.soriku-settings-body {
+    max-width: 740px;
+}
+
+.soriku-settings-accent-swatch {
+    width: 19px;
+    height: 19px;
+    border-radius: 6px;
+    background: var(--acc);
+    border: 1px solid var(--acc-line);
+    display: inline-block;
+}
+
+.soriku-settings-warm-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}

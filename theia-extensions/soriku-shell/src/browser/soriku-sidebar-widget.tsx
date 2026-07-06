@@ -79,7 +79,7 @@ export class SorikuSidebarWidget extends ReactWidget {
     }
 
     protected openSettings = (): void => {
-        this.commands.executeCommand('workbench.action.openGlobalSettings');
+        this.commands.executeCommand('soriku.settings.open');
     };
 
     protected get workspaceName(): string {
