@@ -14,6 +14,7 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import {
     BrowseModel, InstalledModel, ProviderInfo, ProviderPreset, UserProvider,
 } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
 import { formatModelSize, isValidOllamaName, parsePullEvent } from '../common/models-view';
 
 @injectable()
@@ -57,6 +58,9 @@ export class SorikuModelsWidget extends ReactWidget {
     protected browseResults: BrowseModel[] = [];
     protected installingIds = new Set<string>();
     protected busyModelIds = new Set<string>();
+
+    protected readonly pullInputRef = React.createRef<HTMLInputElement>();
+    protected readonly addProviderRef = React.createRef<HTMLSelectElement>();
 
     @postConstruct()
     protected init(): void {
@@ -283,20 +287,36 @@ export class SorikuModelsWidget extends ReactWidget {
         }
     }
 
+    protected focusAndScroll(ref: React.RefObject<HTMLElement>): void {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        ref.current?.focus();
+    }
+
     // ── Render ──────────────────────────────────────────────────────
     protected render(): React.ReactNode {
-        return <div className='soriku-models'>
-            <div className='soriku-models-toolbar'>
-                <span className='soriku-models-title'>Models &amp; providers</span>
-                <button className='theia-button secondary' disabled={this.loading} onClick={() => this.refresh()}>
-                    <span className='codicon codicon-refresh' /> Refresh
-                </button>
+        return <div className='sk-page soriku-models'>
+            <PageHeader
+                eyebrow='Soriku engine'
+                heading='Your'
+                emphasis='AI stack'
+                subhead='The brains behind every prompt. Local-first — cloud is opt-in and capped in EUR, never silent.'
+                actions={<>
+                    <Btn variant='secondary' onClick={() => this.focusAndScroll(this.pullInputRef)}>
+                        <span className='codicon codicon-arrow-down' /> Pull model
+                    </Btn>
+                    <Btn variant='primary' onClick={() => this.focusAndScroll(this.addProviderRef)}>Add provider</Btn>
+                    <Btn variant='secondary' onClick={() => this.refresh()}>
+                        <span className='codicon codicon-refresh' />
+                    </Btn>
+                </>}
+            />
+            <div className='sk-page-body sk-page-body-narrow soriku-models-body'>
+                {this.error && <div className='soriku-models-error'>{this.error}</div>}
+                {this.renderProviders()}
+                {this.renderPull()}
+                {this.renderInstalled()}
+                {this.renderBrowse()}
             </div>
-            {this.error && <div className='soriku-models-error'>{this.error}</div>}
-            {this.renderProviders()}
-            {this.renderPull()}
-            {this.renderInstalled()}
-            {this.renderBrowse()}
         </div>;
     }
 
@@ -326,7 +346,7 @@ export class SorikuModelsWidget extends ReactWidget {
     protected renderAddProvider(): React.ReactNode {
         const isCustom = this.presetId === 'custom';
         return <div className='soriku-models-addprovider'>
-            <select className='theia-select' value={this.presetId} disabled={this.adding}
+            <select ref={this.addProviderRef} className='theia-select' value={this.presetId} disabled={this.adding}
                 onChange={e => { this.presetId = e.target.value; this.update(); }}>
                 <option value=''>Add a provider…</option>
                 {this.presets.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
@@ -355,7 +375,7 @@ export class SorikuModelsWidget extends ReactWidget {
         return <section className='soriku-models-section'>
             <h3>Pull a local model</h3>
             <div className='soriku-models-inline'>
-                <input className='theia-input' placeholder='Ollama model (e.g. llama3.2)'
+                <input ref={this.pullInputRef} className='theia-input' placeholder='Ollama model (e.g. llama3.2)'
                     value={this.pullName} disabled={this.pulling}
                     onChange={e => { this.pullName = e.target.value; this.update(); }}
                     onKeyDown={e => { if (e.key === 'Enter') { this.pull(); } }} />

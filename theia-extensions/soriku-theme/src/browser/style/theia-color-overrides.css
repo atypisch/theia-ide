@@ -150,3 +150,33 @@ body.soriku-light {
     --theia-code-font-family: var(--font-m) !important;
     --theia-ui-font-family: var(--font-s) !important;
 }
+
+/*
+ * Theia's ColorApplicationContribution generates literal (non-var()) CSS
+ * rules for a handful of selectors — notably `.theia-button` and its
+ * `.secondary`/`:hover` variants — baking in the resolved theme color
+ * directly instead of referencing `--theia-button-background`. Overriding
+ * that variable above (as everything else in this file does) has no effect
+ * on these specific rules, so they need their own direct override.
+ */
+body.soriku-dark .theia-button,
+body.soriku-light .theia-button {
+    background: var(--acc) !important;
+    color: var(--on-acc) !important;
+}
+
+body.soriku-dark .theia-button:hover,
+body.soriku-light .theia-button:hover {
+    background: var(--acc2) !important;
+}
+
+body.soriku-dark .theia-button.secondary,
+body.soriku-light .theia-button.secondary {
+    background: var(--raise) !important;
+    color: var(--ink) !important;
+}
+
+body.soriku-dark .theia-button.secondary:hover,
+body.soriku-light .theia-button.secondary:hover {
+    background: var(--hover) !important;
+}

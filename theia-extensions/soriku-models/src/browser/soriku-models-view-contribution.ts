@@ -1,5 +1,5 @@
 /********************************************************************************
- * Soriku IDE — models view contribution (command + right side-bar)
+ * Soriku IDE — models view contribution (full-page main-area view)
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -22,7 +22,7 @@ export class SorikuModelsViewContribution extends AbstractViewContribution<Sorik
         super({
             widgetId: SorikuModelsWidget.ID,
             widgetName: SorikuModelsWidget.LABEL,
-            defaultWidgetOptions: { area: 'right', rank: 300 },
+            defaultWidgetOptions: { area: 'main' },
             toggleCommandId: SorikuModelsCommands.OPEN,
         });
     }

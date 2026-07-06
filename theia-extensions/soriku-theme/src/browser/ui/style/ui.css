@@ -3,6 +3,104 @@
  * AgentAvatar.tsx, Overlay.tsx, Toast.tsx, SettingsRow.tsx). 1:1 from the mockup.
  */
 
+/* ── Page header (Agents/Models/Capability Map/MCP/Routing/Conversations) ── */
+
+.sk-page-header {
+    flex-shrink: 0;
+    padding: 22px 26px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.sk-page-header-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.sk-page-header-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-m);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 7px;
+}
+
+.sk-page-header-eyebrow-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--acc);
+}
+
+.sk-page-header-heading {
+    font-family: var(--font-d);
+    font-size: 29px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+}
+
+.sk-page-header-subhead {
+    color: var(--ink2);
+    font-size: 13px;
+    margin-top: 6px;
+    max-width: 600px;
+}
+
+.sk-page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.sk-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.sk-page-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 26px 32px 44px;
+}
+
+.sk-page-body-narrow {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.sk-page-section-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.sk-page-section-label-text {
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink2);
+}
+
+.sk-page-section-label-rule {
+    height: 1px;
+    flex: 1;
+    background: var(--line);
+}
+
 /* ── Pill ─────────────────────────────────────────────────────────────── */
 
 .sk-pill {

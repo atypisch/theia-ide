@@ -1,31 +1,31 @@
-/* Soriku IDE — Manage Models view. */
+/* Soriku IDE — Manage Models full-page view, 1:1 header/typography from the mockup's AI-stack section. */
 
-.soriku-models {
+.soriku-models-body {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    overflow-y: auto;
-    padding: 8px 10px;
-    gap: 12px;
-}
-
-.soriku-models-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.soriku-models-title {
-    font-weight: 600;
+    gap: 22px;
 }
 
 .soriku-models-error {
-    color: var(--theia-errorForeground);
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.soriku-models-section {
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--bg-el);
+    padding: 14px 16px;
 }
 
 .soriku-models-section h3 {
-    margin: 0 0 6px;
-    font-size: var(--theia-ui-font-size1);
+    margin: 0 0 10px;
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink2);
 }
 
 .soriku-models-list {
@@ -40,8 +40,13 @@
 .soriku-models-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 0;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.soriku-models-row:last-child {
+    border-bottom: none;
 }
 
 .soriku-models-name {
@@ -50,11 +55,15 @@
     white-space: nowrap;
     flex: 1 1 auto;
     min-width: 0;
+    font-family: var(--font-m);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
 }
 
 .soriku-models-meta {
-    color: var(--theia-descriptionForeground);
-    font-size: var(--theia-ui-font-size0);
+    color: var(--ink3);
+    font-size: 11px;
     flex: 0 0 auto;
     max-width: 55%;
     overflow: hidden;
@@ -70,20 +79,24 @@
 }
 
 .soriku-dot.ok {
-    background-color: var(--theia-successBackground, #3fb950);
+    background: var(--ok);
 }
 
 .soriku-dot.bad {
-    background-color: var(--theia-errorForeground, #f85149);
+    background: var(--danger);
 }
 
 .soriku-iconbtn {
     background: transparent;
     border: none;
-    color: var(--theia-icon-foreground);
+    color: var(--ink3);
     cursor: pointer;
     padding: 2px 4px;
     flex: 0 0 auto;
+}
+
+.soriku-iconbtn:hover:not(:disabled) {
+    color: var(--ink);
 }
 
 .soriku-iconbtn:disabled {
@@ -116,21 +129,23 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 6px;
-    border: 1px solid var(--theia-editorGroup-border);
-    border-radius: 4px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
 }
 
 .soriku-models-link {
-    font-size: var(--theia-ui-font-size0);
+    font-size: 11px;
+    color: var(--acc);
 }
 
 .soriku-models-progress {
     display: flex;
     gap: 8px;
-    margin-top: 4px;
-    color: var(--theia-descriptionForeground);
-    font-size: var(--theia-ui-font-size0);
+    margin-top: 8px;
+    color: var(--ink3);
+    font-size: 11px;
+    font-family: var(--font-m);
 }
 
 .soriku-models-pct {

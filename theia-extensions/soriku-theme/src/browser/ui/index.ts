@@ -11,3 +11,4 @@ export * from './Overlay';
 export * from './Toast';
 export * from './SettingsRow';
 export * from './SorikuMark';
+export * from './PageHeader';
