@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { RoutingOverridesResponse, V1ModelsResponse } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { parseModelIds, parseOverrides, validateNewOverride } from '../common/routing-overrides';
+import { mergeCategoryRows, parseModelIds, parseOverrides } from '../common/routing-overrides';
 
 describe('parseOverrides', () => {
     it('maps category/model_id pairs', () => {
@@ -34,10 +34,26 @@ describe('parseModelIds', () => {
     });
 });
 
-describe('validateNewOverride', () => {
-    it('requires a category and a model', () => {
-        assert.equal(validateNewOverride('', 'm').ok, false);
-        assert.equal(validateNewOverride('c', '  ').ok, false);
-        assert.equal(validateNewOverride('c', 'm').ok, true);
+describe('mergeCategoryRows', () => {
+    it('shows every known category, with an override where one exists', () => {
+        const rows = mergeCategoryRows(
+            ['code_generation', 'code_review', 'docs'],
+            [{ category: 'code_review', modelId: 'local-coder' }],
+        );
+        assert.deepEqual(rows, [
+            { category: 'code_generation', override: undefined },
+            { category: 'code_review', override: 'local-coder' },
+            { category: 'docs', override: undefined },
+        ]);
+    });
+
+    it('sorts categories alphabetically regardless of input order', () => {
+        const rows = mergeCategoryRows(['docs', 'code_generation'], []);
+        assert.deepEqual(rows.map(r => r.category), ['code_generation', 'docs']);
+    });
+
+    it('ignores overrides for categories the capability map no longer reports', () => {
+        const rows = mergeCategoryRows(['docs'], [{ category: 'stale_category', modelId: 'x' }]);
+        assert.deepEqual(rows, [{ category: 'docs', override: undefined }]);
     });
 });

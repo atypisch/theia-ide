@@ -9,16 +9,20 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { toCapabilityTable } from 'soriku-capability-map-ext/lib/common/capability-table';
+import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
 import {
     OverrideRow,
+    RoutingCategoryRow,
+    mergeCategoryRows,
     parseModelIds,
     parseOverrides,
-    validateNewOverride,
 } from '../common/routing-overrides';
 
 interface OverridesState {
     status: 'loading' | 'error' | 'ready';
     overrides: OverrideRow[];
+    categories: string[];
     models: string[];
     error?: string;
 }
@@ -35,9 +39,7 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
     @inject(MessageService)
     protected readonly messages: MessageService;
 
-    protected state: OverridesState = { status: 'loading', overrides: [], models: [] };
-    protected categoryRef = React.createRef<HTMLInputElement>();
-    protected modelRef = React.createRef<HTMLSelectElement>();
+    protected state: OverridesState = { status: 'loading', overrides: [], categories: [], models: [] };
     protected busy = false;
 
     @postConstruct()
@@ -57,13 +59,15 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
         this.state = { ...this.state, status: 'loading' };
         this.update();
         try {
-            const [overrides, models] = await Promise.all([
+            const [overrides, models, capabilities] = await Promise.all([
                 this.engineClient.listRoutingOverrides(),
                 this.engineClient.listModels(),
+                this.engineClient.getCapabilities(),
             ]);
             this.state = {
                 status: 'ready',
                 overrides: parseOverrides(overrides),
+                categories: toCapabilityTable(capabilities).categories,
                 models: parseModelIds(models),
             };
         } catch (e) {
@@ -72,44 +76,22 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
         this.update();
     }
 
-    protected async add(): Promise<void> {
+    /** Sets or clears (modelId === '') the override for one category, from its inline picker. */
+    protected async setOverride(category: string, modelId: string): Promise<void> {
         if (this.busy) {
-            return;
-        }
-        const category = this.categoryRef.current?.value ?? '';
-        const modelId = this.modelRef.current?.value ?? '';
-        const validation = validateNewOverride(category, modelId);
-        if (!validation.ok) {
-            this.messages.warn(validation.error ?? 'Invalid override.');
             return;
         }
         this.busy = true;
         this.update();
         try {
-            await this.engineClient.setRoutingOverride({ category: category.trim(), model_id: modelId.trim() });
-            if (this.categoryRef.current) {
-                this.categoryRef.current.value = '';
+            if (modelId === '') {
+                await this.engineClient.deleteRoutingOverride(category);
+            } else {
+                await this.engineClient.setRoutingOverride({ category, model_id: modelId });
             }
             await this.refresh();
         } catch (e) {
-            this.messages.error(`Could not set override: ${(e as Error).message}`);
-        } finally {
-            this.busy = false;
-            this.update();
-        }
-    }
-
-    protected async remove(category: string): Promise<void> {
-        if (this.busy) {
-            return;
-        }
-        this.busy = true;
-        this.update();
-        try {
-            await this.engineClient.deleteRoutingOverride(category);
-            await this.refresh();
-        } catch (e) {
-            this.messages.error(`Could not remove override: ${(e as Error).message}`);
+            this.messages.error(`Could not update routing for "${category}": ${(e as Error).message}`);
         } finally {
             this.busy = false;
             this.update();
@@ -117,66 +99,64 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        return <div className='soriku-routing'>
-            <div className='soriku-routing-header'>
-                <span className='soriku-routing-title'>Routing Overrides (user)</span>
-                <button className='theia-button secondary' onClick={() => this.refresh()}>
-                    <span className='codicon codicon-refresh' /> Refresh
-                </button>
-            </div>
-            <div className='soriku-routing-note'>
-                Force a model for a category. Platform/tenant overrides take precedence and are read-only here.
-            </div>
-            {this.renderAddForm()}
-            {this.renderBody()}
-        </div>;
-    }
-
-    protected renderAddForm(): React.ReactNode {
-        return <div className='soriku-routing-add'>
-            <input
-                ref={this.categoryRef}
-                className='theia-input'
-                type='text'
-                placeholder='category (e.g. code_generation)'
+        return <div className='sk-page soriku-routing'>
+            <PageHeader
+                eyebrow='Smart routing'
+                heading='Which model,'
+                emphasis='which task'
+                subhead='Soriku classifies each prompt and routes it to the strongest model. Force a model per category, or leave it on Auto.'
+                actions={<Btn variant='secondary' onClick={() => this.refresh()}>
+                    <span className='codicon codicon-refresh' />
+                </Btn>}
             />
-            <select ref={this.modelRef} className='theia-select'>
-                {this.state.models.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <button className='theia-button' disabled={this.busy} onClick={() => this.add()}>Add</button>
+            <div className='sk-page-body sk-page-body-narrow soriku-routing-body'>
+                {this.renderBody()}
+            </div>
         </div>;
     }
 
     protected renderBody(): React.ReactNode {
-        const { status, overrides, error } = this.state;
-        if (status === 'loading' && overrides.length === 0) {
-            return <div className='soriku-routing-message'>Loading overrides…</div>;
+        const { status, categories, overrides, models, error } = this.state;
+        if (status === 'loading' && categories.length === 0) {
+            return <div className='soriku-routing-message'>Loading routing…</div>;
         }
         if (status === 'error') {
             return <div className='soriku-routing-message soriku-routing-error'>
-                <div>Could not load overrides.</div>
+                <div>Could not load routing overrides.</div>
                 <div className='soriku-routing-error-detail'>{error}</div>
                 <button className='theia-button' onClick={() => this.refresh()}>Retry</button>
             </div>;
         }
-        if (overrides.length === 0) {
-            return <div className='soriku-routing-message'>No user overrides. Add one above.</div>;
+        if (categories.length === 0) {
+            return <div className='soriku-routing-message'>No categories yet. Run benchmarks in Soriku, then refresh.</div>;
         }
-        return <table className='soriku-routing-table'>
-            <thead><tr><th>Category</th><th>Model</th><th /></tr></thead>
-            <tbody>
-                {overrides.map(row => <tr key={row.category}>
-                    <td>{row.category}</td>
-                    <td>{row.modelId}</td>
-                    <td>
-                        <button
-                            className='theia-button secondary'
-                            disabled={this.busy}
-                            onClick={() => this.remove(row.category)}
-                        >Remove</button>
-                    </td>
-                </tr>)}
-            </tbody>
-        </table>;
+        const rows = mergeCategoryRows(categories, overrides);
+        return <>
+            <div className='soriku-routing-table'>
+                <div className='soriku-routing-table-head'>
+                    <span>Category</span><span>Model override</span>
+                </div>
+                {rows.map(row => this.renderRow(row, models))}
+            </div>
+            <div className='soriku-routing-hint'>
+                <span className='codicon codicon-info' />
+                Click a value to change it. <b>Auto</b> follows the capability map; a forced model always wins for that category.
+            </div>
+        </>;
+    }
+
+    protected renderRow(row: RoutingCategoryRow, models: string[]): React.ReactNode {
+        return <div key={row.category} className='soriku-routing-row'>
+            <span className='soriku-routing-row-name'>{row.category}</span>
+            <select
+                className='theia-select soriku-routing-pick'
+                disabled={this.busy}
+                value={row.override ?? ''}
+                onChange={e => this.setOverride(row.category, e.target.value)}
+            >
+                <option value=''>Auto</option>
+                {models.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+        </div>;
     }
 }

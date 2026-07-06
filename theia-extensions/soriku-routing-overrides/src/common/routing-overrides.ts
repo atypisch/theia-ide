@@ -28,17 +28,24 @@ export function parseModelIds(response: V1ModelsResponse): string[] {
     return data.map(m => m.id).filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
 
-export interface ValidationResult {
-    ok: boolean;
-    error?: string;
+export interface RoutingCategoryRow {
+    category: string;
+    /** The user override for this category, or undefined when it's on Auto. */
+    override?: string;
 }
 
-export function validateNewOverride(category: string, modelId: string): ValidationResult {
-    if (!category.trim()) {
-        return { ok: false, error: 'Enter a category (e.g. code_generation).' };
-    }
-    if (!modelId.trim()) {
-        return { ok: false, error: 'Choose a model.' };
-    }
-    return { ok: true };
+/**
+ * Merges the engine's known categories (from the capability map — the same
+ * grid the router itself scores against) with the user's sparse override
+ * list, into one row per category: 1:1 with the mockup's fixed grid
+ * ("Auto" vs a forced model), built entirely from real data rather than a
+ * hand-picked category list.
+ */
+export function mergeCategoryRows(allCategories: string[], overrides: OverrideRow[]): RoutingCategoryRow[] {
+    const overrideByCategory = new Map(overrides.map(o => [o.category, o.modelId]));
+    return allCategories
+        .slice()
+        .sort((a, b) => a.localeCompare(b))
+        .map(category => ({ category, override: overrideByCategory.get(category) }));
 }
+
