@@ -16,7 +16,10 @@ import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client'
 import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-model-catalog';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
-import { ChatMode, ChatStreamParams, ProviderInfo, RoutingStrategy, V1ModelDescriptor } from 'soriku-engine-client-ext/lib/common/engine-types';
+import {
+    ChatMode, ChatStreamParams, MinionSpawnOutcome, ProviderInfo, RoutingStrategy,
+    SubagentInsight, SubagentPotential, V1ModelDescriptor,
+} from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
@@ -25,6 +28,7 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { Overlay, SegmentedPicker } from 'soriku-theme-ext/lib/browser/ui';
+import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
 import { ChatSessionService } from './chat-session-service';
@@ -36,6 +40,8 @@ import {
     ChatToolCall,
     PendingPlan,
     PlanTaskView,
+    roleLabel,
+    SUBAGENT_ROLES,
     busyPhase,
     createAssistantTurn,
     formatToolCallSummary,
@@ -47,6 +53,20 @@ import {
 const SUBAGENT_LABEL_PREF = 'soriku.ui.subagentLabel';
 /** Per-plan cloud spend cap (EUR); negative = no IDE cap (engine default). */
 const CLOUD_COST_CAP_PREF = 'soriku.routing.cloudCostCapEur';
+
+/** Which subagent overlay (Fase F5) is open, and the identifiers it needs. */
+interface SubagentOverlayState {
+    kind: 'insight' | 'promote' | 'spawn';
+    planId: string;
+    /** The minion's own persona id — set for insight/promote, not spawn (doesn't exist yet). */
+    minionId?: string;
+    /** The head agent's persona id — required for all three. */
+    parentAgentId?: string;
+    /** The minion's role — set for insight/promote; user-picked for spawn. */
+    role?: string;
+    /** Display name, for the overlay title. */
+    name?: string;
+}
 
 /** How the agent works (Cursor-style behaviour), independent of model choice. */
 type AgentBehavior = 'auto' | 'edit' | 'plan' | 'chat';
@@ -139,6 +159,9 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuEditorRevealService)
     protected readonly editorReveal: SorikuEditorRevealService;
 
+    @inject(SorikuToastService)
+    protected readonly toast: SorikuToastService;
+
     @inject(SorikuModelCatalog)
     protected readonly catalog: SorikuModelCatalog;
 
@@ -219,6 +242,15 @@ export class SorikuChatWidget extends ReactWidget {
     /** Root-level mount for the Plan detail overlay (needs a full-viewport backdrop, not the docked chat panel's own box). */
     protected planDetailHost: HTMLDivElement | undefined;
     protected planDetailRoot: Root | undefined;
+    /** Which subagent overlay (Insight / Promote / Spawn — Fase F5) is open, if any. Shares the same root as Plan detail — only one modal is ever open at a time. */
+    protected subagentOverlay: SubagentOverlayState | undefined;
+    protected subagentInsight: SubagentInsight | undefined;
+    protected subagentPotential: SubagentPotential | undefined;
+    protected subagentOverlayLoading = false;
+    protected subagentOverlayError: string | undefined;
+    protected spawnRole: string = SUBAGENT_ROLES[0];
+    protected spawnGoal = '';
+    protected spawning = false;
     /** Coalesce React re-renders during SSE streaming (Cursor-style ~60fps cap). */
     protected updateScheduled = false;
 
@@ -907,6 +939,10 @@ export class SorikuChatWidget extends ReactWidget {
      * which a node nested inside the docked chat panel cannot give it.
      */
     protected renderPlanDetailPortal(): void {
+        if (this.subagentOverlay) {
+            this.planDetailRoot?.render(this.renderSubagentOverlay());
+            return;
+        }
         const turn = this.findExpandedPlan();
         if (!turn?.pendingPlan) {
             this.expandedPlanId = undefined;
@@ -934,6 +970,274 @@ export class SorikuChatWidget extends ReactWidget {
                 </div>
             </Overlay>,
         );
+    }
+
+    // ── Subagents (minions) — Fase F5: Insight / Promote / Spawn ────────────
+
+    /** Opens the Insight overlay for a Fleet minion row and loads its real data. */
+    protected openSubagentInsight(a: AgentActivity, planId: string): void {
+        if (!a.personaId) {
+            return;
+        }
+        this.subagentOverlay = {
+            kind: 'insight', planId, minionId: a.personaId,
+            parentAgentId: a.parentAgentId, role: a.role,
+        };
+        this.subagentInsight = undefined;
+        this.subagentPotential = undefined;
+        this.subagentOverlayError = undefined;
+        this.update();
+        void this.loadSubagentInsight();
+    }
+
+    /** Opens the Spawn overlay for the given head agent's live plan run. */
+    protected openSpawnSubagent(planId: string, parentAgentId: string): void {
+        this.subagentOverlay = { kind: 'spawn', planId, parentAgentId };
+        this.spawnRole = SUBAGENT_ROLES[0];
+        this.spawnGoal = '';
+        this.subagentOverlayError = undefined;
+        this.update();
+    }
+
+    protected closeSubagentOverlay = (): void => {
+        this.subagentOverlay = undefined;
+        this.subagentInsight = undefined;
+        this.subagentPotential = undefined;
+        this.subagentOverlayError = undefined;
+        this.update();
+    };
+
+    protected async loadSubagentInsight(): Promise<void> {
+        const ov = this.subagentOverlay;
+        if (!ov?.minionId) {
+            return;
+        }
+        this.subagentOverlayLoading = true;
+        this.update();
+        try {
+            this.subagentInsight = await this.engineClient.getSubagentInsight(ov.planId, ov.minionId, ov.parentAgentId);
+            // Potential is best-effort (only available while the run is still live) —
+            // its absence just hides the "flagged for potential" banner, never an error.
+            try {
+                this.subagentPotential = await this.engineClient.getSubagentPotential(ov.planId, ov.minionId, ov.parentAgentId);
+            } catch {
+                this.subagentPotential = undefined;
+            }
+        } catch (e) {
+            this.subagentOverlayError = (e as Error).message;
+        } finally {
+            this.subagentOverlayLoading = false;
+            this.update();
+        }
+    }
+
+    /** Switches the open Insight overlay into the Promote overlay (same subagent). */
+    protected openPromoteFromInsight(): void {
+        if (this.subagentOverlay?.kind === 'insight') {
+            this.subagentOverlay = { ...this.subagentOverlay, kind: 'promote' };
+            this.update();
+        }
+    }
+
+    protected async doPromoteSubagent(): Promise<void> {
+        const ov = this.subagentOverlay;
+        if (!ov?.minionId) {
+            return;
+        }
+        this.subagentOverlayLoading = true;
+        this.update();
+        try {
+            const persona = await this.engineClient.promoteSubagent(ov.minionId, ov.planId);
+            this.toast.show(`${persona.name || ov.role || 'Subagent'} promoted to a full agent`);
+            this.closeSubagentOverlay();
+        } catch (e) {
+            this.subagentOverlayError = (e as Error).message;
+        } finally {
+            this.subagentOverlayLoading = false;
+            this.update();
+        }
+    }
+
+    protected async doSpawnSubagent(): Promise<void> {
+        const ov = this.subagentOverlay;
+        if (!ov || ov.kind !== 'spawn' || !ov.parentAgentId || !this.spawnGoal.trim()) {
+            return;
+        }
+        this.spawning = true;
+        this.subagentOverlayError = undefined;
+        this.update();
+        try {
+            const outcome: MinionSpawnOutcome = await this.engineClient.spawnSubagent(ov.planId, {
+                role: this.spawnRole, goal: this.spawnGoal.trim(), parentAgentId: ov.parentAgentId,
+            });
+            if (outcome.status === 'error' || outcome.status === 'rejected') {
+                this.subagentOverlayError = outcome.error || 'Could not spawn the subagent.';
+                return;
+            }
+            this.toast.show(`Spawned ${roleLabel(this.spawnRole)} under ${this.selection.getActiveName() ?? 'the head agent'}`);
+            this.closeSubagentOverlay();
+        } catch (e) {
+            this.subagentOverlayError = (e as Error).message;
+        } finally {
+            this.spawning = false;
+            this.update();
+        }
+    }
+
+    protected renderSubagentOverlay(): React.ReactElement {
+        const ov = this.subagentOverlay!;
+        if (ov.kind === 'spawn') {
+            return <Overlay onClose={this.closeSubagentOverlay} frameStyle={{ width: 480, maxWidth: '92vw' }}>
+                {this.renderSpawnSubagentBody()}
+            </Overlay>;
+        }
+        if (ov.kind === 'promote') {
+            return <Overlay onClose={this.closeSubagentOverlay} frameStyle={{ width: 560, maxWidth: '92vw' }}>
+                {this.renderPromoteSubagentBody()}
+            </Overlay>;
+        }
+        return <Overlay onClose={this.closeSubagentOverlay} frameStyle={{ width: 560, maxWidth: '92vw', maxHeight: 'calc(100vh - 140px)' }}>
+            {this.renderSubagentInsightBody()}
+        </Overlay>;
+    }
+
+    protected renderSubagentInsightBody(): React.ReactNode {
+        const ov = this.subagentOverlay!;
+        const insight = this.subagentInsight;
+        const potential = this.subagentPotential;
+        return <div className='soriku-subagent-insight'>
+            <div className='soriku-subagent-insight-header'>
+                <div className='soriku-subagent-insight-icon'><span className='codicon codicon-organization' /></div>
+                <div className='soriku-subagent-insight-title'>
+                    <div className='soriku-subagent-insight-name'>
+                        <span>{roleLabel(ov.role ?? 'generalist')}</span>
+                        <span className='soriku-subagent-insight-badge'>subagent</span>
+                    </div>
+                    <div className='soriku-subagent-insight-meta'>under {this.selection.getActiveName() ?? 'the head agent'}</div>
+                </div>
+                <button className='soriku-plan-detail-close' onClick={this.closeSubagentOverlay} title='Close'>
+                    <span className='codicon codicon-close' />
+                </button>
+            </div>
+            <div className='soriku-subagent-insight-body sk-scroll'>
+                {this.subagentOverlayLoading && !insight && <div className='soriku-subagent-insight-loading'>Loading…</div>}
+                {this.subagentOverlayError && <div className='soriku-subagent-insight-error'>{this.subagentOverlayError}</div>}
+                {insight && <>
+                    <div className='soriku-subagent-insight-stats'>
+                        <div className='soriku-subagent-stat'>
+                            <div className='soriku-subagent-stat-value'>{insight.runs}</div>
+                            <div className='soriku-subagent-stat-label'>lifetime runs</div>
+                        </div>
+                        <div className='soriku-subagent-stat'>
+                            <div className='soriku-subagent-stat-value soriku-subagent-stat-ok'>
+                                {insight.success_rate === null ? '—' : `${Math.round(insight.success_rate * 100)}%`}
+                            </div>
+                            <div className='soriku-subagent-stat-label'>success rate</div>
+                        </div>
+                    </div>
+                    {insight.learned.length > 0 && <div className='soriku-subagent-section'>
+                        <div className='soriku-subagent-section-title'>What it has learned</div>
+                        {insight.learned.map((line, i) => <div key={i} className='soriku-subagent-learned-row'>
+                            <span className='codicon codicon-check' />{line}
+                        </div>)}
+                    </div>}
+                    {Object.keys(insight.patterns).length > 0 && <div className='soriku-subagent-section'>
+                        <div className='soriku-subagent-section-title'>Decision patterns</div>
+                        <div className='soriku-subagent-patterns'>
+                            {Object.entries(insight.patterns).map(([k, v]) => <div key={k} className='soriku-subagent-pattern-row'>
+                                <span>{k}</span><span>{v.toFixed(2)}</span>
+                            </div>)}
+                        </div>
+                    </div>}
+                </>}
+            </div>
+            {potential?.flagged && <div className='soriku-subagent-flagged'>
+                <span className='codicon codicon-sparkle' />
+                <div className='soriku-subagent-flagged-text'>The engine flagged this subagent as having <b>potential</b>.</div>
+                <button className='theia-button' onClick={() => this.openPromoteFromInsight()}>Promote…</button>
+            </div>}
+        </div>;
+    }
+
+    protected renderPromoteSubagentBody(): React.ReactNode {
+        const ov = this.subagentOverlay!;
+        const potential = this.subagentPotential;
+        return <div className='soriku-subagent-promote'>
+            <div className='soriku-subagent-promote-header'>
+                <div className='soriku-subagent-promote-eyebrow'><span className='codicon codicon-sparkle' />Promotion</div>
+                <div className='soriku-subagent-promote-title'>Promote <span className='sk-em'>{roleLabel(ov.role ?? 'generalist')}</span> to a full agent</div>
+                <div className='soriku-subagent-promote-desc'>
+                    The engine scores every subagent against real thresholds. Soriku IDE only reads the result — it never decides eligibility itself.
+                </div>
+            </div>
+            <div className='soriku-subagent-promote-thresholds'>
+                {potential?.thresholds.map(t => <div key={t.key} className={`soriku-subagent-threshold${t.met ? ' met' : ''}`}>
+                    <span className={`soriku-subagent-threshold-dot${t.met ? ' met' : ''}`} />
+                    <div className='soriku-subagent-threshold-body'>
+                        <div className='soriku-subagent-threshold-label'>
+                            {t.label}
+                            {!t.authoritative && <span
+                                className='soriku-subagent-threshold-derived'
+                                title='Derived signal — does not gate the actual promote action'
+                            > (signal)</span>}
+                        </div>
+                        <div className='soriku-subagent-threshold-target'>target {t.target}</div>
+                    </div>
+                    <span className='soriku-subagent-threshold-value'>{t.value}</span>
+                    <span className={`soriku-subagent-threshold-chip${t.met ? ' met' : ''}`}>{t.met ? 'MET' : 'BELOW'}</span>
+                </div>)}
+            </div>
+            {this.subagentOverlayError && <div className='soriku-subagent-insight-error'>{this.subagentOverlayError}</div>}
+            <div className='soriku-subagent-promote-actions'>
+                <span className='soriku-subagent-promote-note'>
+                    {potential?.eligible_to_promote ? 'Eligible — the engine\'s streak criterion is met.' : 'Not yet eligible — the streak criterion isn\'t met.'}
+                </span>
+                <button className='theia-button secondary' onClick={this.closeSubagentOverlay}>Cancel</button>
+                <button className='theia-button' disabled={!potential?.eligible_to_promote || this.subagentOverlayLoading}
+                    onClick={() => this.doPromoteSubagent()}>
+                    <span className='codicon codicon-arrow-up' />Promote to agent
+                </button>
+            </div>
+        </div>;
+    }
+
+    protected renderSpawnSubagentBody(): React.ReactNode {
+        return <div className='soriku-subagent-spawn'>
+            <div className='soriku-subagent-spawn-header'>
+                <div className='soriku-subagent-spawn-title'>Spawn a <span className='sk-em'>subagent</span></div>
+                <div className='soriku-subagent-spawn-desc'>
+                    Attach a focused minion under {this.selection.getActiveName() ?? 'the head agent'} for this run.
+                    Pick a role and describe its task — it runs on a local model when possible.
+                </div>
+            </div>
+            <div className='soriku-subagent-spawn-body'>
+                <div className='soriku-subagent-spawn-label'>Role</div>
+                <div className='soriku-subagent-spawn-roles'>
+                    {SUBAGENT_ROLES.map(role => <button key={role}
+                        className={`soriku-subagent-spawn-role${this.spawnRole === role ? ' active' : ''}`}
+                        onClick={() => { this.spawnRole = role; this.update(); }}>
+                        <span className='codicon codicon-organization' />
+                        <span>{roleLabel(role)}</span>
+                    </button>)}
+                </div>
+                <div className='soriku-subagent-spawn-label'>Task</div>
+                <textarea
+                    className='theia-input soriku-subagent-spawn-goal'
+                    rows={3}
+                    placeholder='What should this subagent do?'
+                    value={this.spawnGoal}
+                    onChange={e => { this.spawnGoal = e.target.value; this.update(); }}
+                />
+            </div>
+            {this.subagentOverlayError && <div className='soriku-subagent-insight-error'>{this.subagentOverlayError}</div>}
+            <div className='soriku-subagent-spawn-actions'>
+                <button className='theia-button secondary' onClick={this.closeSubagentOverlay}>Cancel</button>
+                <button className='theia-button' disabled={!this.spawnGoal.trim() || this.spawning}
+                    onClick={() => this.doSpawnSubagent()}>
+                    {this.spawning ? 'Spawning…' : 'Spawn'}
+                </button>
+            </div>
+        </div>;
     }
 
     /** Animated busy indicator shown while a turn streams (spinner + current phase). */
@@ -1064,25 +1368,36 @@ export class SorikuChatWidget extends ReactWidget {
             </div>
             {topLevel.map(a => {
                 const minions = a.personaId ? minionsByParent.get(a.personaId) : undefined;
+                const canSpawn = !!(turn.planId && a.personaId);
                 return <React.Fragment key={a.workerId}>
-                    {this.renderFleetRow(a)}
-                    {minions && minions.length > 0 && <div className='soriku-fleet-minions'>
+                    {this.renderFleetRow(a, false, turn.planId)}
+                    {(minions && minions.length > 0 || canSpawn) && <div className='soriku-fleet-minions'>
                         <div className='soriku-fleet-minions-head'>
                             <span className='codicon codicon-type-hierarchy-sub' />
-                            <span>{subTitle} fleet · {minions.length}</span>
+                            <span>{subTitle} fleet · {minions?.length ?? 0}</span>
+                            <div className='soriku-fleet-minions-spacer' />
+                            {canSpawn && <button className='soriku-fleet-spawn-btn' title={`Spawn a ${subLabel.replace(/s$/, '')}`}
+                                onClick={() => this.openSpawnSubagent(turn.planId!, a.personaId!)}>
+                                <span className='codicon codicon-add' /> Spawn
+                            </button>}
                         </div>
-                        {minions.map(m => this.renderFleetRow(m, true))}
+                        {minions?.map(m => this.renderFleetRow(m, true, turn.planId))}
                     </div>}
                 </React.Fragment>;
             })}
         </div>;
     }
 
-    /** One Fleet row. `nested` indents it as a minion under its head agent. */
-    protected renderFleetRow(a: AgentActivity, nested = false): React.ReactNode {
+    /** One Fleet row. `nested` indents it as a minion under its head agent and makes it clickable (Insight overlay) once its plan run is known. */
+    protected renderFleetRow(a: AgentActivity, nested = false, planId?: string): React.ReactNode {
         const label = a.agentName ?? a.role ?? a.personaId ?? a.workerId.slice(0, 8);
         const sub = a.agentName && a.role ? a.role : undefined;
-        return <div key={a.workerId} className={`soriku-fleet-row soriku-fleet-${a.status}${nested ? ' soriku-fleet-row-nested' : ''}`}>
+        const clickable = nested && !!planId && !!a.personaId;
+        return <div key={a.workerId}
+            className={`soriku-fleet-row soriku-fleet-${a.status}${nested ? ' soriku-fleet-row-nested' : ''}${clickable ? ' soriku-fleet-row-clickable' : ''}`}
+            title={clickable ? 'View subagent insight' : undefined}
+            onClick={clickable ? () => this.openSubagentInsight(a, planId!) : undefined}
+        >
             <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
             <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
             {sub && <span className='soriku-fleet-subrole'>{sub}</span>}

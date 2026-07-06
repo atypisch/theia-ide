@@ -17,6 +17,7 @@ import {
     AgentFeedbackRequest,
     AgentFeedbackResponse,
     AgentListResponse,
+    AgentPersona,
     AgentResponse,
     AgentUpdateRequest,
     AuthModeResponse,
@@ -36,6 +37,7 @@ import {
     EngineClientConfig,
     HealthResponse,
     InstalledModelsResponse,
+    MinionSpawnOutcome,
     ModelMutationResponse,
     PlanSignalResponse,
     ProviderPresetsResponse,
@@ -51,6 +53,9 @@ import {
     SetRoutingOverrideRequest,
     SetRoutingOverrideResponse,
     SorikuSseEvent,
+    SpawnMinionRequest,
+    SubagentInsight,
+    SubagentPotential,
     UserProvidersResponse,
     V1ModelsResponse,
     WhoamiResponse,
@@ -163,6 +168,31 @@ export class EngineClientImpl implements EngineClient {
 
     async cancelPlan(planId: string): Promise<PlanSignalResponse> {
         return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/cancel`, {});
+    }
+
+    async getSubagentInsight(planId: string, minionId: string, parentAgentId?: string): Promise<SubagentInsight> {
+        const query = parentAgentId ? `?parent_agent_id=${encodeURIComponent(parentAgentId)}` : '';
+        return this.createTransport().getJson<SubagentInsight>(
+            `/api/plan/${encodeURIComponent(planId)}/minions/${encodeURIComponent(minionId)}/insight${query}`,
+        );
+    }
+
+    async getSubagentPotential(planId: string, minionId: string, parentAgentId?: string): Promise<SubagentPotential> {
+        const query = parentAgentId ? `?parent_agent_id=${encodeURIComponent(parentAgentId)}` : '';
+        return this.createTransport().getJson<SubagentPotential>(
+            `/api/plan/${encodeURIComponent(planId)}/minions/${encodeURIComponent(minionId)}/potential${query}`,
+        );
+    }
+
+    async promoteSubagent(subagentId: string, planId: string): Promise<AgentPersona> {
+        return this.createTransport().postJson<AgentPersona>('/api/agent/promote', { subagentId, planId });
+    }
+
+    async spawnSubagent(planId: string, body: SpawnMinionRequest): Promise<MinionSpawnOutcome> {
+        return this.createTransport().postJson<MinionSpawnOutcome>(
+            `/api/plan/${encodeURIComponent(planId)}/spawn`,
+            { role: body.role, goal: body.goal, parentAgentId: body.parentAgentId },
+        );
     }
 
     async getCapabilities(): Promise<CapabilityMapResponse> {

@@ -551,8 +551,39 @@
     margin: 2px 0;
 }
 
+.soriku-fleet-minions-spacer {
+    flex: 1;
+}
+
+.soriku-fleet-spawn-btn {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: transparent;
+    border: 1px solid var(--theia-editorGroup-border);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    font-weight: 400;
+    padding: 1px 6px;
+    cursor: pointer;
+}
+
+.soriku-fleet-spawn-btn:hover {
+    background: var(--theia-toolbar-hoverBackground);
+}
+
 .soriku-fleet-row-nested {
     opacity: 0.92;
+}
+
+.soriku-fleet-row-clickable {
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.soriku-fleet-row-clickable:hover {
+    background: var(--theia-toolbar-hoverBackground);
 }
 
 .soriku-fleet-dot {
@@ -846,4 +877,387 @@
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+}
+
+/* ─── Subagent Insight / Promote / Spawn (Fase F5) ───────────────────── */
+
+.soriku-subagent-insight-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+}
+
+.soriku-subagent-insight-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--cat-reason) 18%, transparent);
+    color: var(--cat-reason);
+    border: 1px solid color-mix(in srgb, var(--cat-reason) 40%, transparent);
+}
+
+.soriku-subagent-insight-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-subagent-insight-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.soriku-subagent-insight-badge {
+    font-family: var(--font-m);
+    font-size: 9px;
+    color: var(--ink3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+.soriku-subagent-insight-meta {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink3);
+    margin-top: 3px;
+}
+
+.soriku-subagent-insight-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.soriku-subagent-insight-loading,
+.soriku-subagent-insight-error {
+    font-size: 12.5px;
+    color: var(--ink3);
+}
+
+.soriku-subagent-insight-error {
+    color: var(--danger);
+}
+
+.soriku-subagent-insight-stats {
+    display: flex;
+    gap: 10px;
+}
+
+.soriku-subagent-stat {
+    flex: 1;
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    padding: 12px;
+}
+
+.soriku-subagent-stat-value {
+    font-family: var(--font-d);
+    font-size: 22px;
+    font-weight: 500;
+}
+
+.soriku-subagent-stat-ok {
+    color: var(--ok);
+}
+
+.soriku-subagent-stat-label {
+    font-size: 11px;
+    color: var(--ink3);
+    margin-top: 2px;
+}
+
+.soriku-subagent-section-title {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 8px;
+}
+
+.soriku-subagent-learned-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--ink2);
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.soriku-subagent-learned-row .codicon {
+    color: var(--acc);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.soriku-subagent-patterns {
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    overflow: hidden;
+}
+
+.soriku-subagent-pattern-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+}
+
+.soriku-subagent-pattern-row:last-child {
+    border-bottom: none;
+}
+
+.soriku-subagent-pattern-row span:last-child {
+    font-family: var(--font-m);
+}
+
+.soriku-subagent-flagged {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--acc-line);
+    background: var(--acc-soft);
+    flex-shrink: 0;
+}
+
+.soriku-subagent-flagged .codicon {
+    color: var(--acc);
+    flex-shrink: 0;
+}
+
+.soriku-subagent-flagged-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--ink2);
+    line-height: 1.5;
+}
+
+/* ── Promote overlay ─────────────────────────────────────────────────── */
+
+.soriku-subagent-promote-header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.soriku-subagent-promote-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-m);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--acc);
+    margin-bottom: 8px;
+}
+
+.soriku-subagent-promote-title {
+    font-family: var(--font-d);
+    font-size: 22px;
+    font-weight: 500;
+}
+
+.soriku-subagent-promote-desc {
+    font-size: 12.5px;
+    color: var(--ink2);
+    margin-top: 8px;
+    line-height: 1.6;
+}
+
+.soriku-subagent-promote-thresholds {
+    padding: 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.soriku-subagent-threshold {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--bg-sunk);
+}
+
+.soriku-subagent-threshold-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--ink3);
+}
+
+.soriku-subagent-threshold-dot.met {
+    background: var(--ok);
+}
+
+.soriku-subagent-threshold-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-subagent-threshold-label {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.soriku-subagent-threshold-derived {
+    font-size: 10.5px;
+    color: var(--ink3);
+    font-weight: 400;
+}
+
+.soriku-subagent-threshold-target {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink3);
+    margin-top: 2px;
+}
+
+.soriku-subagent-threshold-value {
+    font-family: var(--font-m);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.soriku-subagent-threshold-chip {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    border: 1px solid var(--line2);
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.soriku-subagent-threshold-chip.met {
+    color: var(--ok);
+    border-color: var(--ok-line);
+    background: var(--ok-soft);
+}
+
+.soriku-subagent-promote-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--line);
+}
+
+.soriku-subagent-promote-note {
+    font-size: 11.5px;
+    color: var(--ink3);
+    flex: 1;
+}
+
+/* ── Spawn overlay ────────────────────────────────────────────────────── */
+
+.soriku-subagent-spawn-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.soriku-subagent-spawn-title {
+    font-family: var(--font-d);
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.soriku-subagent-spawn-desc {
+    font-size: 12.5px;
+    color: var(--ink2);
+    margin-top: 6px;
+    line-height: 1.55;
+}
+
+.soriku-subagent-spawn-body {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.soriku-subagent-spawn-label {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-top: 6px;
+}
+
+.soriku-subagent-spawn-roles {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.soriku-subagent-spawn-role {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--bg-sunk);
+    color: var(--ink);
+    font-size: 12.5px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.soriku-subagent-spawn-role .codicon {
+    color: var(--cat-reason);
+    flex-shrink: 0;
+}
+
+.soriku-subagent-spawn-role.active {
+    border-color: var(--acc-line);
+    background: var(--acc-soft);
+    color: var(--acc);
+}
+
+.soriku-subagent-spawn-role.active .codicon {
+    color: var(--acc);
+}
+
+.soriku-subagent-spawn-goal {
+    width: 100%;
+    resize: vertical;
+}
+
+.soriku-subagent-spawn-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--line);
 }

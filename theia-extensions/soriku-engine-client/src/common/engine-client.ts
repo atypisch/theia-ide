@@ -24,11 +24,13 @@ import {
     ConfirmResponse,
     ConversationDetail,
     ConversationSummary,
+    AgentPersona,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
     ExecutePlanRequest,
     HealthResponse,
     InstalledModelsResponse,
+    MinionSpawnOutcome,
     ModelMutationResponse,
     PlanSignalResponse,
     ProviderPresetsResponse,
@@ -44,6 +46,9 @@ import {
     SetRoutingOverrideRequest,
     SetRoutingOverrideResponse,
     SorikuSseEvent,
+    SpawnMinionRequest,
+    SubagentInsight,
+    SubagentPotential,
     UserProvidersResponse,
     V1ModelsResponse,
     WhoamiResponse,
@@ -73,6 +78,16 @@ export interface EngineClient {
     executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */
     cancelPlan(planId: string): Promise<PlanSignalResponse>;
+
+    // ── Subagents (minions) — Fase F5 ──
+    /** Durable insight for a subagent (role stats + its own feedback history); `parentAgentId` is required once the originating plan run has ended. */
+    getSubagentInsight(planId: string, minionId: string, parentAgentId?: string): Promise<SubagentInsight>;
+    /** Promotion criteria for a subagent — only while its plan run is still active. */
+    getSubagentPotential(planId: string, minionId: string, parentAgentId?: string): Promise<SubagentPotential>;
+    /** Manually promote a subagent early; the engine re-verifies real eligibility itself. */
+    promoteSubagent(subagentId: string, planId: string): Promise<AgentPersona>;
+    /** Spawn a new subagent under the given head agent, attached to its live plan run. */
+    spawnSubagent(planId: string, body: SpawnMinionRequest): Promise<MinionSpawnOutcome>;
 
     getCapabilities(): Promise<CapabilityMapResponse>;
     getRoutingGaps(): Promise<RoutingGapsResponse>;

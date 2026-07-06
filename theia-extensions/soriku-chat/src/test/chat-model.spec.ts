@@ -7,7 +7,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent, summarizeAgentInsights, withWorkspacePrefix } from '../common/chat-model';
+import {
+    AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent,
+    roleLabel, SUBAGENT_ROLES, summarizeAgentInsights, withWorkspacePrefix,
+} from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
     return events.reduce(reduceSseEvent, createAssistantTurn('t1'));
@@ -237,9 +240,11 @@ describe('reduceSseEvent', () => {
         assert.equal(awaiting.pendingPlan?.tasks[0].model, 'qwen3:8b');
         assert.equal(awaiting.pendingPlan?.costEur, 0.02);
         assert.equal(awaiting.awaitingApproval, true);
+        assert.equal(awaiting.planId, 'pl_1');
 
         const running = reduceSseEvent(awaiting, { type: 'worker_start', model: 'qwen3:8b' });
         assert.equal(running.awaitingApproval, false);
+        assert.equal(running.planId, 'pl_1', 'planId must survive later events in the same run');
     });
 
     it('treats a cancelled plan as a finished (non-error) turn', () => {
@@ -448,5 +453,19 @@ describe('withWorkspacePrefix (C-B workspace format fix)', () => {
     it('does not double-prefix an already-prefixed prompt (retry of stored text)', () => {
         const once = withWorkspacePrefix('do it', '/ws');
         assert.equal(withWorkspacePrefix(once, '/ws'), once);
+    });
+});
+
+describe('roleLabel', () => {
+    it('title-cases each hyphen-separated word', () => {
+        assert.equal(roleLabel('backend-developer'), 'Backend Developer');
+        assert.equal(roleLabel('generalist'), 'Generalist');
+        assert.equal(roleLabel('devops-engineer'), 'Devops Engineer');
+    });
+    it('covers every real engine role (core/plan.py VALID_ROLES)', () => {
+        assert.equal(SUBAGENT_ROLES.length, 9);
+        for (const role of SUBAGENT_ROLES) {
+            assert.ok(roleLabel(role).length > 0);
+        }
     });
 });

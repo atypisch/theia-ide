@@ -12,6 +12,10 @@ export interface AgentPersona {
     category: string;
     version: number;
     preferred_model?: string | null;
+    /** "" = user-created; "minion" = spawned by a head agent during a plan run. */
+    origin?: string;
+    /** A repeatedly-good minion the engine promoted to a persistent sub-agent. */
+    promoted?: boolean;
     persona: AgentPersonaConfig;
     specializations: AgentSpecialization[];
     memory: Record<string, unknown>;
@@ -183,6 +187,62 @@ export interface ExecutePlanRequest {
 export interface PlanSignalResponse {
     status: string;
     plan_id: string;
+}
+
+// ── Subagents (minions) — Fase F5: Insight / Potential / Spawn ─────────────
+// Only available for a minion's originating plan run while it's still active
+// (the engine's success streak is in-memory, per-run); insight's role-level
+// run/success counts persist across runs, its feedback data is durable.
+
+export interface SubagentInsight {
+    role: string;
+    /** Durable, cross-run count for this role — resets never. */
+    runs: number;
+    /** successes / runs for this role, or null when runs is 0. */
+    success_rate: number | null;
+    /** Human-readable notes derived from this subagent's own feedback_history entries. */
+    learned: string[];
+    /** Decision-pattern keyword -> current weight, limited to keys this subagent touched. */
+    patterns: Record<string, number>;
+    feedback_positive: number;
+    feedback_negative: number;
+}
+
+export interface SubagentPotentialThreshold {
+    key: string;
+    label: string;
+    value: number;
+    target: number;
+    met: boolean;
+    /** True only for the engine's own real promotion rule (the streak); the other criteria are derived UI signals and never gate the promote action. */
+    authoritative: boolean;
+}
+
+export interface SubagentPotential {
+    role: string;
+    thresholds: SubagentPotentialThreshold[];
+    flagged: boolean;
+    /** Mirrors the engine's own criterion — /api/agent/promote re-checks this itself. */
+    eligible_to_promote: boolean;
+    score: number;
+}
+
+export interface SpawnMinionRequest {
+    role: string;
+    goal: string;
+    parentAgentId: string;
+}
+
+export interface MinionSpawnOutcome {
+    minion_id: string | null;
+    name?: string;
+    role?: string;
+    parent_agent_id?: string | null;
+    status: string;
+    success?: boolean;
+    promoted?: boolean;
+    result?: string;
+    error?: string;
 }
 
 export interface ProviderInfo {
