@@ -13,6 +13,8 @@
   "dependencies": {
     "@theia/application-package": "1.73.0-next.2",
     "@theia/core": "1.73.0-next.2",
+    "@theia/navigator": "1.73.0-next.2",
+    "@theia/workspace": "1.73.0-next.2",
     "inversify": "^6.2.2",
     "soriku-theme-ext": "0.1.0",
     "soriku-workbench-ext": "0.1.0"

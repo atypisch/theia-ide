@@ -2453,7 +2453,7 @@
     worker-loader "^3.0.8"
     yargs "^17.7.2"
 
-"@theia/application-package@1.73.0-next.2+8ed51a5e94d":
+"@theia/application-package@1.73.0-next.2", "@theia/application-package@1.73.0-next.2+8ed51a5e94d":
   version "1.73.0-next.2"
   resolved "https://registry.yarnpkg.com/@theia/application-package/-/application-package-1.73.0-next.2.tgz#8c608ef14d3f27356d3de0655e3ea920de796fec"
   integrity sha512-pn1RbLMR0mI7kmZSy+EBkPn0Qb2yuEYypIjtp4dNWv6QO+sO0LMk/pIB5KerS9MjqHKQ7dmPkhQztYOZMVFyxA==

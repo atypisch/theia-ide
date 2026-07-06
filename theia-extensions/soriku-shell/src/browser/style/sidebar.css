@@ -1,0 +1,207 @@
+/*
+ * Soriku IDE — unified sidebar, 1:1 from the mockup (246px column,
+ * workspace switcher, WORKSPACE nav list, account/settings footer).
+ */
+
+/* Hides the left panel's entire icon-rail column (SidePanelHandler#createContainer
+   groups the tab bar with its top/bottom "..." menus into one
+   `.theia-app-sidebar-container` sibling of the actual tree/view content,
+   inside the `#theia-left-content-panel` box) — our nav replaces all of it
+   as the way to select Explorer/Search/SCM/etc. Scoped to the LEFT panel's
+   id so the right-hand side (chat dock, Fase 3) is untouched. A CSS rule
+   survives Theia's own layout-restore re-showing the tab bar; a JS
+   `.hide()` call alone did not (see soriku-sidebar-contribution.ts). */
+#theia-left-content-panel > .theia-app-sidebar-container {
+    display: none !important;
+}
+
+.soriku-sidebar {
+    width: 246px;
+    min-width: 246px;
+    max-width: 246px;
+    background: var(--bg-sunk);
+    border-right: 1px solid var(--line);
+}
+
+.soriku-sidebar-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* ── Workspace switcher ───────────────────────────────────────────────── */
+
+.soriku-sidebar-workspace {
+    height: 46px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    color: inherit;
+}
+
+.soriku-sidebar-workspace:hover {
+    background: var(--hover);
+}
+
+.soriku-sidebar-workspace-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-sidebar-workspace-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-workspace-chevron {
+    flex-shrink: 0;
+    color: var(--ink3);
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
+
+.soriku-sidebar-section-label {
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    padding: 10px 16px 6px;
+    flex-shrink: 0;
+}
+
+.soriku-sidebar-nav {
+    list-style: none;
+    margin: 0;
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+
+.soriku-sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    height: 33px;
+    padding: 0 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: var(--font-s);
+    font-size: 12.5px;
+    margin-bottom: 1px;
+    transition: background 0.1s, color 0.1s;
+    color: var(--ink2);
+}
+
+.soriku-sidebar-nav-item:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-sidebar-nav-item.active {
+    background: var(--acc-soft);
+    color: var(--acc);
+    font-weight: 600;
+}
+
+.soriku-sidebar-nav-item.active:hover {
+    background: color-mix(in srgb, var(--acc) 16%, transparent);
+}
+
+.soriku-sidebar-nav-item .codicon {
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.soriku-sidebar-nav-label {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-spacer {
+    flex: 1 1 auto;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+
+.soriku-sidebar-footer {
+    flex-shrink: 0;
+    height: 54px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px 0 12px;
+    background: var(--bg-sunk);
+}
+
+.soriku-sidebar-avatar {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+.soriku-sidebar-footer-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.soriku-sidebar-footer-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-footer-plan {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-settings-btn {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--ink3);
+    background: transparent;
+}
+
+.soriku-sidebar-settings-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
