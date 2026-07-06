@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTitle, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
+import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
 
 describe('relativeAge', () => {
     const now = Date.parse('2026-06-18T12:00:00Z');
@@ -51,6 +51,20 @@ describe('projectLabel', () => {
         assert.equal(projectLabel('/Users/me/Sites/sumezi/app'), 'sumezi/app');
     });
     it('returns undefined for empty', () => {
-        assert.equal(projectLabel(null), undefined);
+        assert.equal(projectLabel(undefined), undefined);
+    });
+});
+
+describe('conversationInitials', () => {
+    it('uses the persona id when known', () => {
+        assert.equal(conversationInitials('koda', '[Plan] add README'), 'KO');
+        assert.equal(conversationInitials('master-planner', 'x'), 'MP');
+    });
+    it('falls back to the title (stripping any [Mode] prefix) when there is no persona', () => {
+        assert.equal(conversationInitials(undefined, '[Plan] add README'), 'AR');
+        assert.equal(conversationInitials(undefined, 'Solo'), 'SO');
+    });
+    it('falls back to the "Untitled conversation" placeholder for no usable input', () => {
+        assert.equal(conversationInitials(undefined, '   '), 'UC');
     });
 });

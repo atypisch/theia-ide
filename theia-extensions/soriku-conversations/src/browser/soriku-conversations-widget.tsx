@@ -14,7 +14,8 @@ import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { cleanTitle, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
+import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
 
 /** Chat view command (registered by soriku-chat) used to reveal the chat. */
 const SORIKU_CHAT_OPEN = 'soriku.chat.open';
@@ -157,18 +158,31 @@ export class SorikuConversationsWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        const now = Date.now();
         return <div className='soriku-conversations'>
-            <div className='soriku-conversations-toolbar'>
-                <span className='soriku-conversations-title'>Conversations ({this.items.length})</span>
-                <button className='theia-button secondary' disabled={this.loading} onClick={() => this.refresh()}>
-                    <span className='codicon codicon-refresh' /> Refresh
-                </button>
+            <div className='soriku-conversations-list-pane'>
+                <div className='soriku-conversations-header'>
+                    <div className='soriku-conversations-eyebrow'><span className='soriku-conversations-eyebrow-dot' />History</div>
+                    <div className='soriku-conversations-heading'>Your <span className='sk-em'>chats</span></div>
+                </div>
+                {this.renderList()}
             </div>
-            {this.error && <div className='soriku-conversations-error'>{this.error}</div>}
+            <div className='soriku-conversations-empty-pane'>
+                <SorikuMark size={46} className='soriku-conversations-empty-mark' />
+                <span>Open a conversation to continue</span>
+            </div>
+        </div>;
+    }
+
+    protected renderList(): React.ReactNode {
+        const now = Date.now();
+        return <div className='soriku-conversations-list sk-scroll'>
+            {this.error && <div className='soriku-conversations-error'>
+                {this.error}
+                <button className='theia-button secondary' disabled={this.loading} onClick={() => this.refresh()}>Retry</button>
+            </div>}
             {this.loading && this.items.length === 0
                 ? <div className='soriku-conversations-meta'>Loading…</div>
-                : <ul className='soriku-conversations-list'>
+                : <ul className='soriku-conversations-rows'>
                     {this.items.map(item => {
                         const busy = this.busyIds.has(item.id);
                         const mode = modeFromTitle(item.title);
@@ -177,16 +191,18 @@ export class SorikuConversationsWidget extends ReactWidget {
                         return <li key={item.id} className={`soriku-conversations-row${active ? ' active' : ''}`}>
                             <button className='soriku-conversations-open' title='Open conversation' disabled={busy}
                                 onClick={() => this.open(item)}>
-                                <span className='soriku-conversations-name'>
-                                    {mode && <span className='soriku-conversations-mode'>{mode}</span>}
-                                    {cleanTitle(item.title)}
-                                </span>
-                                <span className='soriku-conversations-meta'>
-                                    {[
-                                        relativeAge(item.created_at, now),
-                                        `${item.message_count} msg`,
-                                        project,
-                                    ].filter(Boolean).join(' · ')}
+                                <span className='soriku-conversations-avatar'>{conversationInitials(item.persona_id, item.title)}</span>
+                                <span className='soriku-conversations-row-body'>
+                                    <span className='soriku-conversations-row-head'>
+                                        <span className='soriku-conversations-name'>
+                                            {mode && <span className='soriku-conversations-mode'>{mode}</span>}
+                                            {cleanTitle(item.title)}
+                                        </span>
+                                        <span className='soriku-conversations-time'>{relativeAge(item.created_at, now)}</span>
+                                    </span>
+                                    <span className='soriku-conversations-meta'>
+                                        {[`${item.message_count} msg`, project].filter(Boolean).join(' · ')}
+                                    </span>
                                 </span>
                             </button>
                             <button className='soriku-iconbtn' title='Rename' disabled={busy} onClick={() => this.rename(item)}>

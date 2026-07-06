@@ -1,5 +1,5 @@
 /********************************************************************************
- * Soriku IDE — conversations view contribution (command + right side-bar)
+ * Soriku IDE — conversations view contribution (full-page main-area view)
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -22,7 +22,7 @@ export class SorikuConversationsViewContribution extends AbstractViewContributio
         super({
             widgetId: SorikuConversationsWidget.ID,
             widgetName: SorikuConversationsWidget.LABEL,
-            defaultWidgetOptions: { area: 'right', rank: 250 },
+            defaultWidgetOptions: { area: 'main' },
             toggleCommandId: SorikuConversationsCommands.OPEN,
         });
     }

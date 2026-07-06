@@ -50,3 +50,21 @@ export function projectLabel(projectId?: string | null): string | undefined {
     }
     return parts.slice(-2).join('/');
 }
+
+/**
+ * 1-2 letter avatar initials for a conversation row — from the persona id
+ * (the agent it was with) when known, else the cleaned title. No category
+ * color: conversations don't carry the persona's category, only its id.
+ */
+export function conversationInitials(personaId: string | null | undefined, title: string): string {
+    const titleWithoutMode = cleanTitle(title).replace(/^\[[^\]]+\]\s*/, '');
+    const source = (personaId && personaId.trim()) || titleWithoutMode;
+    const parts = source.trim().split(/[\s_-]+/).filter(Boolean);
+    if (parts.length === 0) {
+        return '?';
+    }
+    if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+}
