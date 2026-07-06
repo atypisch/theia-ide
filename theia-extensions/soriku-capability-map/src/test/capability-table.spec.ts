@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { CapabilityMapResponse } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { sortRows, toCapabilityTable } from '../common/capability-table';
+import { columnMaxima, sortRows, toCapabilityTable } from '../common/capability-table';
 
 const SAMPLE: CapabilityMapResponse = {
     meta: { source: 'bench-2026-05', updated_at: '2026-05-26T14:58:28Z', stale: false },
@@ -71,5 +71,19 @@ describe('sortRows', () => {
         const table = toCapabilityTable(SAMPLE);
         const sorted = sortRows(table.rows, 'model', false);
         assert.equal(sorted[0].model, 'alpha-model:4b');
+    });
+});
+
+describe('columnMaxima', () => {
+    it('finds the highest real score per category', () => {
+        const table = toCapabilityTable(SAMPLE);
+        const maxima = columnMaxima(table);
+        assert.equal(maxima.code_generation, 80);
+        assert.equal(maxima.code_review, 72);
+    });
+
+    it('returns no columns for an empty table', () => {
+        const empty = toCapabilityTable({ status: 'no_data' } as unknown as CapabilityMapResponse);
+        assert.deepEqual(columnMaxima(empty), {});
     });
 });

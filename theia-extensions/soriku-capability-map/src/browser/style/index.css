@@ -1,75 +1,136 @@
-/* Soriku IDE — capability map (functional foundation styling only). */
+/* Soriku IDE — capability map full-page view, 1:1 heatmap from the mockup's grid. */
 
-.soriku-capmap {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: auto;
-}
-
-.soriku-capmap-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--theia-editorGroup-border);
-}
-
-.soriku-capmap-title {
-    font-weight: 600;
+.soriku-capmap-body-wrap {
+    min-width: 840px;
 }
 
 .soriku-capmap-message {
     padding: 16px;
-    color: var(--theia-descriptionForeground);
+    color: var(--ink3);
 }
 
 .soriku-capmap-error-detail {
     margin: 6px 0;
-    font-family: var(--theia-code-font-family);
+    font-family: var(--font-m);
     opacity: 0.8;
-}
-
-.soriku-capmap-body {
-    padding: 8px 12px;
 }
 
 .soriku-capmap-meta {
     display: flex;
     gap: 12px;
-    margin-bottom: 8px;
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-descriptionForeground);
+    margin-bottom: 10px;
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink3);
 }
 
 .soriku-capmap-stale {
-    color: var(--theia-editorWarning-foreground);
+    color: var(--warn);
 }
 
 .soriku-capmap-table {
     border-collapse: collapse;
     width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+    background: var(--bg-el);
 }
 
-.soriku-capmap-table th,
-.soriku-capmap-table td {
-    border: 1px solid var(--theia-editorGroup-border);
-    padding: 4px 8px;
-    text-align: right;
+.soriku-capmap-table th {
+    padding: 11px 8px;
+    text-align: center;
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    background: var(--bg-sunk);
+    border-bottom: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
     white-space: nowrap;
 }
 
-.soriku-capmap-th {
-    cursor: pointer;
-    user-select: none;
-    background-color: var(--theia-editorWidget-background);
+.soriku-capmap-table th:first-child {
+    text-align: left;
+    padding-left: 16px;
+    border-left: none;
 }
 
 .soriku-capmap-th.active {
-    color: var(--theia-textLink-foreground);
+    color: var(--acc);
+}
+
+.soriku-capmap-table td {
+    height: 44px;
+    padding: 0 8px;
+    text-align: center;
+    border-left: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-m);
+    font-size: 11.5px;
+}
+
+.soriku-capmap-table tr:last-child td {
+    border-bottom: none;
 }
 
 .soriku-capmap-model {
     text-align: left;
-    font-family: var(--theia-code-font-family);
+    padding-left: 16px !important;
+    border-left: none !important;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.soriku-capmap-aggregate {
+    color: var(--ink2);
+    font-weight: 600;
+}
+
+.soriku-capmap-cell.best {
+    box-shadow: inset 0 0 0 1.5px var(--acc);
+}
+
+.soriku-capmap-cell-empty {
+    color: var(--ink3);
+}
+
+.soriku-capmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 14px;
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink3);
+}
+
+.soriku-capmap-legend-gradient {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.soriku-capmap-legend-gradient-bar {
+    width: 60px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--bg-sunk), var(--acc));
+}
+
+.soriku-capmap-legend-best {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.soriku-capmap-legend-best-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1.5px var(--acc);
 }

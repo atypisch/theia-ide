@@ -8,9 +8,11 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
 import {
     CapabilitySortKey,
     CapabilityTable,
+    columnMaxima,
     sortRows,
     toCapabilityTable,
 } from '../common/capability-table';
@@ -70,14 +72,19 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        return <div className='soriku-capmap'>
-            <div className='soriku-capmap-header'>
-                <span className='soriku-capmap-title'>Capability Map</span>
-                <button className='theia-button secondary' onClick={() => this.refresh()}>
+        return <div className='sk-page soriku-capmap'>
+            <PageHeader
+                eyebrow='Capability map'
+                heading='What each model is'
+                emphasis='good at'
+                subhead='The router scores every task against this grid before it picks a model. Best-in-category is outlined.'
+                actions={<Btn variant='secondary' onClick={() => this.refresh()}>
                     <span className='codicon codicon-refresh' /> Refresh
-                </button>
+                </Btn>}
+            />
+            <div className='sk-page-body soriku-capmap-body-wrap'>
+                {this.renderBody()}
             </div>
-            {this.renderBody()}
         </div>;
     }
 
@@ -97,6 +104,7 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
             return <div className='soriku-capmap-message'>No capability data yet. Run benchmarks in Soriku, then refresh.</div>;
         }
         const rows = sortRows(table.rows, this.sortBy, this.descending);
+        const colMax = columnMaxima(table);
         return <div className='soriku-capmap-body'>
             {table.meta && <div className='soriku-capmap-meta'>
                 {table.meta.source && <span>Source: {table.meta.source}</span>}
@@ -116,12 +124,39 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
                         <td className='soriku-capmap-model'>
                             {row.model}{row.stale && <span className='soriku-capmap-stale'> stale</span>}
                         </td>
-                        <td>{row.aggregate ?? '—'}</td>
-                        {table.categories.map(cat => <td key={cat}>{row.scores[cat] ?? '—'}</td>)}
+                        <td className='soriku-capmap-aggregate'>{row.aggregate ?? '—'}</td>
+                        {table.categories.map(cat => this.renderCell(row.scores[cat], row.scores[cat] === colMax[cat]))}
                     </tr>)}
                 </tbody>
             </table>
+            <div className='soriku-capmap-legend'>
+                <span>Score 0–100</span>
+                <span className='soriku-capmap-legend-gradient'>
+                    <span className='soriku-capmap-legend-gradient-bar' />low → high
+                </span>
+                <span className='soriku-capmap-legend-best'>
+                    <span className='soriku-capmap-legend-best-swatch' />best in category
+                </span>
+            </div>
         </div>;
+    }
+
+    /**
+     * 1:1 the mockup's heatmap cell formula: background = accent at score*0.9%
+     * opacity, best-in-column gets a bold weight + inset outline.
+     */
+    protected renderCell(score: number | undefined, best: boolean): React.ReactNode {
+        if (score === undefined) {
+            return <td className='soriku-capmap-cell soriku-capmap-cell-empty'>—</td>;
+        }
+        return <td
+            className={`soriku-capmap-cell${best ? ' best' : ''}`}
+            style={{
+                background: `color-mix(in srgb, var(--acc) ${Math.round(score * 0.9)}%, transparent)`,
+                color: score > 62 ? 'var(--on-acc)' : 'var(--ink2)',
+                fontWeight: best ? 700 : 500,
+            }}
+        >{score}</td>;
     }
 
     protected renderHeader(label: string, key: CapabilitySortKey): React.ReactNode {

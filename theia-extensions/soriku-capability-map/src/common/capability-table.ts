@@ -90,6 +90,16 @@ export function toCapabilityTable(response: CapabilityMapResponse): CapabilityTa
     };
 }
 
+/** Highest real score per category column — the heatmap's "best in category" outline. */
+export function columnMaxima(table: CapabilityTable): Record<string, number> {
+    const maxima: Record<string, number> = {};
+    for (const cat of table.categories) {
+        const scores = table.rows.map(r => r.scores[cat]).filter((v): v is number => v !== undefined);
+        maxima[cat] = scores.length > 0 ? Math.max(...scores) : -Infinity;
+    }
+    return maxima;
+}
+
 /** Sort rows by a category score (or by `model`/`aggregate`); missing scores sort last. */
 export function sortRows(rows: CapabilityRow[], sortBy: CapabilitySortKey, descending = true): CapabilityRow[] {
     const copy = rows.slice();
