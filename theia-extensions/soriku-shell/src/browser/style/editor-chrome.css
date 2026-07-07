@@ -1,0 +1,55 @@
+/*
+ * Soriku IDE — editor-chrome shape/polish to match the mockup: active tab
+ * accent border, mono breadcrumb, bottom-panel tab sizing, Problems badge.
+ */
+
+/* ── Editor tab bar — active tab gets the 2px accent top border ──────────
+   Theia's own active-tab styling is generated at runtime by
+   TabbarStylingParticipant (interpolates a resolved color, not a CSS var),
+   so overriding --theia-tab-active* custom properties has no effect here —
+   this needs a direct rule against the real tab DOM classes. */
+
+#theia-main-content-panel .lm-TabBar .lm-TabBar-tab.lm-mod-current {
+    background: var(--bg-el) !important;
+    color: var(--ink) !important;
+    border-top: 2px solid var(--acc) !important;
+}
+
+#theia-main-content-panel .lm-TabBar:not(.theia-tabBar-active) .lm-TabBar-tab.lm-mod-current {
+    color: var(--ink2) !important;
+}
+
+/* ── Breadcrumb — mono font, faint separators, accent-colored active file ── */
+
+.theia-breadcrumbs {
+    font-family: var(--font-m) !important;
+    font-size: 10.5px !important;
+}
+
+.theia-breadcrumb-item:not(:last-of-type)::after {
+    opacity: 0.4;
+}
+
+.theia-breadcrumb-item:last-of-type {
+    color: var(--acc) !important;
+}
+
+/* ── Bottom panel (Terminal/Output/Problems/Ports) tabs ──────────────────── */
+
+#theia-bottom-content-panel .lm-TabBar .lm-TabBar-tab {
+    height: 32px !important;
+}
+
+#theia-bottom-content-panel .lm-TabBar .lm-TabBar-tab.lm-mod-current {
+    background: var(--hover) !important;
+    color: var(--ink) !important;
+}
+
+/* Problems tab's real marker-count badge (already wired by Theia's own
+   ProblemWidgetTabBarDecorator) — recolor to the mockup's warn tone. Scoped
+   to #shell-tab-problems (the tab's real, stable widget-id-derived DOM id)
+   so this doesn't recolor unrelated badges elsewhere (e.g. Source Control). */
+#shell-tab-problems .theia-badge-decorator-horizontal {
+    background-color: var(--warn) !important;
+    color: var(--on-acc) !important;
+}
