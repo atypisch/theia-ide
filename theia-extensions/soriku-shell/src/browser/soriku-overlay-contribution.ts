@@ -71,7 +71,7 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
             keybindingFor: (commandId: string) => this.keybindingFor(commandId),
             onOpenAllShortcuts: () => {
                 this.overlayService.close();
-                this.commands.executeCommand('keybindings:open');
+                this.commands.executeCommand('keymaps:open');
             },
             onConfirmNewWindow: () => {
                 this.overlayService.close();

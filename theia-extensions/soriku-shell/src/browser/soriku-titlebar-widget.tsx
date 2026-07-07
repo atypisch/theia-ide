@@ -12,11 +12,18 @@ import { CommandService } from '@theia/core/lib/common/command';
 import { CommonCommands } from '@theia/core/lib/browser/common-frontend-contribution';
 import { ThemeService } from '@theia/core/lib/browser/theming';
 import { WindowTitleService } from '@theia/core/lib/browser/window/window-title-service';
+import { KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { environment } from '@theia/application-package/lib/environment';
 import { Pill, SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuEngineStatusService } from 'soriku-workbench-ext/lib/browser/soriku-engine-status-service';
 import { EngineConnectionState } from 'soriku-workbench-ext/lib/common/engine-status';
-import { SORIKU_DARK_THEME_ID, SORIKU_LIGHT_THEME_ID } from 'soriku-theme-ext/lib/browser/soriku-theme-contribution';
+import { SORIKU_DARK_THEME_ID } from 'soriku-theme-ext/lib/browser/soriku-theme-contribution';
+import { SorikuTitlebarMenu } from './soriku-titlebar-menu';
+
+const COMMAND_PALETTE_COMMAND_ID = 'workbench.action.showCommands';
+
+/** Kept in sync with SorikuTitlebarCommands.TOGGLE_THEME in soriku-titlebar-contribution.ts. */
+const TOGGLE_THEME_COMMAND_ID = 'soriku.theme.toggle';
 
 /** "Local mode · connected" / "Hosted · connecting…" / "Engine unreachable", per the mockup pill. */
 function engineText(state: EngineConnectionState): string {
@@ -64,6 +71,9 @@ export class SorikuTitlebarWidget extends ReactWidget {
     @inject(SorikuEngineStatusService)
     protected readonly engineStatus: SorikuEngineStatusService;
 
+    @inject(KeybindingRegistry)
+    protected readonly keybindings: KeybindingRegistry;
+
     @postConstruct()
     protected init(): void {
         this.id = SorikuTitlebarWidget.ID;
@@ -78,8 +88,7 @@ export class SorikuTitlebarWidget extends ReactWidget {
     }
 
     protected toggleTheme = (): void => {
-        const current = this.themeService.getCurrentTheme().id;
-        this.themeService.setCurrentTheme(current === SORIKU_DARK_THEME_ID ? SORIKU_LIGHT_THEME_ID : SORIKU_DARK_THEME_ID, true);
+        this.commandService.executeCommand(TOGGLE_THEME_COMMAND_ID);
     };
 
     protected toggleLeftPanel = (): void => {
@@ -92,6 +101,18 @@ export class SorikuTitlebarWidget extends ReactWidget {
 
     protected toggleRightPanel = (): void => {
         this.commandService.executeCommand(CommonCommands.TOGGLE_RIGHT_PANEL.id);
+    };
+
+    protected openCommandPalette = (): void => {
+        this.commandService.executeCommand(COMMAND_PALETTE_COMMAND_ID);
+    };
+
+    protected keybindingFor = (commandId: string): string | undefined => {
+        const kb = this.keybindings.getKeybindingsForCommand(commandId)[0];
+        if (!kb) {
+            return undefined;
+        }
+        return this.keybindings.acceleratorFor(kb).join(' ');
     };
 
     protected render(): React.ReactNode {
@@ -108,7 +129,14 @@ export class SorikuTitlebarWidget extends ReactWidget {
                 <span className="soriku-titlebar-word">
                     Soriku <span className="soriku-titlebar-word-accent">Code</span>
                 </span>
+                <SorikuTitlebarMenu keybindingFor={this.keybindingFor} executeCommand={id => this.commandService.executeCommand(id)} />
                 <span className="soriku-titlebar-breadcrumb">{this.windowTitleService.title}</span>
+                <div className="soriku-titlebar-spacer" />
+                <button className="soriku-titlebar-palette-trigger" onClick={this.openCommandPalette}>
+                    <span className="codicon codicon-search" />
+                    <span className="soriku-titlebar-palette-trigger-text">Run a command or go to file…</span>
+                    <span className="soriku-titlebar-palette-trigger-hint">{this.keybindingFor(COMMAND_PALETTE_COMMAND_ID)}</span>
+                </button>
                 <div className="soriku-titlebar-spacer" />
                 <Pill tone={engineTone(state.status)}>
                     <span className="soriku-titlebar-dot" />
