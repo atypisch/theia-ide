@@ -1,52 +1,61 @@
-/* Soriku IDE — agent edit form (functional foundation styling only). */
+/* Soriku IDE — agent edit form, retheme onto the same PageHeader/SettingsGroup/
+ * Card pattern used by the Settings page (soriku-workbench's settings.css). */
 
-.soriku-agent-edit {
+.soriku-agent-edit.sk-page {
+    background: var(--bg, var(--theia-editor-background));
+    color: var(--ink, var(--theia-foreground));
+    font-family: var(--font-s);
+    height: 100%;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    padding: 12px 16px;
-    overflow: auto;
+}
+
+.soriku-agent-edit-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
 .soriku-agent-edit-message {
     padding: 16px;
-    color: var(--theia-descriptionForeground);
+    color: var(--ink3, var(--theia-descriptionForeground));
 }
 
 .soriku-agent-edit-error {
-    color: var(--theia-errorForeground);
+    color: var(--danger, var(--theia-errorForeground));
 }
 
-.soriku-agent-edit-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
+.soriku-agent-edit-input {
+    min-width: 220px;
 }
 
-.soriku-agent-edit-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.soriku-agent-edit-section {
+    padding: 14px 16px;
 }
 
-.soriku-agent-edit-label {
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-descriptionForeground);
+.soriku-agent-edit-section-title {
+    font-family: var(--font-d);
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.soriku-agent-edit-section-desc {
+    color: var(--ink3);
+    font-size: 12px;
+    margin-bottom: 8px;
 }
 
 .soriku-agent-edit-prompt {
     width: 100%;
     box-sizing: border-box;
     resize: vertical;
-    font-family: var(--theia-code-font-family);
-    margin-bottom: 8px;
+    font-family: var(--font-m, var(--theia-code-font-family));
 }
 
 .soriku-agent-edit-note {
-    font-size: var(--theia-ui-font-size0);
-    color: var(--theia-editorWarning-foreground);
-    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--warn, var(--theia-editorWarning-foreground));
 }
 
 .soriku-agent-edit-actions {
@@ -55,20 +64,14 @@
 }
 
 /* What this agent has learned (read-only) */
-.soriku-agent-learning {
-    margin-top: 14px;
-    border-top: 1px solid var(--theia-editorGroup-border);
-    padding-top: 8px;
-}
-
 .soriku-agent-learning-h {
     font-weight: 600;
     margin-top: 6px;
-    font-size: var(--theia-ui-font-size0);
+    font-size: 12px;
 }
 
 .soriku-agent-learning-body ul {
     margin: 2px 0 0;
     padding-left: 18px;
-    font-size: var(--theia-ui-font-size0);
+    font-size: 12px;
 }

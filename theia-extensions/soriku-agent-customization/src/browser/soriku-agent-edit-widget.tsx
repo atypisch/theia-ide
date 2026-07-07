@@ -9,6 +9,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
+import { Btn, Card, PageHeader, SettingsGroup, SettingsRow } from 'soriku-theme-ext/lib/browser/ui';
 import { AgentForm, LearningSummary, buildUpdateRequest, summarizeLearning, toAgentForm } from '../common/agent-form';
 
 interface EditState {
@@ -113,39 +114,52 @@ export class SorikuAgentEditWidget extends ReactWidget {
             return <div className='soriku-agent-edit-message soriku-agent-edit-error'>Could not load agent: {error}</div>;
         }
         const saving = status === 'saving';
-        return <div className='soriku-agent-edit'>
-            <div className='soriku-agent-edit-grid'>
-                {this.field('Name', this.nameRef, form.name)}
-                {this.field('Role', this.roleRef, form.role)}
-                {this.field('Description', this.descriptionRef, form.description)}
-                {this.field('Preferred model (blank = auto)', this.modelRef, form.preferredModel)}
-                {this.field('Visibility', this.visibilityRef, form.visibility)}
-            </div>
-            <label className='soriku-agent-edit-label'>System prompt</label>
-            <textarea
-                ref={this.promptRef}
-                className='theia-input soriku-agent-edit-prompt'
-                rows={12}
-                defaultValue={form.systemPrompt}
+        return <div className='sk-page soriku-agent-edit'>
+            <PageHeader
+                eyebrow='Agents'
+                heading='Edit'
+                emphasis={form.name || 'agent'}
+                subhead={[form.role, form.preferredModel || 'auto model'].filter(Boolean).join(' · ')}
             />
-            <label className='soriku-agent-edit-label'>Decision patterns (one “keyword: weight” per line, 0–1)</label>
-            <textarea
-                ref={this.decisionPatternsRef}
-                className='theia-input soriku-agent-edit-prompt'
-                rows={5}
-                placeholder={'kubernetes: 0.8\nreact: 0.5'}
-                defaultValue={form.decisionPatternsText}
-            />
-            <div className='soriku-agent-edit-note'>
-                Per-agent tool whitelist and routing mode are not yet persisted by the engine.
-                Set those per chat for now.
+            <div className='sk-page-body sk-page-body-narrow soriku-agent-edit-body'>
+                <SettingsGroup title='Persona'>
+                    {this.field('Name', this.nameRef, form.name)}
+                    {this.field('Role', this.roleRef, form.role)}
+                    {this.field('Description', this.descriptionRef, form.description)}
+                    {this.field('Preferred model', this.modelRef, form.preferredModel, 'Blank = auto')}
+                    {this.field('Visibility', this.visibilityRef, form.visibility)}
+                </SettingsGroup>
+                <Card className='soriku-agent-edit-section'>
+                    <div className='soriku-agent-edit-section-title'>System prompt</div>
+                    <textarea
+                        ref={this.promptRef}
+                        className='theia-input soriku-agent-edit-prompt'
+                        rows={12}
+                        defaultValue={form.systemPrompt}
+                    />
+                </Card>
+                <Card className='soriku-agent-edit-section'>
+                    <div className='soriku-agent-edit-section-title'>Decision patterns</div>
+                    <div className='soriku-agent-edit-section-desc'>One "keyword: weight" per line, 0–1</div>
+                    <textarea
+                        ref={this.decisionPatternsRef}
+                        className='theia-input soriku-agent-edit-prompt'
+                        rows={5}
+                        placeholder={'kubernetes: 0.8\nreact: 0.5'}
+                        defaultValue={form.decisionPatternsText}
+                    />
+                </Card>
+                <div className='soriku-agent-edit-note'>
+                    Per-agent tool whitelist and routing mode are not yet persisted by the engine.
+                    Set those per chat for now.
+                </div>
+                <div className='soriku-agent-edit-actions'>
+                    <Btn variant='primary' disabled={saving} onClick={() => this.save()}>
+                        {saving ? 'Saving…' : 'Save'}
+                    </Btn>
+                </div>
+                {this.renderLearning()}
             </div>
-            <div className='soriku-agent-edit-actions'>
-                <button className='theia-button' disabled={saving} onClick={() => this.save()}>
-                    {saving ? 'Saving…' : 'Save'}
-                </button>
-            </div>
-            {this.renderLearning()}
         </div>;
     }
 
@@ -157,8 +171,8 @@ export class SorikuAgentEditWidget extends ReactWidget {
         }
         const empty = l.feedbackRules.length === 0 && l.qualityScores.length === 0
             && l.stack.length === 0 && l.interactions === 0;
-        return <div className='soriku-agent-learning'>
-            <label className='soriku-agent-edit-label'>What this agent has learned</label>
+        return <Card className='soriku-agent-edit-section soriku-agent-learning'>
+            <div className='soriku-agent-edit-section-title'>What this agent has learned</div>
             {empty
                 ? <div className='soriku-agent-edit-note'>No learning yet — give the agent feedback (👍/👎) in chat.</div>
                 : <div className='soriku-agent-learning-body'>
@@ -179,13 +193,14 @@ export class SorikuAgentEditWidget extends ReactWidget {
                         <div>{l.stack.join(', ')}</div>
                     </div>}
                 </div>}
-        </div>;
+        </Card>;
     }
 
-    protected field(label: string, ref: React.RefObject<HTMLInputElement>, value: string): React.ReactNode {
-        return <div className='soriku-agent-edit-row'>
-            <label className='soriku-agent-edit-label'>{label}</label>
-            <input ref={ref} className='theia-input' type='text' defaultValue={value} />
-        </div>;
+    protected field(label: string, ref: React.RefObject<HTMLInputElement>, value: string, description = ''): React.ReactNode {
+        return <SettingsRow
+            label={label}
+            description={description}
+            control={<input ref={ref} className='theia-input soriku-agent-edit-input' type='text' defaultValue={value} />}
+        />;
     }
 }
