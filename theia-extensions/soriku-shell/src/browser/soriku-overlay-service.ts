@@ -8,7 +8,7 @@
 import { injectable } from '@theia/core/shared/inversify';
 import { Emitter, Event } from '@theia/core/lib/common';
 
-export type SorikuOverlayKind = 'shortcuts' | 'new-window';
+export type SorikuOverlayKind = 'shortcuts' | 'new-window' | 'new-file' | 'docs';
 
 @injectable()
 export class SorikuOverlayService {

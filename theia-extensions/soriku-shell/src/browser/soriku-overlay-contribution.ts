@@ -1,6 +1,6 @@
 /********************************************************************************
  * Soriku IDE — mounts the global overlay host and registers the commands that
- * open it (Keyboard shortcuts, New window) plus the Documentation link.
+ * open it (Keyboard shortcuts, New window, New file, Documentation).
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -11,16 +11,17 @@ import { inject, injectable } from '@theia/core/shared/inversify';
 import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/common';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
-import { WindowService } from '@theia/core/lib/browser/window/window-service';
+import { open, OpenerService } from '@theia/core/lib/browser/opener-service';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import { SorikuOverlayService } from './soriku-overlay-service';
 import { SorikuOverlayHost } from './soriku-overlay-host';
-
-const SORIKU_DOCS_URL = 'https://soriku.com/docs';
 
 export namespace SorikuOverlayCommands {
     const CATEGORY = 'Soriku';
     export const SHORTCUTS: Command = { id: 'soriku.overlay.shortcuts', category: CATEGORY, label: 'Keyboard Shortcuts' };
     export const NEW_WINDOW: Command = { id: 'soriku.overlay.newWindow', category: CATEGORY, label: 'New Window…' };
+    export const NEW_FILE: Command = { id: 'soriku.overlay.newFile', category: CATEGORY, label: 'New File…' };
     export const OPEN_DOCS: Command = { id: 'soriku.docs.open', category: CATEGORY, label: 'Documentation' };
 }
 
@@ -36,8 +37,14 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
     @inject(KeybindingRegistry)
     protected readonly keybindings: KeybindingRegistry;
 
-    @inject(WindowService)
-    protected readonly windowService: WindowService;
+    @inject(FileService)
+    protected readonly fileService: FileService;
+
+    @inject(WorkspaceService)
+    protected readonly workspaceService: WorkspaceService;
+
+    @inject(OpenerService)
+    protected readonly openerService: OpenerService;
 
     protected root: Root | undefined;
 
@@ -70,7 +77,27 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
                 this.overlayService.close();
                 this.commands.executeCommand('workbench.action.newWindow');
             },
+            onCreateFile: (relativePath: string) => this.createFile(relativePath),
         }));
+    }
+
+    protected async createFile(relativePath: string): Promise<string | undefined> {
+        const root = this.workspaceService.tryGetRoots()[0]?.resource;
+        if (!root) {
+            return 'No workspace is open.';
+        }
+        const uri = root.resolve(relativePath);
+        if (await this.fileService.exists(uri)) {
+            return 'A file already exists at this path.';
+        }
+        try {
+            await this.fileService.create(uri);
+        } catch (e) {
+            return (e as Error).message;
+        }
+        this.overlayService.close();
+        await open(this.openerService, uri);
+        return undefined;
     }
 
     protected keybindingFor(commandId: string): string | undefined {
@@ -88,8 +115,11 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
         commands.registerCommand(SorikuOverlayCommands.NEW_WINDOW, {
             execute: () => this.overlayService.open('new-window'),
         });
+        commands.registerCommand(SorikuOverlayCommands.NEW_FILE, {
+            execute: () => this.overlayService.open('new-file'),
+        });
         commands.registerCommand(SorikuOverlayCommands.OPEN_DOCS, {
-            execute: () => this.windowService.openNewWindow(SORIKU_DOCS_URL),
+            execute: () => this.overlayService.open('docs'),
         });
     }
 }

@@ -141,3 +141,183 @@
     gap: 10px;
     margin-top: 6px;
 }
+
+/* ── New file ────────────────────────────────────────────────────────── */
+
+.soriku-overlay-newfile {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.soriku-overlay-newfile-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--line2);
+    border-radius: var(--rs);
+    padding: 8px 12px;
+    background: var(--bg-sunk);
+}
+
+.soriku-overlay-newfile-icon {
+    color: var(--acc);
+    font-size: 15px;
+}
+
+.soriku-overlay-newfile-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--ink);
+    font-family: var(--font-m);
+    font-size: 13px;
+}
+
+.soriku-overlay-newfile-hint {
+    font-size: 12px;
+    color: var(--ink3);
+}
+
+.soriku-overlay-newfile-error {
+    font-size: 12px;
+    color: var(--danger);
+}
+
+.soriku-overlay-newfile-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+/* ── Documentation ───────────────────────────────────────────────────── */
+
+.soriku-overlay-docs {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+}
+
+.soriku-overlay-docs-nav {
+    width: 224px;
+    flex-shrink: 0;
+    background: var(--bg-sunk);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+}
+
+.soriku-overlay-docs-nav-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px 12px;
+}
+
+.soriku-overlay-docs-nav-title {
+    font-family: var(--font-d);
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.soriku-overlay-docs-offline-pill {
+    font-family: var(--font-m);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ok);
+    background: var(--ok-soft);
+    border: 1px solid var(--ok-line);
+    border-radius: 999px;
+    padding: 2px 7px;
+}
+
+.soriku-overlay-docs-nav-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: var(--rs);
+    color: var(--ink2);
+    font-size: 12.5px;
+    padding: 7px 8px;
+    cursor: pointer;
+}
+
+.soriku-overlay-docs-nav-item:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-overlay-docs-nav-item.active {
+    background: var(--acc-soft);
+    color: var(--acc);
+    font-weight: 600;
+}
+
+.soriku-overlay-docs-nav-footer {
+    margin-top: auto;
+    font-size: 11px;
+    color: var(--ink3);
+    padding: 8px 6px 0;
+    line-height: 1.5;
+}
+
+.soriku-overlay-docs-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.soriku-overlay-docs-eyebrow {
+    font-family: var(--font-m);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+}
+
+.soriku-overlay-docs-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 26px;
+    max-width: 640px;
+}
+
+.soriku-overlay-docs-h {
+    font-family: var(--font-d);
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 14px;
+}
+
+.soriku-overlay-docs-h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 20px 0 6px;
+}
+
+.soriku-overlay-docs-p {
+    font-size: 13.5px;
+    color: var(--ink2);
+    line-height: 1.6;
+    margin: 0 0 10px;
+}
+
+.soriku-overlay-docs-code {
+    font-family: var(--font-m);
+    font-size: 12px;
+    color: var(--acc);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line2);
+    border-radius: var(--rs);
+    padding: 10px 12px;
+    margin: 0 0 10px;
+    white-space: pre-wrap;
+}
