@@ -9,18 +9,11 @@
 
 import { WindowService } from '@theia/core/lib/browser/window/window-service';
 import * as React from 'react';
-import { getBrandingVariant } from './theia-ide-config';
 
 export interface ExternalBrowserLinkProps {
     text: string;
     url: string;
     windowService: WindowService;
-}
-
-export function renderProductName(): React.ReactNode {
-    const variant = getBrandingVariant();
-    const suffix = variant !== 'stable' ? ` ${variant.charAt(0).toUpperCase() + variant.slice(1)}` : '';
-    return <h1>Soriku <span className="gs-blue-header">IDE</span>{suffix}</h1>;
 }
 
 function BrowserLink(props: ExternalBrowserLinkProps): JSX.Element {
@@ -37,7 +30,7 @@ function BrowserLink(props: ExternalBrowserLinkProps): JSX.Element {
 export function renderExtendingCustomizing(windowService: WindowService): React.ReactNode {
     return <div className='gs-section'>
         <h3 className='gs-section-header'>
-            Extending Soriku IDE
+            Extending Soriku Code
         </h3>
         <div >
             Install VS Code extensions from the <BrowserLink text="OpenVSX registry" url="https://open-vsx.org/"

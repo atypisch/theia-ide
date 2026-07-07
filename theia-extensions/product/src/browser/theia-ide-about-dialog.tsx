@@ -47,9 +47,9 @@ export class TheiaIDEAboutDialog extends AboutDialog {
         const channel = hasUpdater ? this.preferences.get<string>('updates.channel', 'stable') : undefined;
         return <div className='soriku-about'>
             <SorikuMark size={48} />
-            <div className='soriku-about-wordmark'>Soriku <span className='sk-em'>IDE</span></div>
+            <div className='soriku-about-wordmark'>Soriku <span className='sk-em'>Code</span></div>
             <div className='soriku-about-meta'>
-                {['IDE', version && `v${version}`, `engine ${shortHost(baseUrl)}`, channel && `${channel} channel`].filter(Boolean).join(' · ')}
+                {['Code', version && `v${version}`, `engine ${shortHost(baseUrl)}`, channel && `${channel} channel`].filter(Boolean).join(' · ')}
             </div>
             <div className='soriku-about-tagline'>
                 A local-first AI IDE. Your code and models stay on your machine. Cloud is opt-in and capped in EUR.

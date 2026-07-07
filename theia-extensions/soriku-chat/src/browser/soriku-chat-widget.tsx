@@ -1167,7 +1167,7 @@ export class SorikuChatWidget extends ReactWidget {
                 <div className='soriku-subagent-promote-eyebrow'><span className='codicon codicon-sparkle' />Promotion</div>
                 <div className='soriku-subagent-promote-title'>Promote <span className='sk-em'>{roleLabel(ov.role ?? 'generalist')}</span> to a full agent</div>
                 <div className='soriku-subagent-promote-desc'>
-                    The engine scores every subagent against real thresholds. Soriku IDE only reads the result — it never decides eligibility itself.
+                    The engine scores every subagent against real thresholds. Soriku Code only reads the result — it never decides eligibility itself.
                 </div>
             </div>
             <div className='soriku-subagent-promote-thresholds'>

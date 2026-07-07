@@ -1,8 +1,8 @@
 {
   "private": true,
   "name": "theia-ide-browser-app",
-  "description": "Soriku IDE browser product",
-  "productName": "Soriku IDE",
+  "description": "Soriku Code browser product",
+  "productName": "Soriku Code",
   "version": "1.0.0",
   "license": "MIT",
   "author": "Atypisch <marten@atypisch.nl>",
@@ -21,7 +21,7 @@
   "theia": {
     "frontend": {
       "config": {
-        "applicationName": "Soriku IDE",
+        "applicationName": "Soriku Code",
         "warnOnPotentiallyInsecureHostPattern": false,
         "preferences": {
           "toolbar.showToolbar": true,
@@ -34,6 +34,11 @@
           "editor.wordWrap": "off",
           "files.autoSave": "afterDelay",
           "files.autoSaveDelay": 1000,
+          "files.watcherExclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/node_modules/*/**": true
+          },
           "terminal.integrated.fontSize": 13,
           "workbench.startupEditor": "welcomePage",
           "ai-features.AiEnable.enableAI": false,

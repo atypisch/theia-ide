@@ -1,5 +1,5 @@
 appId: com.atypisch.soriku.ide
-productName: SorikuIDE
+productName: Soriku Code
 copyright: Copyright © 2026 Atypisch
 electronDist: ../../node_modules/electron/dist
 electronVersion: 39.8.7
@@ -29,6 +29,7 @@ protocols:
 files:
   - src-gen
   - lib
+  - product.json
   - resources/icons/WindowIcon/512-512.png
   - resources/TheiaIDESplash.svg
   - scripts
@@ -97,13 +98,13 @@ nsis:
   uninstallerSidebar: resources/icons/InstallerSidebarImage/164-314Windows.bmp
   allowToChangeInstallationDirectory: true
   runAfterFinish: false
-  artifactName: Soriku-IDE-${version}-${arch}.${ext}
+  artifactName: Soriku-Code-${version}-${arch}.${ext}
   license: LICENSE
 dmg:
-  artifactName: Soriku-IDE-${version}-${arch}.${ext}
+  artifactName: Soriku-Code-${version}-${arch}.${ext}
 deb:
-  artifactName: Soriku-IDE-${version}-${arch}.${ext}
+  artifactName: Soriku-Code-${version}-${arch}.${ext}
 appImage:
-  artifactName: Soriku-IDE-${version}-${arch}.${ext}
+  artifactName: Soriku-Code-${version}-${arch}.${ext}
 
 afterPack: ./scripts/after-pack.js

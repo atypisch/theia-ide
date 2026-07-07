@@ -1,8 +1,8 @@
 {
   "private": true,
   "name": "theia-ide-electron-app",
-  "description": "Soriku IDE desktop product",
-  "productName": "Soriku IDE",
+  "description": "Soriku Code desktop product",
+  "productName": "Soriku Code",
   "version": "1.0.0",
   "main": "scripts/theia-electron-main.js",
   "license": "MIT",
@@ -23,7 +23,7 @@
     "target": "electron",
     "frontend": {
       "config": {
-        "applicationName": "Soriku IDE",
+        "applicationName": "Soriku Code",
         "reloadOnReconnect": true,
         "preferences": {
           "toolbar.showToolbar": true,
@@ -35,6 +35,11 @@
           "editor.wordWrap": "off",
           "files.autoSave": "afterDelay",
           "files.autoSaveDelay": 1000,
+          "files.watcherExclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/node_modules/*/**": true
+          },
           "terminal.integrated.fontSize": 13,
           "workbench.startupEditor": "welcomePage",
           "ai-features.AiEnable.enableAI": false,

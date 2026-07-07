@@ -26,12 +26,6 @@ body[data-theia-branding="next"] .theia-icon {
     background-image: url("../icons/512-512-next.png");
 }
 
-.gs-blue-header {
-    color: #5088e7;
-    text-transform: capitalize;
-    font-weight: 600;
-}
-
 .gs-text-bold {
     font-weight: 600;
 }
@@ -40,19 +34,111 @@ body[data-theia-branding="next"] .theia-icon {
     text-decoration: underline;
 }
 
-.gs-float {
-    float: right;
-    padding-left: 20px;
+/* ── Welcome page, retheme of @theia/getting-started's stock gs-* markup to
+ * match the mockup's token palette/fonts (Card/PageHeader/Btn control the
+ * parts this extension renders directly; these rules cover the inherited
+ * Start/Recent/Settings/Help/Preferences sections, whose real Theia
+ * functionality — open file, open workspace, recent-list — is kept as-is). */
+
+.soriku-welcome.sk-page {
+    background: var(--bg, var(--theia-editor-background));
+    color: var(--ink, var(--theia-foreground));
+    font-family: var(--font-s);
 }
 
-.gs-logo {
-    background-image: var(--theia-branding-logo);
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: contain;
-    width: 250px;
-    height: 118px;
-    padding: 20px;
+.soriku-welcome-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.soriku-welcome-intro-heading {
+    font-family: var(--font-d);
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.soriku-welcome-intro-body {
+    color: var(--ink2);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.soriku-welcome-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.soriku-welcome-col.sk-card {
+    padding: 14px 16px;
+}
+
+.soriku-welcome-footer {
+    color: var(--ink3);
+    font-size: 12px;
+    text-align: center;
+    padding: 4px 0 8px;
+}
+
+.soriku-welcome .gs-section {
+    margin-bottom: 16px;
+}
+
+.soriku-welcome .gs-section:last-child {
+    margin-bottom: 0;
+}
+
+.soriku-welcome .gs-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-m);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    font-weight: 500;
+    margin: 0 0 8px;
+}
+
+.soriku-welcome .gs-section-header .codicon {
+    color: var(--acc);
+}
+
+.soriku-welcome .gs-action-container {
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.soriku-welcome .gs-action-container a[role='button'] {
+    color: var(--ink2);
+    cursor: pointer;
+}
+
+.soriku-welcome .gs-action-container a[role='button']:hover {
+    color: var(--acc);
+    text-decoration: underline;
+}
+
+.soriku-welcome .gs-action-details {
+    color: var(--ink3);
+    font-family: var(--font-m);
+    font-size: 11px;
+    margin-left: 6px;
+}
+
+.soriku-welcome .gs-no-recent {
+    color: var(--ink3);
+    font-size: 13px;
+}
+
+.soriku-welcome .gs-preference-container {
+    border-top: 1px solid var(--line);
+    padding: 12px 32px;
+    color: var(--ink3);
+    font-size: 12px;
 }
 
 /* ── About dialog, 1:1 from the mockup's ABOUT overlay ──────────────────── */

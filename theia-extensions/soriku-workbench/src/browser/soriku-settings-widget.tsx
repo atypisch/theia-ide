@@ -196,7 +196,7 @@ export class SorikuSettingsWidget extends ReactWidget {
         const themeId = this.themeService.getCurrentTheme().id;
         const state = this.engineStatus.getState();
         const versionLabel = this.version ? `v${this.version}` : '';
-        const subhead = [`Soriku IDE${versionLabel ? ' · ' + versionLabel : ''}`, `engine ${shortHost(baseUrl)}`, 'runs entirely on this machine.'].join(' · ');
+        const subhead = [`Soriku Code${versionLabel ? ' · ' + versionLabel : ''}`, `engine ${shortHost(baseUrl)}`, 'runs entirely on this machine.'].join(' · ');
 
         return <div className='sk-page soriku-settings'>
             <PageHeader eyebrow='Preferences' heading='General' emphasis='settings' subhead={subhead} />
@@ -369,7 +369,7 @@ export class SorikuSettingsWidget extends ReactWidget {
             />
             <SettingsRow
                 label='Check for updates'
-                description='Soriku IDE checks soriku.com for a newer build'
+                description='Soriku Code checks soriku.com for a newer build'
                 control={<Btn variant='secondary' onClick={() => this.commands.executeCommand('electron-theia:check-for-updates')}>
                     Check now
                 </Btn>}
