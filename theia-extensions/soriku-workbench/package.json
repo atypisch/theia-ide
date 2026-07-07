@@ -14,6 +14,7 @@
     "@theia/core": "1.73.0-next.2",
     "inversify": "^6.2.2",
     "soriku-agents-ext": "0.1.0",
+    "soriku-auth-ext": "0.1.0",
     "soriku-engine-client-ext": "0.1.0",
     "soriku-theme-ext": "0.1.0"
   },

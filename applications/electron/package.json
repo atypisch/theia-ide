@@ -42,6 +42,7 @@
         },
         "electron": {
           "showWindowEarly": false,
+          "uriScheme": "soriku",
           "splashScreenOptions": {
             "content": "resources/TheiaIDESplash.svg",
             "height": 276,

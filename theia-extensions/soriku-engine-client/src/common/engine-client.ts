@@ -15,6 +15,8 @@ import {
     AgentResponse,
     AgentUpdateRequest,
     AuthModeResponse,
+    BillingPlansResponse,
+    BillingPortalResponse,
     BrowseModelsResponse,
     CapabilityMapResponse,
     ChatStreamParams,
@@ -25,6 +27,8 @@ import {
     ConversationDetail,
     ConversationSummary,
     AgentPersona,
+    CreateCheckoutRequest,
+    CreateCheckoutResponse,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
     ExecutePlanRequest,
@@ -63,6 +67,13 @@ export interface EngineClient {
     ping(): Promise<HealthResponse>;
     getAuthMode(): Promise<AuthModeResponse>;
     whoami(): Promise<WhoamiResponse>;
+
+    // ── Billing / subscription (Fase 6) ──
+    getBillingPlans(): Promise<BillingPlansResponse>;
+    /** Opens a Simezu-hosted checkout for a plan upgrade; caller opens the returned URL in a browser. */
+    createCheckout(body: CreateCheckoutRequest): Promise<CreateCheckoutResponse>;
+    /** Opens the Simezu billing/account portal; caller opens the returned URL in a browser. */
+    getBillingPortal(): Promise<BillingPortalResponse>;
 
     listAgents(): Promise<AgentListResponse>;
     getAgent(agentId: string): Promise<AgentResponse>;

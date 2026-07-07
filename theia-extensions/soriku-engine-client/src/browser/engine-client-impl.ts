@@ -21,6 +21,8 @@ import {
     AgentResponse,
     AgentUpdateRequest,
     AuthModeResponse,
+    BillingPlansResponse,
+    BillingPortalResponse,
     BrowseModelsResponse,
     CompleteRequest,
     CompleteResponse,
@@ -31,6 +33,8 @@ import {
     ConfirmResponse,
     ConversationDetail,
     ConversationSummary,
+    CreateCheckoutRequest,
+    CreateCheckoutResponse,
     DeleteRoutingOverrideResponse,
     DiscoverModelsResponse,
     ExecutePlanRequest,
@@ -63,6 +67,7 @@ import {
 import {
     DEFAULT_ENGINE_BASE_URL,
     DEFAULT_ENGINE_TIMEOUT_MS,
+    SORIKU_ACTIVE_GROUP_ID,
     SORIKU_ENGINE_AUTH_TOKEN,
     SORIKU_ENGINE_BASE_URL,
     SORIKU_ENGINE_TIMEOUT,
@@ -87,6 +92,7 @@ export class EngineClientImpl implements EngineClient {
             baseUrl: this.preferenceService.get<string>(SORIKU_ENGINE_BASE_URL, DEFAULT_ENGINE_BASE_URL),
             authToken: this.tokenHolder.getToken() ?? preferenceToken,
             timeoutMs: this.preferenceService.get<number>(SORIKU_ENGINE_TIMEOUT, DEFAULT_ENGINE_TIMEOUT_MS),
+            groupId: this.preferenceService.get<string>(SORIKU_ACTIVE_GROUP_ID, '') || undefined,
         };
     }
 
@@ -104,6 +110,18 @@ export class EngineClientImpl implements EngineClient {
 
     async whoami(): Promise<WhoamiResponse> {
         return this.createTransport().getJson<WhoamiResponse>('/api/v1/auth/whoami');
+    }
+
+    async getBillingPlans(): Promise<BillingPlansResponse> {
+        return this.createTransport().getJson<BillingPlansResponse>('/api/billing/plans');
+    }
+
+    async createCheckout(body: CreateCheckoutRequest): Promise<CreateCheckoutResponse> {
+        return this.createTransport().postJson<CreateCheckoutResponse>('/api/billing/checkout', body);
+    }
+
+    async getBillingPortal(): Promise<BillingPortalResponse> {
+        return this.createTransport().getJson<BillingPortalResponse>('/api/billing/portal');
     }
 
     async listAgents(): Promise<AgentListResponse> {

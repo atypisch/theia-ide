@@ -32,6 +32,9 @@ export function buildAuthHeaders(config: EngineClientConfig): Record<string, str
     if (config.authToken) {
         headers['Authorization'] = `Bearer ${config.authToken}`;
     }
+    if (config.groupId) {
+        headers['X-Soriku-Group'] = config.groupId;
+    }
     return headers;
 }
 

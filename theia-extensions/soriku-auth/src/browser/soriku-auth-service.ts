@@ -22,6 +22,14 @@ import {
 export const CREDENTIALS_SERVICE = 'soriku-ide';
 export const CREDENTIALS_ACCOUNT = 'engine-auth-token';
 
+/**
+ * soriku.com's browser-login entry point. Its redirect back to
+ * `soriku://auth-callback#token=…` is built in Fase 8 (soriku.com); this IDE
+ * side (the `soriku://` protocol registration + SorikuAuthUriHandler) is
+ * real and complete, but the full round-trip only works once that lands.
+ */
+export const SORIKU_LOGIN_URL = 'https://soriku.com/login?target=ide';
+
 @injectable()
 export class SorikuAuthService {
 
@@ -88,11 +96,13 @@ export class SorikuAuthService {
     }
 
     /**
-     * Connect by pasting a Simezu API key. Opens the Simezu site in the browser (so the user can
-     * mint a key) and stores the pasted key in the OS keychain. No-op in local mode.
+     * Connect via browser sign-in (soriku.com hands off to `soriku://auth-callback#token=…`,
+     * caught by SorikuAuthUriHandler and routed to `applyDeepLinkToken`) — pasting a key
+     * remains the fallback for whenever the deep-link round-trip doesn't land, e.g. no
+     * `soriku://` handler registered yet, or the browser session is in a different profile.
+     * No-op in local mode.
      */
     async connect(): Promise<void> {
-        let simezuUrl: string | undefined;
         try {
             const authMode = await this.engineClient.getAuthMode();
             if (normalizeAuthMode(authMode.auth_mode) === 'local') {
@@ -100,26 +110,38 @@ export class SorikuAuthService {
                 await this.refresh();
                 return;
             }
-            simezuUrl = authMode.simezu_base_url ?? undefined;
         } catch (e) {
             this.messages.error(`Could not reach the Soriku engine: ${(e as Error).message}`);
             return;
         }
-        if (simezuUrl) {
-            this.windowService.openNewWindow(simezuUrl);
-        }
+        this.windowService.openNewWindow(SORIKU_LOGIN_URL);
         const key = await this.quickInput.input({
             title: 'Connect to Simezu',
-            prompt: 'Paste your Simezu API key',
+            prompt: 'Finish signing in in the browser tab — or paste your Simezu API key here',
             placeHolder: 'sk-soriku-…',
             password: true,
         });
         if (!key || !key.trim()) {
             return;
         }
-        this.setTokenInternal(key.trim());
+        await this.applyToken(key.trim());
+    }
+
+    /**
+     * Applies a token obtained via the `soriku://auth-callback` deep link — called by
+     * SorikuAuthUriHandler, never by `connect()` itself (which uses the paste-key path).
+     * Safe to call even when no `connect()` is in flight (e.g. the user re-triggered
+     * sign-in from a stray browser tab); it just re-applies the token either way.
+     */
+    async applyDeepLinkToken(token: string): Promise<void> {
+        await this.applyToken(token, { source: 'deep-link' });
+    }
+
+    /** Store a token (keychain, best-effort) and refresh state from it. Shared by paste-key and deep-link. */
+    protected async applyToken(token: string, options?: { source: 'paste' | 'deep-link' }): Promise<void> {
+        this.setTokenInternal(token);
         try {
-            await this.credentials.setPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT, key.trim());
+            await this.credentials.setPassword(CREDENTIALS_SERVICE, CREDENTIALS_ACCOUNT, token);
         } catch (e) {
             this.messages.warn(`Token saved for this session only (keychain unavailable): ${(e as Error).message}`);
         }
@@ -127,7 +149,8 @@ export class SorikuAuthService {
         if (this.state.error) {
             this.messages.error(this.state.error);
         } else {
-            this.messages.info(computeStatusView(this.state).text);
+            const prefix = options?.source === 'deep-link' ? 'Signed in via browser — ' : '';
+            this.messages.info(prefix + computeStatusView(this.state).text);
         }
     }
 

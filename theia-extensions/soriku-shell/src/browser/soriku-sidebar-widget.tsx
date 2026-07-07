@@ -22,6 +22,8 @@ import { CommandService } from '@theia/core/lib/common/command';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import { FILE_NAVIGATOR_ID } from '@theia/navigator/lib/browser/navigator-widget';
 import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { SorikuAuthService } from 'soriku-auth-ext/lib/browser/soriku-auth-service';
+import { sidebarAccountView } from '../common/sidebar-account-view';
 
 interface NavItem {
     id: string;
@@ -59,6 +61,9 @@ export class SorikuSidebarWidget extends ReactWidget {
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
 
+    @inject(SorikuAuthService)
+    protected readonly authService: SorikuAuthService;
+
     protected activeNav = 'explorer';
 
     @postConstruct()
@@ -67,6 +72,7 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.addClass('soriku-sidebar');
         this.update();
         this.toDispose.push(this.workspaceService.onWorkspaceChanged(() => this.update()));
+        this.toDispose.push(this.authService.onDidChangeState(() => this.update()));
     }
 
     protected async selectNav(item: NavItem): Promise<void> {
@@ -111,16 +117,24 @@ export class SorikuSidebarWidget extends ReactWidget {
                     ))}
                 </ul>
                 <div className="soriku-sidebar-spacer" />
-                <div className="soriku-sidebar-footer">
-                    <span className="soriku-sidebar-avatar">You</span>
-                    <div className="soriku-sidebar-footer-text">
-                        <div className="soriku-sidebar-footer-name">Account</div>
-                        <div className="soriku-sidebar-footer-plan">Local · Free plan</div>
-                    </div>
-                    <button className="soriku-sidebar-settings-btn" title="Settings" onClick={this.openSettings}>
-                        <span className="codicon codicon-settings-gear" />
-                    </button>
+                {this.renderFooter()}
+            </div>
+        );
+    }
+
+    /** Local: static "Local · Free plan" (mockup default). Simezu: real, already-loaded auth state. */
+    protected renderFooter(): React.ReactNode {
+        const view = sidebarAccountView(this.authService.getState());
+        return (
+            <div className="soriku-sidebar-footer">
+                <span className="soriku-sidebar-avatar">{view.avatarText}</span>
+                <div className="soriku-sidebar-footer-text">
+                    <div className="soriku-sidebar-footer-name">{view.name}</div>
+                    <div className="soriku-sidebar-footer-plan">{view.subtitle}</div>
                 </div>
+                <button className="soriku-sidebar-settings-btn" title="Settings" onClick={this.openSettings}>
+                    <span className="codicon codicon-settings-gear" />
+                </button>
             </div>
         );
     }

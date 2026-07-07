@@ -36,3 +36,21 @@ const CONNECTION_LABELS: Record<string, string> = {
 export function connectionLabel(status: string): string {
     return CONNECTION_LABELS[status] ?? 'Not connected';
 }
+
+/** "priority_routing" -> "Priority routing" — for core/billing/plans.py's snake_case feature keys. */
+export function featureLabel(feature: string): string {
+    const words = feature.split('_').filter(Boolean);
+    if (words.length === 0) {
+        return feature;
+    }
+    return words[0].charAt(0).toUpperCase() + words[0].slice(1) + (words.length > 1 ? ' ' + words.slice(1).join(' ') : '');
+}
+
+/** Extract a friendly message from a thrown EngineError's parsed body, falling back to its own message. */
+export function engineErrorMessage(error: unknown): string {
+    const body = (error as { body?: unknown } | undefined)?.body;
+    if (body && typeof body === 'object' && 'message' in body && typeof (body as { message?: unknown }).message === 'string') {
+        return (body as { message: string }).message;
+    }
+    return error instanceof Error ? error.message : String(error);
+}

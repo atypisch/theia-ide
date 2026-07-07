@@ -87,3 +87,30 @@ export function computeStatusView(state: AuthState): AuthStatusView {
         tooltip: 'Could not reach the Soriku engine. Click to manage the connection.',
     };
 }
+
+/** Deep-link scheme/host the app registers as its protocol handler (see applications/electron/package.json's uriScheme). */
+export const DEEP_LINK_SCHEME = 'soriku';
+export const DEEP_LINK_AUTH_HOST = 'auth-callback';
+
+/**
+ * Extract the bearer token from a `soriku://auth-callback#token=…` deep link.
+ * Pure string parsing (no Theia URI class) so it's unit-testable and reusable
+ * from the OpenHandler without depending on how URI happens to split scheme/
+ * authority/fragment for a non-http scheme.
+ */
+export function parseDeepLinkToken(url: string): string | undefined {
+    let rest: string;
+    try {
+        const withoutScheme = url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+        rest = withoutScheme;
+    } catch {
+        return undefined;
+    }
+    const [host, fragment] = rest.split('#', 2);
+    if (host !== DEEP_LINK_AUTH_HOST || !fragment) {
+        return undefined;
+    }
+    const params = new URLSearchParams(fragment);
+    const token = params.get('token');
+    return token && token.trim() ? token.trim() : undefined;
+}

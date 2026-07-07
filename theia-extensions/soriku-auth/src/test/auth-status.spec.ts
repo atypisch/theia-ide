@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {
     computeStatusView,
     normalizeAuthMode,
+    parseDeepLinkToken,
     pickUserName,
 } from '../common/auth-status';
 
@@ -72,5 +73,31 @@ describe('computeStatusView', () => {
     it('unknown mode reports engine unknown', () => {
         const view = computeStatusView({ mode: 'unknown', hasToken: false });
         assert.equal(view.text, 'Soriku: engine unknown');
+    });
+});
+
+describe('parseDeepLinkToken', () => {
+    it('extracts the token from a real auth-callback deep link', () => {
+        assert.equal(parseDeepLinkToken('soriku://auth-callback#token=sk-soriku-abc123'), 'sk-soriku-abc123');
+    });
+
+    it('ignores extra fragment params after the token', () => {
+        assert.equal(parseDeepLinkToken('soriku://auth-callback#token=abc&foo=bar'), 'abc');
+    });
+
+    it('rejects a different host', () => {
+        assert.equal(parseDeepLinkToken('soriku://something-else#token=abc'), undefined);
+    });
+
+    it('rejects a missing token', () => {
+        assert.equal(parseDeepLinkToken('soriku://auth-callback#foo=bar'), undefined);
+    });
+
+    it('rejects a missing fragment entirely', () => {
+        assert.equal(parseDeepLinkToken('soriku://auth-callback'), undefined);
+    });
+
+    it('rejects an empty token value', () => {
+        assert.equal(parseDeepLinkToken('soriku://auth-callback#token='), undefined);
     });
 });

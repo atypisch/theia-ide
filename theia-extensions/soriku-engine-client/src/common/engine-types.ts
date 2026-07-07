@@ -407,6 +407,17 @@ export interface WhoamiResponse {
     name?: string;
     display_name?: string;
     tenant_id?: string;
+    /** Simezu groups (teams) this account belongs to — real data from AuthContext, empty outside Simezu/local mode. */
+    available_groups?: SimezuGroup[];
+    [key: string]: unknown;
+}
+
+export interface SimezuGroup {
+    id: string;
+    name: string;
+    type?: string;
+    member_count?: number;
+    role?: string;
     [key: string]: unknown;
 }
 
@@ -562,6 +573,12 @@ export interface EngineClientConfig {
      * (a hung engine would otherwise block the reader forever). Default 300 000 ms.
      */
     sseIdleTimeoutMs?: number;
+    /**
+     * Active Simezu group/tenant (teams) — sent as X-Soriku-Group; the engine's
+     * auth middleware uses it to pick request context. Omitted when not signed
+     * in or on the default group.
+     */
+    groupId?: string;
 }
 
 // ── External MCP servers (client) ──
@@ -592,4 +609,61 @@ export interface McpTestResponse {
     ok: boolean;
     tools: string[];
     error?: string | null;
+}
+
+// ── Billing / plans (Fase 6) — mirrors core/billing/plans.py exactly ───────
+
+export interface PlanPricing {
+    price: number;
+    founder_price: number | null;
+    founder_active: boolean;
+    billing_unit: string;
+}
+
+export interface PlanCapabilities {
+    byok: boolean;
+    api_access: boolean;
+    priority_routing: boolean;
+    shared_agents: boolean;
+    shared_providers: boolean;
+    worker_tools: boolean;
+    hosted_execution: boolean;
+    daily_cost_limit: number | null;
+}
+
+export interface BillingPlan {
+    name: string;
+    price_eur: number;
+    founder_price_eur: number | null;
+    billing_unit: string;
+    max_seats: number;
+    max_api_keys: number;
+    capabilities: PlanCapabilities;
+    features: string[];
+    pricing: PlanPricing;
+}
+
+export interface BillingPlansResponse {
+    plans: Record<string, BillingPlan>;
+    current_plan: string;
+    payment_status: string;
+}
+
+export interface CreateCheckoutRequest {
+    plan: string;
+    seats?: number;
+}
+
+/**
+ * Success shape only — a 400 (Simezu not configured / no group for this
+ * tenant) throws an `EndpointError` instead of resolving; the engine's
+ * `{error, message}` body is on `error.body`, not a resolved value.
+ */
+export interface CreateCheckoutResponse {
+    checkout_url: string;
+}
+
+/** Success shape only — see CreateCheckoutResponse's note on the error path. */
+export interface BillingPortalResponse {
+    portal_url: string;
 }

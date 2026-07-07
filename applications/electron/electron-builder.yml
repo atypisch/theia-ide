@@ -14,6 +14,16 @@ npmRebuild: false
 directories:
   buildResources: resources
 
+# Top-level (not mac-only): electron-builder generates the matching
+# registration for every target from this one block — macOS Info.plist,
+# Windows NSIS registry entry, Linux .desktop MimeType. Drives the
+# `soriku://auth-callback#token=…` deep link (Fase 6); must match
+# applications/electron/package.json's theia.frontend.config.electron.uriScheme.
+protocols:
+  - name: soriku
+    schemes:
+      - soriku
+
 # node_modules and package.json are copied automatically
 # Exclude node_modules manually because electron is copied by electron-builder and we are using a bundled backend
 files:
@@ -38,10 +48,6 @@ win:
 mac:
   icon: resources/icons/MacLauncherIcons/icon.icns
   category: public.app-category.developer-tools
-  protocols:
-    - name: theia
-      schemes:
-        - theia
   darkModeSupport: true
   target:
     - dmg

@@ -9,6 +9,7 @@ import { PreferenceSchema, PreferenceScope } from '@theia/core';
 export const SORIKU_ENGINE_BASE_URL = 'soriku.engine.baseUrl';
 export const SORIKU_ENGINE_AUTH_TOKEN = 'soriku.engine.authToken';
 export const SORIKU_ENGINE_TIMEOUT = 'soriku.engine.timeout';
+export const SORIKU_ACTIVE_GROUP_ID = 'soriku.auth.activeGroupId';
 
 export const DEFAULT_ENGINE_BASE_URL = 'http://127.0.0.1:8765';
 /** Default timeout for non-streaming engine calls, in milliseconds. */
@@ -49,6 +50,13 @@ export const sorikuEnginePreferenceSchema: PreferenceSchema = {
             description: 'Show inline (ghost-text) code completions as you type, '
                 + 'from the local code model. Press Tab to accept. Off disables them.',
             default: true,
+            scope: PreferenceScope.User,
+        },
+        [SORIKU_ACTIVE_GROUP_ID]: {
+            type: 'string',
+            description: 'Active Simezu group/tenant (teams). Sent as X-Soriku-Group on every '
+                + 'request; empty means the account\'s default group.',
+            default: '',
             scope: PreferenceScope.User,
         },
     },

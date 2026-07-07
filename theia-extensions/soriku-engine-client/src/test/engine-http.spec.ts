@@ -85,6 +85,16 @@ describe('engine-http utilities', () => {
         const headers = buildAuthHeaders({ baseUrl: BASE_CONFIG.baseUrl });
         assert.equal(headers['Authorization'], undefined);
     });
+
+    it('buildAuthHeaders includes X-Soriku-Group when a group is active', () => {
+        const headers = buildAuthHeaders({ ...BASE_CONFIG, groupId: 'grp_1' });
+        assert.equal(headers['X-Soriku-Group'], 'grp_1');
+    });
+
+    it('buildAuthHeaders omits X-Soriku-Group when no group is set', () => {
+        const headers = buildAuthHeaders(BASE_CONFIG);
+        assert.equal(headers['X-Soriku-Group'], undefined);
+    });
 });
 
 describe('parseSseChunk', () => {
