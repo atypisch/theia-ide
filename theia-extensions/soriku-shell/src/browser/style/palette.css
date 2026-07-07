@@ -8,8 +8,33 @@
     border-radius: var(--r) !important;
     box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .7) !important;
     font-family: var(--font-s) !important;
+    /* Monaco's own updateLayout() already caps width at min(62vw, 600px) and
+       centers `left` in px to match — only `top` (normally titleBarOffset,
+       near the very top) needs overriding to match the mockup's 88px. */
+    top: 88px !important;
+    width: 600px !important;
 }
 
 .quick-input-widget .monaco-inputbox {
     border-radius: var(--rs) !important;
 }
+
+/* ── Quick-pick item icon-chip colours (soriku.quickActions.open) ────────
+   iconClasses on a QuickPickItem land on `.monaco-icon-label`, whose own
+   `::before` is already the 16x22 icon slot (background-image by default) —
+   reusing that same box as a solid-colour chip instead of an svg icon. */
+
+.monaco-icon-label.soriku-qp-icon::before {
+    content: '';
+    background-image: none !important;
+    width: 8px;
+    height: 8px;
+    margin: 7px 10px 7px 1px;
+    border-radius: 3px;
+}
+
+.monaco-icon-label.soriku-qp-icon-accent::before { background: var(--acc); }
+.monaco-icon-label.soriku-qp-icon-code::before { background: var(--cat-code); }
+.monaco-icon-label.soriku-qp-icon-reason::before { background: var(--cat-reason); }
+.monaco-icon-label.soriku-qp-icon-general::before { background: var(--cat-general); }
+.monaco-icon-label.soriku-qp-icon-neutral::before { background: var(--ink3); }

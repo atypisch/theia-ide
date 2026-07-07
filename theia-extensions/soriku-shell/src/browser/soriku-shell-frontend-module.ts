@@ -20,11 +20,13 @@ import { SorikuSidebarWidget } from './soriku-sidebar-widget';
 import { SorikuSidebarContribution } from './soriku-sidebar-contribution';
 import { SorikuOverlayService } from './soriku-overlay-service';
 import { SorikuOverlayContribution } from './soriku-overlay-contribution';
+import { SorikuQuickActionsContribution } from './soriku-quick-actions-contribution';
 
 export default new ContainerModule(bind => {
     bind(SorikuTitlebarWidget).toSelf().inSingletonScope();
     bind(SorikuTitlebarContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuTitlebarContribution);
+    bind(CommandContribution).toService(SorikuTitlebarContribution);
 
     bind(SorikuSidebarWidget).toSelf().inSingletonScope();
     bind(SorikuSidebarContribution).toSelf().inSingletonScope();
@@ -34,4 +36,7 @@ export default new ContainerModule(bind => {
     bind(SorikuOverlayContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuOverlayContribution);
     bind(CommandContribution).toService(SorikuOverlayContribution);
+
+    bind(SorikuQuickActionsContribution).toSelf().inSingletonScope();
+    bind(CommandContribution).toService(SorikuQuickActionsContribution);
 });
