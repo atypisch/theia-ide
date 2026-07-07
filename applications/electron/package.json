@@ -3,17 +3,17 @@
   "name": "theia-ide-electron-app",
   "description": "Soriku IDE desktop product",
   "productName": "Soriku IDE",
-  "version": "1.72.100",
+  "version": "1.0.0",
   "main": "scripts/theia-electron-main.js",
   "license": "MIT",
-  "author": "Eclipse Theia <theia-dev@eclipse.org>",
-  "homepage": "https://github.com/eclipse-theia/theia-ide#readme",
+  "author": "Atypisch <marten@atypisch.nl>",
+  "homepage": "https://github.com/atypisch/theia-ide#readme",
   "bugs": {
-    "url": "https://github.com/eclipse-theia/theia/issues"
+    "url": "https://github.com/atypisch/theia-ide/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eclipse-theia/theia-ide.git"
+    "url": "git+https://github.com/atypisch/theia-ide.git"
   },
   "engines": {
     "yarn": ">=1.7.0 <2",
@@ -157,7 +157,6 @@
     "electron-builder": "26.0.12",
     "electron-chromedriver": "^28.3.3",
     "electron-mocha": "^12.3.1",
-    "electron-osx-sign": "^0.6.0",
     "js-yaml": "^3.14.2",
     "mocha": "^8.4.0",
     "rimraf": "^2.7.1",
@@ -175,16 +174,14 @@
     "watch": "concurrently -n compile,build \"theiaext watch --preserveWatchOutput\" \"theia build --watch --mode development\"",
     "start": "electron scripts/theia-electron-main.js --plugins=local-dir:../../plugins",
     "start:debug": "yarn start --log-level=debug",
-    "package": "yarn clean:dist && yarn rebuild && electron-builder -c.mac.identity=null --publish never",
+    "package": "yarn clean:dist && yarn rebuild && electron-builder --publish never",
     "package:prod": "yarn deploy",
-    "deploy": "yarn clean:dist && yarn rebuild && electron-builder -c.mac.identity=null --publish always",
+    "deploy": "yarn clean:dist && yarn rebuild && electron-builder --publish always",
     "package:preview": "yarn clean:dist && yarn rebuild && electron-builder -c.mac.identity=null --dir",
     "update:checksum": "ts-node scripts/update-checksum.ts",
     "update:blockmap": "ts-node scripts/update-blockmap.ts",
     "update:theia": "ts-node ../../scripts/update-theia-version.ts",
     "update:next": "ts-node ../../scripts/update-theia-version.ts next",
-    "sign:directory": "ts-node scripts/sign-directory.ts",
-    "sign:directory:windows": "ts-node scripts/sign-directory-windows.ts",
     "test": "mocha --timeout 60000 \"./test/*.spec.js\"",
     "lint": "eslint --ext js,jsx,ts,tsx scripts && eslint --ext js,jsx,ts,tsx test",
     "lint:fix": "eslint --ext js,jsx,ts,tsx scripts --fix && eslint --ext js,jsx,ts,tsx test -fix"

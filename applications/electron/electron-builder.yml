@@ -1,6 +1,6 @@
 appId: com.atypisch.soriku.ide
 productName: SorikuIDE
-copyright: Copyright © 2020-2026 Eclipse Foundation, Inc
+copyright: Copyright © 2026 Atypisch
 electronDist: ../../node_modules/electron/dist
 electronVersion: 39.8.7
 asar: true
@@ -43,7 +43,7 @@ win:
     - nsis
   publish:
     provider: generic
-    url: "https://download.eclipse.org/theia/ide/${version}/windows"
+    url: "https://soriku.com/downloads/ide/stable/windows"
     useMultipleRangeRequest: false
 mac:
   icon: resources/icons/MacLauncherIcons/icon.icns
@@ -54,19 +54,37 @@ mac:
     - zip
   publish:
     provider: generic
-    url: "https://download.eclipse.org/theia/ide/latest/macos"
+    # Default arch path; scripts/release-desktop.sh overrides this per build
+    # (`--config.mac.publish.url=…/macos-arm`) for the arm64 pass, matching
+    # the updater's separate macos/macos-arm feed URLs.
+    url: "https://soriku.com/downloads/ide/stable/macos"
+  # Real signing/notarization (electron-builder's built-in flow, not a custom
+  # script): active only when CSC_LINK/CSC_KEY_PASSWORD (signing) and
+  # APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID (notarization) are set
+  # in the environment. `yarn package:preview` still forces
+  # `-c.mac.identity=null` for unsigned local dev builds.
+  hardenedRuntime: true
+  entitlements: entitlements.plist
+  entitlementsInherit: entitlements.plist
+  # electron-builder 26's schema: this is a boolean, not {teamId}. Credentials
+  # are 100% environment-driven — electron-builder auto-notarizes whenever one
+  # of these env-var sets is present: APPLE_API_KEY+APPLE_API_KEY_ID+
+  # APPLE_API_ISSUER, or APPLE_ID+APPLE_APP_SPECIFIC_PASSWORD+APPLE_TEAM_ID, or
+  # APPLE_KEYCHAIN+APPLE_KEYCHAIN_PROFILE. `notarize: true` just keeps it from
+  # being silently skipped; it still no-ops without real credentials in env.
+  notarize: true
 linux:
   icon: resources/icons/LinuxLauncherIcons
   category: Development
   mimeTypes:
     - inode/directory
-  vendor: Eclipse Foundation, Inc
+  vendor: Atypisch
   target:
     - deb
     - AppImage
   publish:
     provider: generic
-    url: "https://download.eclipse.org/theia/ide/latest/linux"
+    url: "https://soriku.com/downloads/ide/stable/linux"
 
 nsis:
   menuCategory: true
@@ -79,13 +97,13 @@ nsis:
   uninstallerSidebar: resources/icons/InstallerSidebarImage/164-314Windows.bmp
   allowToChangeInstallationDirectory: true
   runAfterFinish: false
-  artifactName: ${productName}Setup.${ext}
+  artifactName: Soriku-IDE-${version}-${arch}.${ext}
   license: LICENSE
 dmg:
-  artifactName: ${productName}.${ext}
+  artifactName: Soriku-IDE-${version}-${arch}.${ext}
 deb:
-  artifactName: ${productName}.${ext}
+  artifactName: Soriku-IDE-${version}-${arch}.${ext}
 appImage:
-  artifactName: ${productName}.${ext}
+  artifactName: Soriku-IDE-${version}-${arch}.${ext}
 
 afterPack: ./scripts/after-pack.js

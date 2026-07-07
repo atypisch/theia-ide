@@ -7,29 +7,23 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import * as fs from 'fs-extra';
-import * as http from 'http';
-import * as os from 'os';
-import * as path from 'path';
 import { ElectronMainApplication, ElectronMainApplicationContribution } from '@theia/core/lib/electron-main/electron-main-application';
 import { TheiaUpdater, TheiaUpdaterClient, UpdaterSettings } from '../../common/updater/theia-updater';
 import { injectable } from '@theia/core/shared/inversify';
 import { isOSX, isWindows } from '@theia/core';
 import { CancellationToken } from 'builder-util-runtime';
 
-const STABLE_CHANNEL_WINDOWS = 'https://download.eclipse.org/theia/ide/version/windows';
-const STABLE_CHANNEL_MACOS = 'https://download.eclipse.org/theia/ide/latest/macos';
-const STABLE_CHANNEL_MACOS_ARM = 'https://download.eclipse.org/theia/ide/latest/macos-arm';
-const STABLE_CHANNEL_LINUX = 'https://download.eclipse.org/theia/ide/latest/linux';
+/**
+ * soriku.com hosts both the update manifest and the artifacts (user's own
+ * decision, Fase 6/7 planning) — one path shape, no Eclipse infra involved.
+ * Overridable via SORIKU_UPDATE_BASE for staging a release against a local
+ * http server before it's live on soriku.com.
+ */
+const UPDATE_BASE = process.env.SORIKU_UPDATE_BASE || 'https://soriku.com/downloads/ide';
 
-const PREVIEW_CHANNEL_WINDOWS = 'https://download.eclipse.org/theia/ide-preview/version/windows';
-const PREVIEW_CHANNEL_MACOS = 'https://download.eclipse.org/theia/ide-preview/latest/macos';
-const PREVIEW_CHANNEL_MACOS_ARM = 'https://download.eclipse.org/theia/ide-preview/latest/macos-arm';
-const PREVIEW_CHANNEL_LINUX = 'https://download.eclipse.org/theia/ide-preview/latest/linux';
-
-// Next updates are currently only available for Linux.
-// The feed is served from GitHub Release assets (rolling "next" tag).
-const NEXT_CHANNEL_LINUX = 'https://github.com/eclipse-theia/theia-ide/releases/download/next';
+function feedUrl(channel: 'stable' | 'preview', platform: 'windows' | 'macos' | 'macos-arm' | 'linux'): string {
+    return `${UPDATE_BASE}/${channel}/${platform}`;
+}
 
 const { autoUpdater } = require('electron-updater');
 
@@ -114,18 +108,9 @@ export class TheiaUpdaterImpl implements TheiaUpdater, ElectronMainApplicationCo
         autoUpdater.logger.info('Downloading update');
         this.cancellationToken = new CancellationToken();
         autoUpdater.downloadUpdate(this.cancellationToken);
-
-        // record download stat, ignore errors
-        fs.mkdtemp(path.join(os.tmpdir(), 'updater-'))
-            .then(tmpDir => {
-                const file = fs.createWriteStream(path.join(tmpDir, 'update'));
-                http.get('https://www.eclipse.org/downloads/download.php?file=/theia/update&r=1', response => {
-                    response.pipe(file);
-                    file.on('finish', () => {
-                        file.close();
-                    });
-                });
-            });
+        // No download-stat ping here (the eclipse.org one this replaced sent
+        // a bare tracking request to eclipse.org on every download) —
+        // telemetry-free is a Soriku IDE product commitment, not a default.
     }
 
     onStart(application: ElectronMainApplication): void {
@@ -171,23 +156,14 @@ export class TheiaUpdaterImpl implements TheiaUpdater, ElectronMainApplicationCo
     }
 
     protected getFeedURL(channel: string): string {
+        const resolvedChannel = channel === 'preview' ? 'preview' : 'stable';
         if (isWindows) {
-            const curVersion = autoUpdater.currentVersion.toString();
-            // Next not yet available on Windows, fall back to stable
-            return (channel === 'preview') ? PREVIEW_CHANNEL_WINDOWS.replace('version', curVersion) : STABLE_CHANNEL_WINDOWS.replace('version', curVersion);
-        } else if (isOSX) {
-            // Next not yet available on macOS, fall back to stable
-            if (process.arch === 'arm64') {
-                return (channel === 'preview') ? PREVIEW_CHANNEL_MACOS_ARM : STABLE_CHANNEL_MACOS_ARM;
-            } else {
-                return (channel === 'preview') ? PREVIEW_CHANNEL_MACOS : STABLE_CHANNEL_MACOS;
-            }
-        } else {
-            if (channel === 'next') {
-                return NEXT_CHANNEL_LINUX;
-            }
-            return (channel === 'preview') ? PREVIEW_CHANNEL_LINUX : STABLE_CHANNEL_LINUX;
+            return feedUrl(resolvedChannel, 'windows');
         }
+        if (isOSX) {
+            return feedUrl(resolvedChannel, process.arch === 'arm64' ? 'macos-arm' : 'macos');
+        }
+        return feedUrl(resolvedChannel, 'linux');
     }
 
     disconnectClient(client: TheiaUpdaterClient): void {

@@ -8,7 +8,7 @@
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { CommandService, PreferenceScope, PreferenceService } from '@theia/core/lib/common';
+import { CommandRegistry, PreferenceScope, PreferenceService } from '@theia/core/lib/common';
 import { QuickInputService } from '@theia/core/lib/browser';
 import { ApplicationServer } from '@theia/core/lib/common/application-protocol';
 import { ThemeService } from '@theia/core/lib/browser/theming';
@@ -39,8 +39,8 @@ export class SorikuSettingsWidget extends ReactWidget {
     @inject(QuickInputService)
     protected readonly quickInput: QuickInputService;
 
-    @inject(CommandService)
-    protected readonly commands: CommandService;
+    @inject(CommandRegistry)
+    protected readonly commands: CommandRegistry;
 
     @inject(ApplicationServer)
     protected readonly applicationServer: ApplicationServer;
@@ -272,6 +272,8 @@ export class SorikuSettingsWidget extends ReactWidget {
                     />
                 </SettingsGroup>
 
+                {this.renderUpdatesGroup()}
+
                 <SettingsGroup title='Account'>
                     <SettingsRow
                         label='Status'
@@ -345,6 +347,33 @@ export class SorikuSettingsWidget extends ReactWidget {
                     ? <Pill tone='acc'>Active</Pill>
                     : <Btn variant='ghost' onClick={() => this.switchGroup(group.id)}>Switch</Btn>}
             />)}
+        </SettingsGroup>;
+    }
+
+    /**
+     * The updater (theia-ide-updater-ext) only binds in the Electron target
+     * (`frontendElectron` in its package.json) — this group simply doesn't
+     * exist in the browser dev-harness build, rather than showing a "Check
+     * for updates" button that would silently do nothing.
+     */
+    protected renderUpdatesGroup(): React.ReactNode {
+        if (!this.commands.getCommand('electron-theia:check-for-updates')) {
+            return undefined;
+        }
+        const channel = this.preferences.get<string>('updates.channel', 'stable');
+        return <SettingsGroup title='Updates'>
+            <SettingsRow
+                label='Version'
+                description={`Update channel: ${channel}`}
+                control={<PillValue>{this.version ? `v${this.version}` : '—'}</PillValue>}
+            />
+            <SettingsRow
+                label='Check for updates'
+                description='Soriku IDE checks soriku.com for a newer build'
+                control={<Btn variant='secondary' onClick={() => this.commands.executeCommand('electron-theia:check-for-updates')}>
+                    Check now
+                </Btn>}
+            />
         </SettingsGroup>;
     }
 }

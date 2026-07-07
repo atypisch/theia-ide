@@ -3,16 +3,16 @@
   "name": "theia-ide-browser-app",
   "description": "Soriku IDE browser product",
   "productName": "Soriku IDE",
-  "version": "1.72.100",
+  "version": "1.0.0",
   "license": "MIT",
-  "author": "Eclipse Theia <theia-dev@eclipse.org>",
-  "homepage": "https://github.com/eclipse-theia/theia-ide#readme",
+  "author": "Atypisch <marten@atypisch.nl>",
+  "homepage": "https://github.com/atypisch/theia-ide#readme",
   "bugs": {
-    "url": "https://github.com/eclipse-theia/theia/issues"
+    "url": "https://github.com/atypisch/theia-ide/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eclipse-theia/theia-ide.git"
+    "url": "git+https://github.com/atypisch/theia-ide.git"
   },
   "engines": {
     "yarn": ">=1.7.0 <2",
