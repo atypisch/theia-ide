@@ -26,6 +26,8 @@ import { OpenerService } from '@theia/core/lib/browser/opener-service';
 import { DecorationsService } from '@theia/core/lib/browser/decorations-service';
 import { CommandService } from '@theia/core/lib/common/command';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
+import { Endpoint } from '@theia/core/lib/browser/endpoint';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { FileNavigatorWidget } from '@theia/navigator/lib/browser/navigator-widget';
 import { FileNavigatorModel } from '@theia/navigator/lib/browser/navigator-model';
 import { FILE_NAVIGATOR_ID } from '@theia/navigator/lib/browser/navigator-widget';
@@ -82,6 +84,9 @@ export class SorikuSidebarWidget extends ReactWidget {
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
 
+    @inject(FileService)
+    protected readonly fileService: FileService;
+
     @inject(SorikuAuthService)
     protected readonly authService: SorikuAuthService;
 
@@ -109,19 +114,45 @@ export class SorikuSidebarWidget extends ReactWidget {
     protected activeNav = 'explorer';
     protected filesModel: FileNavigatorModel | undefined;
     protected infoState: Partial<Record<string, InfoState>> = {};
+    protected workspaceIconUrl: string | undefined;
 
     @postConstruct()
     protected init(): void {
         this.id = SorikuSidebarWidget.ID;
         this.addClass('soriku-sidebar');
         this.update();
-        this.toDispose.push(this.workspaceService.onWorkspaceChanged(() => this.update()));
+        this.toDispose.push(this.workspaceService.onWorkspaceChanged(() => {
+            void this.refreshWorkspaceIcon();
+            this.update();
+        }));
         this.toDispose.push(this.authService.onDidChangeState(() => this.update()));
         this.toDispose.push(this.scmService.onDidChangeSelectedRepository(() => this.update()));
         this.toDispose.push(this.engineStatus.onDidChangeState(() => { if (this.activeNav === 'settings') { this.update(); } }));
         this.loadFilesModel();
         this.loadInfo(this.activeNav);
+        void this.refreshWorkspaceIcon();
     }
+    protected async refreshWorkspaceIcon(): Promise<void> {
+        const root = this.workspaceService.tryGetRoots()[0]?.resource;
+        if (!root) {
+            this.workspaceIconUrl = undefined;
+            this.update();
+            return;
+        }
+        const candidates = ['favicon.ico', 'favicon.png', 'favicon.svg', 'public/favicon.ico', 'public/favicon.png', 'assets/favicon.ico'];
+        for (const rel of candidates) {
+            const uri = root.resolve(rel);
+            if (await this.fileService.exists(uri)) {
+                const endpoint = new Endpoint({ path: `files${uri.path.toString()}` });
+                this.workspaceIconUrl = endpoint.getRestUrl().toString();
+                this.update();
+                return;
+            }
+        }
+        this.workspaceIconUrl = undefined;
+        this.update();
+    }
+
 
     protected async loadFilesModel(): Promise<void> {
         const widget = await this.widgetManager.getOrCreateWidget<FileNavigatorWidget>(FILE_NAVIGATOR_ID);
@@ -175,7 +206,14 @@ export class SorikuSidebarWidget extends ReactWidget {
         return (
             <div className="soriku-sidebar-inner">
                 <button className="soriku-sidebar-workspace" onClick={() => this.commands.executeCommand('workspace:open')}>
-                    <SorikuMark size={22} />
+                    {this.workspaceIconUrl
+                        ? <img
+                            className="soriku-sidebar-workspace-icon"
+                            src={this.workspaceIconUrl}
+                            alt=""
+                            onError={() => { this.workspaceIconUrl = undefined; this.update(); }}
+                        />
+                        : <SorikuMark size={22} />}
                     <div className="soriku-sidebar-workspace-text">
                         <div className="soriku-sidebar-workspace-name">{this.workspaceName}</div>
                     </div>

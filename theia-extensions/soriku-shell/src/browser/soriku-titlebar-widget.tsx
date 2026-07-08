@@ -127,7 +127,7 @@ export class SorikuTitlebarWidget extends ReactWidget {
                 </div>
                 <SorikuMark size={18} className="soriku-titlebar-logo" />
                 <span className="soriku-titlebar-word">
-                    Soriku <span className="soriku-titlebar-word-accent">Code</span>
+                    <span className="soriku-titlebar-word-accent">Code</span>
                 </span>
                 <SorikuTitlebarMenu keybindingFor={this.keybindingFor} executeCommand={id => this.commandService.executeCommand(id)} />
                 <span className="soriku-titlebar-breadcrumb">{this.windowTitleService.title}</span>

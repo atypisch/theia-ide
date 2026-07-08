@@ -7,6 +7,13 @@
     border-bottom: 1px solid var(--line);
 }
 
+/* Hide Theia's editor toolbar strip (back/forward/split icons under titlebar). */
+#main-toolbar,
+#theia-main-content-panel #main-toolbar,
+.theia-main-content-panel #main-toolbar {
+    display: none !important;
+}
+
 /* Theia's stock BrowserMenuBarContribution adds its own logo ("theia:icon")
    and File/Edit/.../Help menu bar ("theia:menubar") widgets to the top
    panel outside Electron (Electron targets swap this for the native OS
@@ -42,7 +49,7 @@
    NOT running in Electron (browser dev preview has no native equivalent). */
 .soriku-titlebar-traffic-spacer {
     flex: 0 0 auto;
-    width: 8px;
+    width: 72px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -56,7 +63,7 @@
 }
 
 .soriku-titlebar-fake-controls .soriku-titlebar-traffic-spacer {
-    width: 62px;
+    width: 72px;
 }
 
 .soriku-titlebar-fake-controls .soriku-titlebar-fake-dot {

@@ -15,6 +15,16 @@
     display: none !important;
 }
 
+#theia-left-content-panel {
+    background: var(--bg-sunk) !important;
+}
+
+#theia-left-content-panel .p-SplitPanel-handle {
+    background: var(--line) !important;
+    width: 1px !important;
+    min-width: 1px !important;
+}
+
 .soriku-sidebar {
     width: 246px;
     min-width: 246px;
@@ -50,6 +60,14 @@
 
 .soriku-sidebar-workspace:hover {
     background: var(--hover);
+}
+
+.soriku-sidebar-workspace-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    object-fit: cover;
+    flex-shrink: 0;
 }
 
 .soriku-sidebar-workspace-text {
