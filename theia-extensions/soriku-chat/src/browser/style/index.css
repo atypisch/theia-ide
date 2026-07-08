@@ -10,6 +10,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 6px 10px;
     border-bottom: 1px solid var(--theia-sideBarSectionHeader-border);
@@ -633,6 +634,7 @@
 .soriku-chat-header-actions {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
     gap: 6px;
 }
 
@@ -1002,13 +1004,17 @@
     background: var(--bg-sunk) !important;
 }
 
-/* Chat dock shell */
+/* Chat dock shell. min-width lives on soriku-chat-widget (the Lumino
+   widget's own root node, via ReactWidget#addClass) rather than the nested
+   .soriku-chat content div — Lumino's SplitPanel resize/drag logic reads
+   size limits off the widget's own node (ElementExt.sizeLimits), not
+   arbitrary descendants, so a min-width on a nested div never stopped the
+   user from dragging the dock narrower than our content could actually
+   shrink to, which clipped the composer's Send button and the DO/MODEL/
+   ROUTE pickers instead of the drag simply refusing to go that narrow. */
 .soriku-chat-widget {
     background: var(--bg-sunk);
     border-left: 1px solid var(--line);
-}
-
-.soriku-chat {
     min-width: 360px;
 }
 
@@ -1066,6 +1072,8 @@
 .soriku-chat-actions {
     margin-top: 8px;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .soriku-chat-actions .sk-btn:last-child {

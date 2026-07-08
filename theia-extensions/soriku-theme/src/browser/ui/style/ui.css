@@ -211,12 +211,15 @@
 
 .sk-segmented {
     display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     align-items: center;
     background: var(--bg-el);
     border: 1px solid var(--line);
     border-radius: var(--rs);
     padding: 2px;
     gap: 1px;
+    box-sizing: border-box;
 }
 
 .sk-segmented-label {
