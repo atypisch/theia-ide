@@ -97,7 +97,7 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
             return <div className='soriku-capmap-message soriku-capmap-error'>
                 <div>Could not load the capability map.</div>
                 <div className='soriku-capmap-error-detail'>{error}</div>
-                <button className='theia-button' onClick={() => this.refresh()}>Retry</button>
+                <Btn variant='secondary' onClick={() => this.refresh()}>Retry</Btn>
             </div>;
         }
         if (!table || table.empty) {

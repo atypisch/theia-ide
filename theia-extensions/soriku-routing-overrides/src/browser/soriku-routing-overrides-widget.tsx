@@ -124,7 +124,7 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
             return <div className='soriku-routing-message soriku-routing-error'>
                 <div>Could not load routing overrides.</div>
                 <div className='soriku-routing-error-detail'>{error}</div>
-                <button className='theia-button' onClick={() => this.refresh()}>Retry</button>
+                <Btn variant='secondary' onClick={() => this.refresh()}>Retry</Btn>
             </div>;
         }
         if (categories.length === 0) {

@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { Btn, SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
 
@@ -184,7 +184,7 @@ export class SorikuConversationsWidget extends ReactWidget {
         return <div className='soriku-conversations-list sk-scroll'>
             {this.error && <div className='soriku-conversations-error'>
                 {this.error}
-                <button className='theia-button secondary' disabled={this.loading} onClick={() => this.refresh()}>Retry</button>
+                <Btn variant='secondary' disabled={this.loading} onClick={() => this.refresh()}>Retry</Btn>
             </div>}
             {this.loading && this.items.length === 0
                 ? <div className='soriku-conversations-meta'>Loading…</div>

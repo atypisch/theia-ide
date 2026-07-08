@@ -152,7 +152,7 @@ export class SorikuAgentsWidget extends ReactWidget {
             return <div className='soriku-agents-message soriku-agents-error'>
                 <div>Could not load agents.</div>
                 <div className='soriku-agents-error-detail'>{error}</div>
-                <button className='theia-button' onClick={() => this.refresh()}>Retry</button>
+                <Btn variant='secondary' onClick={() => this.refresh()}>Retry</Btn>
             </div>;
         }
         if (items.length === 0) {

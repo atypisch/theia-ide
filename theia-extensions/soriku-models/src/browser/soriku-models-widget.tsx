@@ -368,9 +368,9 @@ export class SorikuModelsWidget extends ReactWidget {
                     onChange={e => { this.apiKey = e.target.value; this.update(); }} />
                 {!isCustom && this.selectedPreset?.api_key_url &&
                     <a className='soriku-models-link' href={this.selectedPreset.api_key_url} target='_blank' rel='noreferrer'>Get an API key</a>}
-                <button className='theia-button' disabled={this.adding} onClick={() => this.addProvider()}>
+                <Btn disabled={this.adding} onClick={() => this.addProvider()}>
                     {this.adding ? 'Adding…' : 'Add provider'}
-                </button>
+                </Btn>
             </div>}
         </div>;
     }
@@ -383,9 +383,9 @@ export class SorikuModelsWidget extends ReactWidget {
                     value={this.pullName} disabled={this.pulling}
                     onChange={e => { this.pullName = e.target.value; this.update(); }}
                     onKeyDown={e => { if (e.key === 'Enter') { this.pull(); } }} />
-                <button className='theia-button' disabled={this.pulling} onClick={() => this.pull()}>
+                <Btn disabled={this.pulling} onClick={() => this.pull()}>
                     {this.pulling ? 'Pulling…' : 'Pull'}
-                </button>
+                </Btn>
             </div>
             {this.pulling && <div className='soriku-models-progress'>
                 <span>{this.pullStatus}</span>
@@ -433,9 +433,9 @@ export class SorikuModelsWidget extends ReactWidget {
                     value={this.browseQuery} disabled={this.browsing}
                     onChange={e => { this.browseQuery = e.target.value; this.update(); }}
                     onKeyDown={e => { if (e.key === 'Enter') { this.browse(); } }} />
-                <button className='theia-button secondary' disabled={this.browsing} onClick={() => this.browse()}>
+                <Btn variant='secondary' disabled={this.browsing} onClick={() => this.browse()}>
                     {this.browsing ? 'Searching…' : 'Search'}
-                </button>
+                </Btn>
             </div>
             <ul className='soriku-models-list'>
                 {this.browseResults.map(m => {

@@ -16,6 +16,7 @@ import { SorikuWorkbenchContribution } from './soriku-workbench-contribution';
 import { SorikuInlineEditController } from './soriku-inline-edit-controller';
 import { SorikuEngineStatusService } from './soriku-engine-status-service';
 import { SorikuEngineStatusContribution } from './soriku-engine-status-contribution';
+import { SorikuWarmModelStatusContribution } from './soriku-warm-model-status-contribution';
 import { sorikuWorkbenchPreferenceSchema } from './soriku-workbench-preferences';
 import { SorikuSettingsWidget } from './soriku-settings-widget';
 import { SorikuSettingsViewContribution } from './soriku-settings-view-contribution';
@@ -33,6 +34,9 @@ export default new ContainerModule(bind => {
     bind(SorikuEngineStatusContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuEngineStatusContribution);
     bind(CommandContribution).toService(SorikuEngineStatusContribution);
+
+    bind(SorikuWarmModelStatusContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(SorikuWarmModelStatusContribution);
 
     bind(SorikuSettingsWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({

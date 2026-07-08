@@ -226,8 +226,8 @@ export class SorikuMcpWidget extends ReactWidget {
                     /> require confirmation
                 </label>
                 <span className='soriku-mcp-spacer' />
-                <button className='theia-button secondary' disabled={this.busy} onClick={() => this.test()}>Test</button>
-                <button className='theia-button' disabled={this.busy} onClick={() => this.add()}>Add</button>
+                <Btn variant='secondary' disabled={this.busy} onClick={() => this.test()}>Test</Btn>
+                <Btn disabled={this.busy} onClick={() => this.add()}>Add</Btn>
             </div>
         </div>;
     }
@@ -241,7 +241,7 @@ export class SorikuMcpWidget extends ReactWidget {
             return <div className='soriku-mcp-message soriku-mcp-error'>
                 <div>Could not load MCP servers.</div>
                 <div className='soriku-mcp-error-detail'>{error}</div>
-                <button className='theia-button' onClick={() => this.refresh()}>Retry</button>
+                <Btn variant='secondary' onClick={() => this.refresh()}>Retry</Btn>
             </div>;
         }
         if (servers.length === 0) {
@@ -267,11 +267,11 @@ export class SorikuMcpWidget extends ReactWidget {
                 </div>
                 <div className='soriku-mcp-card-target'>{s.transport ?? 'stdio'} · {target}</div>
             </div>
-            <button
-                className='theia-button secondary'
+            <Btn
+                variant='secondary'
                 disabled={this.busy}
                 onClick={() => this.remove(s.name)}
-            >Remove</button>
+            >Remove</Btn>
         </div>;
     }
 }
