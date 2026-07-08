@@ -1,0 +1,104 @@
+/*
+ * Soriku IDE — ⌘K inline edit: the floating review card + the decoration
+ * marking the hunk range it's proposing to replace, 1:1 from the mockup's
+ * inline-edit card (~540px, accent border, prev/next hunk nav, footer
+ * kbd-hints).
+ */
+
+.soriku-inline-edit-widget {
+    max-width: 540px;
+    z-index: 50;
+}
+
+.soriku-inline-edit-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--acc-line);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.soriku-inline-edit-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.soriku-inline-edit-card-header .codicon-sparkle {
+    color: var(--acc);
+}
+
+.soriku-inline-edit-card-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-inline-edit-card-chip {
+    font-family: var(--font-m);
+    font-size: 10px;
+    color: var(--ink3);
+    border: 1px solid var(--line2);
+    border-radius: var(--rs);
+    padding: 1px 6px;
+}
+
+.soriku-inline-edit-card-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.soriku-inline-edit-chevron {
+    background: transparent;
+    border: none;
+    color: var(--ink2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--rs);
+}
+
+.soriku-inline-edit-chevron:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-inline-edit-card-count {
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink3);
+}
+
+.soriku-inline-edit-card-desc {
+    font-size: 12px;
+    color: var(--ink2);
+}
+
+.soriku-inline-edit-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.soriku-inline-edit-card-footer {
+    font-family: var(--font-m);
+    font-size: 10px;
+    color: var(--ink3);
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+}
+
+/* Hunk-range decoration in the editor itself. */
+.soriku-inline-edit-hunk-range {
+    background: var(--acc-soft);
+}

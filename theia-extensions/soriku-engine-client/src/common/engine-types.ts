@@ -175,6 +175,32 @@ export interface CompleteResponse {
     completion: string;
 }
 
+/** ⌘K inline-edit request: an instruction + the full file text, engine proposes hunks. */
+export interface InlineEditRequest {
+    path: string;
+    language?: string;
+    instruction: string;
+    file_content: string;
+    selection: string;
+    model_id?: string;
+}
+
+export interface InlineEditHunk {
+    /** 1-based, inclusive. */
+    start_line: number;
+    /** 1-based, inclusive. */
+    end_line: number;
+    /** Sliced by the engine from the real file_content — never model-hallucinated. */
+    old_text: string;
+    new_text: string;
+    description: string;
+}
+
+export interface InlineEditResponse {
+    title: string;
+    hunks: InlineEditHunk[];
+}
+
 export interface PlanTaskEdit {
     id: string;
     goal: string;

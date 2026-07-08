@@ -34,6 +34,8 @@ import {
     ExecutePlanRequest,
     HealthResponse,
     TranscribeResponse,
+    InlineEditRequest,
+    InlineEditResponse,
     InstalledModelsResponse,
     MinionSpawnOutcome,
     ModelMutationResponse,
@@ -89,6 +91,8 @@ export interface EngineClient {
     confirmTool(body: ConfirmRequest): Promise<ConfirmResponse>;
     /** Inline (fill-in-the-middle) code completion for editor ghost-text. */
     complete(body: CompleteRequest): Promise<CompleteResponse>;
+    /** ⌘K inline edit: proposes review-able hunks for a selection/cursor + instruction. */
+    proposeInlineEdit(body: InlineEditRequest): Promise<InlineEditResponse>;
     /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
     executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */

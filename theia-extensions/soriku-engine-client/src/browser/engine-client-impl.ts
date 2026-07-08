@@ -40,6 +40,8 @@ import {
     ExecutePlanRequest,
     EngineClientConfig,
     HealthResponse,
+    InlineEditRequest,
+    InlineEditResponse,
     InstalledModelsResponse,
     MinionSpawnOutcome,
     TranscribeResponse,
@@ -183,6 +185,10 @@ export class EngineClientImpl implements EngineClient {
 
     async complete(body: CompleteRequest): Promise<CompleteResponse> {
         return this.createTransport().postJson<CompleteResponse>('/api/complete', body);
+    }
+
+    async proposeInlineEdit(body: InlineEditRequest): Promise<InlineEditResponse> {
+        return this.createTransport().postJson<InlineEditResponse>('/api/edit/inline', body);
     }
 
     async executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse> {
