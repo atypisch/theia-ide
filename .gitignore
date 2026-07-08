@@ -14,3 +14,6 @@ license-check-summary.txt*
 **/test-screenshots.playwright-mcp/
 applications/*/build-meta/
 design/
+
+# Playwright MCP scratch artifacts (screenshots, DOM snapshots) — never commit
+.playwright-mcp/
