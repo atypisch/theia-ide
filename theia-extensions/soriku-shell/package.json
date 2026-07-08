@@ -15,9 +15,12 @@
     "@theia/core": "1.73.0-next.2",
     "@theia/filesystem": "1.73.0-next.2",
     "@theia/navigator": "1.73.0-next.2",
+    "@theia/scm": "1.73.0-next.2",
+    "@theia/search-in-workspace": "1.73.0-next.2",
     "@theia/workspace": "1.73.0-next.2",
     "inversify": "^6.2.2",
     "soriku-auth-ext": "0.1.0",
+    "soriku-engine-client-ext": "0.1.0",
     "soriku-theme-ext": "0.1.0",
     "soriku-workbench-ext": "0.1.0"
   },

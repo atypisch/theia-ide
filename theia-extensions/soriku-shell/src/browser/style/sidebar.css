@@ -139,6 +139,281 @@
     flex: 1 1 auto;
 }
 
+/* ── Context panel (per-nav-item, below the WORKSPACE nav list) ──────────── */
+
+.soriku-sidebar-context {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    border-top: 1px solid var(--line);
+}
+
+/* Explorer — FILES tree */
+
+.soriku-sidebar-files-panel {
+    padding: 6px 0;
+}
+
+.soriku-sidebar-files-empty {
+    padding: 12px 16px;
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-files-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding-right: 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.soriku-sidebar-files-row:hover {
+    background: var(--hover);
+}
+
+.soriku-sidebar-files-row.active {
+    background: var(--acc-soft);
+}
+
+.soriku-sidebar-files-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-files-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink2);
+}
+
+.soriku-sidebar-files-status {
+    flex-shrink: 0;
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Find in Files */
+
+.soriku-sidebar-search-panel {
+    padding: 10px 12px;
+}
+
+.soriku-sidebar-search-input {
+    width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: var(--rs);
+    border: 1px solid var(--line2);
+    background: var(--bg-el);
+    color: var(--ink);
+    font-family: var(--font-s);
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.soriku-sidebar-search-status {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-search-results {
+    margin-top: 8px;
+}
+
+.soriku-sidebar-search-file {
+    margin-bottom: 8px;
+}
+
+.soriku-sidebar-search-file-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 2px;
+}
+
+.soriku-sidebar-search-match-count {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-search-match {
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink2);
+    padding: 3px 6px 3px 10px;
+    border-radius: var(--rs);
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-search-match:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+/* Source Control */
+
+.soriku-sidebar-scm-panel {
+    padding: 10px 12px;
+}
+
+.soriku-sidebar-scm-empty {
+    padding: 12px 4px;
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-scm-input {
+    width: 100%;
+    min-height: 52px;
+    padding: 8px;
+    border-radius: var(--rs);
+    border: 1px solid var(--line2);
+    background: var(--bg-el);
+    color: var(--ink);
+    font-family: var(--font-s);
+    font-size: 12px;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.soriku-sidebar-scm-panel .sk-btn {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.soriku-sidebar-scm-group {
+    margin-top: 12px;
+}
+
+.soriku-sidebar-scm-group-label {
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 4px;
+}
+
+.soriku-sidebar-scm-resource {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: var(--rs);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink2);
+}
+
+.soriku-sidebar-scm-resource:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-sidebar-scm-resource-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-scm-resource-letter {
+    flex-shrink: 0;
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Agents/Models/Capability Map/MCP/Routing/Settings — generic side-info card */
+
+.soriku-sidebar-info-panel {
+    padding: 12px 14px;
+}
+
+.soriku-sidebar-info-eyebrow {
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--acc);
+    margin-bottom: 8px;
+}
+
+.soriku-sidebar-info-loading,
+.soriku-sidebar-info-error {
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-info-error-detail {
+    margin-top: 4px;
+    color: var(--danger);
+    font-size: 11px;
+}
+
+.soriku-sidebar-info-retry {
+    margin-top: 8px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: var(--rs);
+    border: 1px solid var(--line2);
+    background: var(--bg-el);
+    color: var(--ink);
+    font-size: 11.5px;
+    cursor: pointer;
+}
+
+.soriku-sidebar-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+}
+
+.soriku-sidebar-info-row-icon {
+    flex-shrink: 0;
+    color: var(--ink3);
+    font-size: 14px;
+}
+
+.soriku-sidebar-info-row-label {
+    flex: 1;
+    color: var(--ink2);
+}
+
+.soriku-sidebar-info-row-value {
+    font-family: var(--font-m);
+    font-size: 11.5px;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.soriku-sidebar-info-footer {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: 10.5px;
+    color: var(--ink3);
+}
+
 /* ── Footer ───────────────────────────────────────────────────────────── */
 
 .soriku-sidebar-footer {
