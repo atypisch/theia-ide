@@ -36,7 +36,6 @@ import { SearchInWorkspaceService } from '@theia/search-in-workspace/lib/browser
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuEngineStatusService } from 'soriku-workbench-ext/lib/browser/soriku-engine-status-service';
 import { shortHost } from 'soriku-workbench-ext/lib/common/engine-status';
-import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuAuthService } from 'soriku-auth-ext/lib/browser/soriku-auth-service';
 import { sidebarAccountView } from '../common/sidebar-account-view';
 import { SorikuSidebarFilesPanel } from './panels/soriku-sidebar-files-panel';
@@ -202,6 +201,18 @@ export class SorikuSidebarWidget extends ReactWidget {
         return ws ? ws.resource.path.base : 'No workspace';
     }
 
+    protected get workspaceInitials(): string {
+        const name = this.workspaceName.trim();
+        if (!name) {
+            return 'PR';
+        }
+        const parts = name.split(/[\s\-_]+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
+        return name.slice(0, 2).toUpperCase();
+    }
+
     protected render(): React.ReactNode {
         return (
             <div className="soriku-sidebar-inner">
@@ -213,7 +224,7 @@ export class SorikuSidebarWidget extends ReactWidget {
                             alt=""
                             onError={() => { this.workspaceIconUrl = undefined; this.update(); }}
                         />
-                        : <SorikuMark size={22} />}
+                        : <span className="soriku-sidebar-workspace-fallback">{this.workspaceInitials}</span>}
                     <div className="soriku-sidebar-workspace-text">
                         <div className="soriku-sidebar-workspace-name">{this.workspaceName}</div>
                     </div>

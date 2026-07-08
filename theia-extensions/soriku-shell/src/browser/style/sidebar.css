@@ -70,6 +70,23 @@
     flex-shrink: 0;
 }
 
+.soriku-sidebar-workspace-fallback {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: var(--bg-el);
+    border: 1px solid var(--line2);
+}
+
 .soriku-sidebar-workspace-text {
     flex: 1;
     min-width: 0;
