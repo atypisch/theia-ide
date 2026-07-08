@@ -14,7 +14,7 @@ import { ThemeService } from '@theia/core/lib/browser/theming';
 import { WindowTitleService } from '@theia/core/lib/browser/window/window-title-service';
 import { KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { environment } from '@theia/application-package/lib/environment';
-import { Pill, SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
+import { Pill, SorikuLogo } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuEngineStatusService } from 'soriku-workbench-ext/lib/browser/soriku-engine-status-service';
 import { EngineConnectionState } from 'soriku-workbench-ext/lib/common/engine-status';
 import { SORIKU_DARK_THEME_ID } from 'soriku-theme-ext/lib/browser/soriku-theme-contribution';
@@ -125,7 +125,7 @@ export class SorikuTitlebarWidget extends ReactWidget {
                     <span className="soriku-titlebar-fake-dot soriku-titlebar-fake-dot-min" />
                     <span className="soriku-titlebar-fake-dot soriku-titlebar-fake-dot-max" />
                 </div>
-                <SorikuMark size={18} className="soriku-titlebar-logo" />
+                <SorikuLogo height={19} className="soriku-titlebar-logo" />
                 <span className="soriku-titlebar-word">
                     <span className="soriku-titlebar-word-accent">Code</span>
                 </span>
