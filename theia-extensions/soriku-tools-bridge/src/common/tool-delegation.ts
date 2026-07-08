@@ -208,6 +208,36 @@ export function applyUnifiedPatch(original: string, patch: string): string {
     return out.join('\n');
 }
 
+export interface LineDiffStats {
+    added: number;
+    removed: number;
+}
+
+/**
+ * Simple line-based diff stat (added/removed counts) for the chat DiffBar —
+ * an LCS-length line diff, not a full Myers diff. Capped at 4000 lines per
+ * side so a huge generated file can't make this O(n*m) DP blow up; beyond
+ * that the caller should treat the stats as unavailable rather than wait.
+ */
+export function computeLineDiffStats(before: string, after: string): LineDiffStats | undefined {
+    // ''.split('\n') is ['' ] — one phantom empty "line" — which would
+    // otherwise count a brand-new file as "+N -1" and an emptied file as
+    // "+1 -N" instead of the expected "+N -0" / "+0 -N".
+    const a = before === '' ? [] : before.split('\n');
+    const b = after === '' ? [] : after.split('\n');
+    if (a.length > 4000 || b.length > 4000) {
+        return undefined;
+    }
+    const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+    for (let i = a.length - 1; i >= 0; i--) {
+        for (let j = b.length - 1; j >= 0; j--) {
+            dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+    }
+    const lcs = dp[0][0];
+    return { added: b.length - lcs, removed: a.length - lcs };
+}
+
 /** Format project_search hits like the engine tool. */
 export function formatSearchResults(hits: { path: string; line: number; text: string }[], capped = 50): string {
     if (hits.length === 0) {

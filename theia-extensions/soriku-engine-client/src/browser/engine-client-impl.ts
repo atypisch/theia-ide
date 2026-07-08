@@ -42,6 +42,7 @@ import {
     HealthResponse,
     InstalledModelsResponse,
     MinionSpawnOutcome,
+    TranscribeResponse,
     ModelMutationResponse,
     PlanSignalResponse,
     ProviderPresetsResponse,
@@ -110,6 +111,13 @@ export class EngineClientImpl implements EngineClient {
 
     async whoami(): Promise<WhoamiResponse> {
         return this.createTransport().getJson<WhoamiResponse>('/api/v1/auth/whoami');
+    }
+
+    async transcribeAudio(audio: Blob, language?: string, signal?: AbortSignal): Promise<TranscribeResponse> {
+        const form = new FormData();
+        form.append('file', audio, 'recording.webm');
+        const query = language ? `?language=${encodeURIComponent(language)}` : '';
+        return this.createTransport().postForm<TranscribeResponse>(`/api/v1/transcribe${query}`, form, signal);
     }
 
     async getBillingPlans(): Promise<BillingPlansResponse> {

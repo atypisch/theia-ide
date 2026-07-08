@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 import {
-    AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, reduceSseEvent,
+    AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, parseFileMentions, reduceSseEvent,
     roleLabel, SUBAGENT_ROLES, summarizeAgentInsights, withWorkspacePrefix,
 } from '../common/chat-model';
 
@@ -467,5 +467,30 @@ describe('roleLabel', () => {
         for (const role of SUBAGENT_ROLES) {
             assert.ok(roleLabel(role).length > 0);
         }
+    });
+});
+
+describe('parseFileMentions', () => {
+    it('extracts a single @file mention', () => {
+        assert.deepEqual(parseFileMentions('please fix @router.py'), ['router.py']);
+    });
+
+    it('extracts multiple mentions in order of first appearance', () => {
+        assert.deepEqual(
+            parseFileMentions('compare @agents/router.py with @agents/base.py, then update @index.ts'),
+            ['agents/router.py', 'agents/base.py', 'index.ts'],
+        );
+    });
+
+    it('dedupes repeated mentions of the same file', () => {
+        assert.deepEqual(parseFileMentions('look at @router.py again — @router.py has the bug'), ['router.py']);
+    });
+
+    it('ignores plain @-mentions with no recognized file extension', () => {
+        assert.deepEqual(parseFileMentions('cc @someone, please review'), []);
+    });
+
+    it('returns an empty array for text with no mentions', () => {
+        assert.deepEqual(parseFileMentions('no file references here'), []);
     });
 });

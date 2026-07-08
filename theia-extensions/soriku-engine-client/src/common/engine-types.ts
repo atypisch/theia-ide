@@ -426,6 +426,16 @@ export interface HealthResponse {
     [key: string]: unknown;
 }
 
+/** Response from POST /api/v1/transcribe (core/voice — real, non-mocked speech-to-text). */
+export interface TranscribeResponse {
+    text: string;
+    language_detected?: string;
+    duration_seconds?: number;
+    provider_used?: string;
+    model_used?: string;
+    processing_time_ms?: number;
+}
+
 export interface RankedModelInfo {
     model_id: string;
     score: number;

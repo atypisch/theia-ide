@@ -9,15 +9,10 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandRegistry, MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { AgentAvatar, AgentCategory, Badge, Btn, Card } from 'soriku-theme-ext/lib/browser/ui';
+import { AgentAvatar, AgentCategory, Badge, Btn, Card, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import { AgentItem, toAgentItems } from '../common/agent-view';
 import { SorikuAgentSelectionService } from './soriku-agent-selection';
 import { SorikuAgentCatalog } from './soriku-agent-catalog';
-
-/** Engine categories are free-text; fall back to 'general' for anything unrecognized. */
-function toKnownCategory(category: string): AgentCategory {
-    return category === 'coding' || category === 'reasoning' || category === 'general' ? category : 'general';
-}
 
 type AgentFilter = 'all' | AgentCategory;
 const AGENT_FILTERS: ReadonlyArray<{ value: AgentFilter; label: string }> = [
@@ -92,7 +87,7 @@ export class SorikuAgentsWidget extends ReactWidget {
     }
 
     protected openChat(item: AgentItem): void {
-        this.selection.setActive(item.id, item.name);
+        this.selection.setActive(item.id, item.name, item.category, item.avatarColor);
         if (this.commands.getCommand(SORIKU_CHAT_OPEN_COMMAND)) {
             this.commands.executeCommand(SORIKU_CHAT_OPEN_COMMAND, item.id);
         } else {

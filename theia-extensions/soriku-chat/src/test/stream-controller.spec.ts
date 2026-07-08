@@ -80,6 +80,16 @@ describe('ChatStreamController.run', () => {
         assert.equal(final.text, 'partial');
     });
 
+    it('user stop before any text streamed is still done+stopped with empty text (never renders as a silent blank bubble)', async () => {
+        const h = makeController([
+            new EngineError('aborted', 'SSE stream aborted'),
+        ]);
+        const { final } = await h.run();
+        assert.equal(final.status, 'done');
+        assert.equal(final.phase, 'stopped');
+        assert.equal(final.text, '');
+    });
+
     it('a transport drop marks the turn interrupted (retryable), text preserved (#5)', async () => {
         const h = makeController([
             { type: 'chunk', content: 'kept' },

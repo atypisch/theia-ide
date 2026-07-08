@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    applyUnifiedPatch,
+    applyUnifiedPatch, computeLineDiffStats,
     DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind,
     progressiveRevealFrames, truncateToMaxLines, normalizePosixPath, isPathWithinRoot, sessionAllowKey,
 } from '../common/tool-delegation';
@@ -198,5 +198,33 @@ describe('applyUnifiedPatch — strict validation (C-D)', () => {
     it('supports pure insertion via a -0,0 hunk into an empty file', () => {
         const patch = '@@ -0,0 +1,2 @@\n+first\n+second';
         assert.equal(applyUnifiedPatch('', patch), 'first\nsecond\n');
+    });
+});
+
+describe('computeLineDiffStats (chat DiffBar)', () => {
+    it('counts added lines for a brand-new file (empty before)', () => {
+        const stats = computeLineDiffStats('', 'a\nb\nc');
+        assert.deepEqual(stats, { added: 3, removed: 0 });
+    });
+
+    it('counts removed lines when a file is emptied', () => {
+        const stats = computeLineDiffStats('a\nb\nc', '');
+        assert.deepEqual(stats, { added: 0, removed: 3 });
+    });
+
+    it('reports zero added/removed for identical content', () => {
+        const stats = computeLineDiffStats('a\nb\nc', 'a\nb\nc');
+        assert.deepEqual(stats, { added: 0, removed: 0 });
+    });
+
+    it('counts a mix of unchanged, added and removed lines', () => {
+        const stats = computeLineDiffStats('a\nb\nc', 'a\nx\nc\nd');
+        assert.deepEqual(stats, { added: 2, removed: 1 });
+    });
+
+    it('returns undefined rather than compute when either side exceeds the 4000-line cap', () => {
+        const huge = new Array(4001).fill('line').join('\n');
+        assert.equal(computeLineDiffStats(huge, 'a'), undefined);
+        assert.equal(computeLineDiffStats('a', huge), undefined);
     });
 });

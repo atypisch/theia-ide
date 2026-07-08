@@ -30,3 +30,8 @@ export function categoryColors(category: AgentCategory): CategoryColors {
         line: `color-mix(in srgb, ${c} 40%, transparent)`,
     };
 }
+
+/** Coerces the engine's free-text category string to one of the three known categories. */
+export function toKnownCategory(category: string | undefined): AgentCategory {
+    return category === 'coding' || category === 'reasoning' || category === 'general' ? category : 'general';
+}

@@ -64,6 +64,49 @@ export class EngineHttpTransport {
         return this.requestJson<T>('DELETE', path);
     }
 
+    /**
+     * multipart/form-data POST (audio transcription upload) — deliberately
+     * bypasses rawRequest()/buildAuthHeaders(), which hardcode
+     * `Content-Type: application/json`; a FormData body needs the browser to
+     * set its own `multipart/form-data; boundary=...` header.
+     */
+    async postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+        const headers: Record<string, string> = { 'Accept': 'application/json' };
+        if (this.config.authToken) {
+            headers['Authorization'] = `Bearer ${this.config.authToken}`;
+        }
+        if (this.config.groupId) {
+            headers['X-Soriku-Group'] = this.config.groupId;
+        }
+        let response: Response;
+        try {
+            response = await this.fetchFn(joinUrl(this.config.baseUrl, path), { method: 'POST', headers, body: form, signal });
+        } catch (error) {
+            if ((error as Error).name === 'AbortError') {
+                throw new EngineError('aborted', `Request aborted: ${path}`);
+            }
+            throw new EngineUnavailableError(`Network error for ${path}: ${(error as Error).message}`, { cause: error as Error });
+        }
+        if (!response.ok) {
+            let errorBody: unknown;
+            try {
+                errorBody = await response.clone().json();
+            } catch {
+                errorBody = await response.clone().text().catch(() => undefined);
+            }
+            throw engineErrorFromStatus(response.status, `HTTP ${response.status} for ${path}`, { body: errorBody });
+        }
+        const text = await response.text();
+        if (!text) {
+            return undefined as T;
+        }
+        try {
+            return JSON.parse(text) as T;
+        } catch (error) {
+            throw new EngineError('parse', `Failed to parse JSON from ${path}`, { cause: error as Error, status: response.status, body: text });
+        }
+    }
+
     async requestJson<T>(method: string, path: string, body?: unknown): Promise<T> {
         const response = await this.rawRequest(method, path, body, false);
         if (response.status === 204) {

@@ -16,13 +16,14 @@ import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client'
 import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { describeToolConfirmation, parseConfirmToolEvent } from '../common/tool-confirmation';
 import {
-    DELEGATED_TOOLS, ToolRequest, applyUnifiedPatch, errorResult, formatDirectoryListing, formatSearchResults,
-    formatWriteResult, getNumberArg, getStringArg, isPathWithinRoot, okResult, parseToolRequestEvent, pathKind,
-    sessionAllowKey, truncateToMaxLines,
+    DELEGATED_TOOLS, ToolRequest, applyUnifiedPatch, computeLineDiffStats, errorResult, formatDirectoryListing,
+    formatSearchResults, formatWriteResult, getNumberArg, getStringArg, isPathWithinRoot, okResult,
+    parseToolRequestEvent, pathKind, sessionAllowKey, truncateToMaxLines,
 } from '../common/tool-delegation';
 import { SorikuEditorRevealService } from './soriku-editor-reveal-service';
 import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
 import { SorikuDiffReviewService } from './soriku-diff-review-service';
+import { SorikuGeneratedFilesTracker } from './soriku-generated-files-tracker';
 
 /** Session-scoped auto-approve for destructive tools (Allow always). */
 const SESSION_ALLOW = new Set<string>();
@@ -47,6 +48,9 @@ export class SorikuToolConfirmationService {
 
     @inject(SorikuDiffReviewService)
     protected readonly diffReview: SorikuDiffReviewService;
+
+    @inject(SorikuGeneratedFilesTracker)
+    protected readonly generatedFiles: SorikuGeneratedFilesTracker;
 
     /** Tools the IDE can execute locally — sent to the engine as `client_tools`. */
     delegatedTools(): string[] {
@@ -185,8 +189,19 @@ export class SorikuToolConfirmationService {
         }
         if (request.tool === 'file_write') {
             const text = getStringArg(request.args, 'content') ?? '';
+            let before = '';
+            try {
+                before = (await this.fileService.read(uri)).value;
+            } catch {
+                before = '';
+            }
             await this.fileService.write(uri, text);
             const result = okResult(formatWriteResult(uri.path.toString(), uri.path.base, text.length));
+            // Keyed by the tool call's own raw `path` arg — the same string
+            // chat-model.ts reads off the SSE event to build generatedFiles,
+            // so the chat widget's DiffBar lookup matches without depending
+            // on this service's own URI-resolution/normalization.
+            this.recordDiffStats(getStringArg(request.args, 'path') ?? uri.path.toString(), before, text);
             await this.editorReveal.revealPath(uri.path.toString());
             return result;
         }
@@ -196,6 +211,7 @@ export class SorikuToolConfirmationService {
             const updated = applyUnifiedPatch(existing.value, patch);
             await this.fileService.write(uri, updated);
             const result = okResult(formatWriteResult(uri.path.toString(), uri.path.base, updated.length));
+            this.recordDiffStats(getStringArg(request.args, 'path') ?? uri.path.toString(), existing.value, updated);
             await this.editorReveal.revealPath(uri.path.toString());
             return result;
         }
@@ -215,6 +231,14 @@ export class SorikuToolConfirmationService {
             return okResult((out.stdout || '') + (out.stderr || ''));
         }
         return errorResult(`Unsupported tool: ${request.tool}`);
+    }
+
+    /** Records real added/removed line stats for the chat DiffBar; silently skips if the diff is too large to compute cheaply. */
+    protected recordDiffStats(path: string, before: string, after: string): void {
+        const stats = computeLineDiffStats(before, after);
+        if (stats) {
+            this.generatedFiles.record(path, stats);
+        }
     }
 
     /**

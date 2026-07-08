@@ -38,6 +38,20 @@ export interface PendingPlan {
 export interface GeneratedFileView {
     path: string;
     filename?: string;
+    /** Line-diff stats for the DiffBar, when known (never fabricated — omitted otherwise). */
+    added?: number;
+    removed?: number;
+}
+
+const FILE_MENTION_RE = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
+
+/** Extracts deduped `@file.ext`-style mentions from a chat prompt, in order of first appearance. */
+export function parseFileMentions(text: string): string[] {
+    const seen = new Set<string>();
+    for (const match of text.matchAll(FILE_MENTION_RE)) {
+        seen.add(match[1]);
+    }
+    return Array.from(seen);
 }
 
 // ── Turn construction ───────────────────────────────────────────────────────
@@ -115,6 +129,7 @@ export interface UserMessage {
     role: 'user';
     id: string;
     text: string;
+    fileMentions?: string[];
 }
 
 export type ChatMessage = UserMessage | AssistantTurn;

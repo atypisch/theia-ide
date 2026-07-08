@@ -96,14 +96,15 @@ export function SegmentedPicker<T extends string>({ label, options, value, onCha
 }
 
 /** Primary/secondary/ghost button, e.g. "Approve & run" / "Cancel". */
-export function Btn({ children, variant = 'primary', onClick, disabled }: {
+export function Btn({ children, variant = 'primary', onClick, disabled, title }: {
     children: React.ReactNode;
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
     onClick?: () => void;
     disabled?: boolean;
+    title?: string;
 }): React.ReactElement {
     return (
-        <button className={`sk-btn sk-btn-${variant}`} onClick={onClick} disabled={disabled}>
+        <button className={`sk-btn sk-btn-${variant}`} onClick={onClick} disabled={disabled} title={title}>
             {children}
         </button>
     );

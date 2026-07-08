@@ -23,11 +23,13 @@ import {
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
+import { initials } from 'soriku-agents-ext/lib/common/agent-view';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
+import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
-import { Overlay, SegmentedPicker } from 'soriku-theme-ext/lib/browser/ui';
+import { AgentAvatar, Badge, Btn, DiffBar, Overlay, Pill, SegmentedPicker, StatusDot, VerifyPill, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
@@ -45,6 +47,7 @@ import {
     busyPhase,
     createAssistantTurn,
     formatToolCallSummary,
+    parseFileMentions,
     summarizeAgentInsights,
     withWorkspacePrefix,
 } from '../common/chat-model';
@@ -159,6 +162,9 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuEditorRevealService)
     protected readonly editorReveal: SorikuEditorRevealService;
 
+    @inject(SorikuGeneratedFilesTracker)
+    protected readonly generatedFilesTracker: SorikuGeneratedFilesTracker;
+
     @inject(SorikuToastService)
     protected readonly toast: SorikuToastService;
 
@@ -215,6 +221,11 @@ export class SorikuChatWidget extends ReactWidget {
         this.session.conversationTitle = value;
     }
     protected inputRef = React.createRef<HTMLTextAreaElement>();
+
+    /** Mic dictation state, backed by the real POST /api/v1/transcribe endpoint (core/voice) — no mock. */
+    protected recording: 'idle' | 'recording' | 'transcribing' = 'idle';
+    protected mediaRecorder: MediaRecorder | undefined;
+    protected recordedChunks: Blob[] = [];
 
     /** One stream at a time — backed by the controller (P4-a), so there is a single source of truth. */
     protected get streaming(): boolean {
@@ -306,11 +317,13 @@ export class SorikuChatWidget extends ReactWidget {
         }));
         this.toDispose.push(this.session.onDidChange(() => this.scheduleUpdate()));
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
+        this.toDispose.push(this.generatedFilesTracker.onDidChange(() => this.scheduleUpdate()));
         // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
         // no longer mutates state / executes delegated tools / writes files) and flush
         // any pending approvals so the engine stream isn't left blocked (#2/#1).
         this.toDispose.push({
             dispose: () => {
+                this.mediaRecorder?.stop();
                 this.streamController.abort();
                 this.toolApproval.cancelAll();
             },
@@ -451,6 +464,56 @@ export class SorikuChatWidget extends ReactWidget {
         return this.session.nextId();
     }
 
+    protected async toggleRecording(): Promise<void> {
+        if (this.recording === 'recording') {
+            this.mediaRecorder?.stop();
+            return;
+        }
+        if (this.recording !== 'idle') {
+            return;
+        }
+        let stream: MediaStream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            this.messages.error(`Could not access the microphone: ${(e as Error).message}`);
+            return;
+        }
+        this.recordedChunks = [];
+        const recorder = new MediaRecorder(stream);
+        this.mediaRecorder = recorder;
+        recorder.ondataavailable = e => { if (e.data.size > 0) { this.recordedChunks.push(e.data); } };
+        recorder.onstop = () => {
+            stream.getTracks().forEach(track => track.stop());
+            this.mediaRecorder = undefined;
+            this.transcribeRecording();
+        };
+        recorder.start();
+        this.recording = 'recording';
+        this.update();
+    }
+
+    protected async transcribeRecording(): Promise<void> {
+        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+        this.recordedChunks = [];
+        this.recording = 'transcribing';
+        this.update();
+        try {
+            const result = await this.engineClient.transcribeAudio(blob);
+            const textarea = this.inputRef.current;
+            if (textarea) {
+                const sep = textarea.value && !textarea.value.endsWith(' ') ? ' ' : '';
+                textarea.value = `${textarea.value}${sep}${result.text}`;
+                textarea.focus();
+            }
+        } catch (e) {
+            this.messages.error(`Transcription failed: ${(e as Error).message}`);
+        } finally {
+            this.recording = 'idle';
+            this.update();
+        }
+    }
+
     protected submitFromInput(): void {
         const textarea = this.inputRef.current;
         if (!textarea) {
@@ -473,7 +536,8 @@ export class SorikuChatWidget extends ReactWidget {
             return;
         }
         this.resolvingPlans.clear();
-        this.conversation.push({ role: 'user', id: this.nextId(), text });
+        const fileMentions = parseFileMentions(text);
+        this.conversation.push({ role: 'user', id: this.nextId(), text, fileMentions: fileMentions.length > 0 ? fileMentions : undefined });
         const initialTurn = createAssistantTurn(this.nextId());
         const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
@@ -586,15 +650,7 @@ export class SorikuChatWidget extends ReactWidget {
         if (this.preferences.get<boolean>('soriku.context.editorEnabled', true) !== false) {
             items.push(...buildEditorContextItems(this.editorContext.collect()));
         }
-        const mentionRe = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
-        let match: RegExpExecArray | null;
-        const seen = new Set<string>();
-        while ((match = mentionRe.exec(prompt)) !== null) {
-            const rel = match[1];
-            if (seen.has(rel)) {
-                continue;
-            }
-            seen.add(rel);
+        for (const rel of parseFileMentions(prompt)) {
             items.push({ type: 'file', value: rel });
         }
         return items;
@@ -754,25 +810,30 @@ export class SorikuChatWidget extends ReactWidget {
 
     protected render(): React.ReactNode {
         this.renderPlanDetailPortal();
-        const agentId = this.selection.getActiveId();
-        const agentName = this.selection.getActiveName();
+        const active = this.selection.getActive();
+        const agentId = active.id;
+        const agentName = active.name;
+        const category = active.category ? toKnownCategory(active.category) : undefined;
         return <div className='soriku-chat'>
             <div className='soriku-chat-header'>
                 <div className='soriku-chat-header-main'>
                     {agentId
-                        ? <span>Agent: <span className='soriku-chat-agent'>{agentName ?? agentId}</span></span>
+                        ? <span className='soriku-chat-agent-identity'>
+                            <AgentAvatar initials={initials(agentName ?? agentId)} category={category ?? 'general'} size='sm' />
+                            <span className='soriku-chat-agent'>{agentName ?? agentId}</span>
+                            {category && <Badge tone='acc'>{category}</Badge>}
+                        </span>
                         : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
                     {this.conversationTitle && <span className='soriku-chat-conv-title' title={this.conversationTitle}>{this.conversationTitle}</span>}
                 </div>
                 <div className='soriku-chat-header-actions'>
-                    {agentId && <button className='theia-button secondary soriku-chat-insights-toggle'
-                        title='What this agent has learned' onClick={() => this.toggleInsights()}>
+                    {agentId && <Btn variant='secondary' title='What this agent has learned' onClick={() => this.toggleInsights()}>
                         <span className='codicon codicon-lightbulb' /> Insights
-                    </button>}
-                    <button className='theia-button secondary soriku-chat-new' title='Start a new conversation'
+                    </Btn>}
+                    <Btn variant='secondary' title='Start a new conversation'
                         disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
                         New chat
-                    </button>
+                    </Btn>
                 </div>
             </div>
             {agentId && this.insightsOpen && this.renderInsights()}
@@ -798,9 +859,17 @@ export class SorikuChatWidget extends ReactWidget {
                     }}
                 />
                 <div className='soriku-chat-actions'>
+                    <Btn
+                        variant={this.recording === 'recording' ? 'danger' : 'secondary'}
+                        disabled={!agentId || this.recording === 'transcribing'}
+                        title={this.recording === 'recording' ? 'Stop recording' : 'Dictate a message'}
+                        onClick={() => this.toggleRecording()}
+                    >
+                        <span className={`codicon ${this.recording === 'transcribing' ? 'codicon-loading codicon-modifier-spin' : 'codicon-mic'}`} />
+                    </Btn>
                     {this.streaming
-                        ? <button className='theia-button secondary' onClick={() => this.stop()}>Stop</button>
-                        : <button className='theia-button' disabled={!agentId} onClick={() => this.submitFromInput()}>Send</button>}
+                        ? <Btn variant='secondary' onClick={() => this.stop()}>Stop</Btn>
+                        : <Btn disabled={!agentId} onClick={() => this.submitFromInput()}>Send</Btn>}
                 </div>
             </div>
         </div>;
@@ -810,6 +879,9 @@ export class SorikuChatWidget extends ReactWidget {
         if (message.role === 'user') {
             return <div key={message.id} className='soriku-msg soriku-msg-user'>
                 <div className='soriku-msg-text'>{message.text}</div>
+                {message.fileMentions && message.fileMentions.length > 0 && <div className='soriku-msg-file-chips'>
+                    {message.fileMentions.map(f => <Pill key={f}>{f}</Pill>)}
+                </div>}
             </div>;
         }
         return this.renderAssistant(message);
@@ -840,14 +912,16 @@ export class SorikuChatWidget extends ReactWidget {
             {turn.status === 'error' && <div className='soriku-msg-error'>
                 {turn.error}
                 {turn.authRequired && <span className='soriku-msg-error-actions'>
-                    <button className='theia-button secondary' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</button>
-                    <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+                    <Btn variant='secondary' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</Btn>
+                    <Btn variant='secondary' onClick={() => this.retryTurn(turn.id)}>Retry</Btn>
                 </span>}
             </div>}
             {turn.status === 'interrupted' && <div className='soriku-msg-interrupted'>
                 <span>Connection interrupted — partial answer kept.</span>
-                <button className='theia-button secondary' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+                <Btn variant='secondary' onClick={() => this.retryTurn(turn.id)}>Retry</Btn>
             </div>}
+            {turn.status === 'done' && !turn.text && turn.phase === 'stopped' &&
+                <div className='soriku-msg-stopped'>Stopped — no answer was generated.</div>}
             {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
         </div>;
     }
@@ -914,12 +988,12 @@ export class SorikuChatWidget extends ReactWidget {
 
     protected renderPlanActions(plan: PendingPlan, resolving: boolean): React.ReactNode {
         return <div className='soriku-plan-actions'>
-            <button className='theia-button' disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
+            <Btn disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
                 {resolving ? 'Starting…' : 'Approve & run'}
-            </button>
-            <button className='theia-button secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
+            </Btn>
+            <Btn variant='secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
                 Cancel
-            </button>
+            </Btn>
         </div>;
     }
 
@@ -1154,7 +1228,7 @@ export class SorikuChatWidget extends ReactWidget {
             {potential?.flagged && <div className='soriku-subagent-flagged'>
                 <span className='codicon codicon-sparkle' />
                 <div className='soriku-subagent-flagged-text'>The engine flagged this subagent as having <b>potential</b>.</div>
-                <button className='theia-button' onClick={() => this.openPromoteFromInsight()}>Promote…</button>
+                <Btn onClick={() => this.openPromoteFromInsight()}>Promote…</Btn>
             </div>}
         </div>;
     }
@@ -1192,11 +1266,11 @@ export class SorikuChatWidget extends ReactWidget {
                 <span className='soriku-subagent-promote-note'>
                     {potential?.eligible_to_promote ? 'Eligible — the engine\'s streak criterion is met.' : 'Not yet eligible — the streak criterion isn\'t met.'}
                 </span>
-                <button className='theia-button secondary' onClick={this.closeSubagentOverlay}>Cancel</button>
-                <button className='theia-button' disabled={!potential?.eligible_to_promote || this.subagentOverlayLoading}
+                <Btn variant='secondary' onClick={this.closeSubagentOverlay}>Cancel</Btn>
+                <Btn disabled={!potential?.eligible_to_promote || this.subagentOverlayLoading}
                     onClick={() => this.doPromoteSubagent()}>
                     <span className='codicon codicon-arrow-up' />Promote to agent
-                </button>
+                </Btn>
             </div>
         </div>;
     }
@@ -1231,11 +1305,11 @@ export class SorikuChatWidget extends ReactWidget {
             </div>
             {this.subagentOverlayError && <div className='soriku-subagent-insight-error'>{this.subagentOverlayError}</div>}
             <div className='soriku-subagent-spawn-actions'>
-                <button className='theia-button secondary' onClick={this.closeSubagentOverlay}>Cancel</button>
-                <button className='theia-button' disabled={!this.spawnGoal.trim() || this.spawning}
+                <Btn variant='secondary' onClick={this.closeSubagentOverlay}>Cancel</Btn>
+                <Btn disabled={!this.spawnGoal.trim() || this.spawning}
                     onClick={() => this.doSpawnSubagent()}>
                     {this.spawning ? 'Spawning…' : 'Spawn'}
-                </button>
+                </Btn>
             </div>
         </div>;
     }
@@ -1398,7 +1472,7 @@ export class SorikuChatWidget extends ReactWidget {
             title={clickable ? 'View subagent insight' : undefined}
             onClick={clickable ? () => this.openSubagentInsight(a, planId!) : undefined}
         >
-            <span className={`soriku-fleet-dot soriku-fleet-dot-${a.status}`} />
+            <span title={a.status}><StatusDot status={a.status} /></span>
             <span className='soriku-fleet-role' title={a.personaId ? `persona: ${a.personaId}` : a.workerId}>{label}</span>
             {sub && <span className='soriku-fleet-subrole'>{sub}</span>}
             {a.model && <span className='soriku-fleet-model'>{a.model}</span>}
@@ -1408,23 +1482,28 @@ export class SorikuChatWidget extends ReactWidget {
             {a.corrections > 0 && <span className='soriku-fleet-fix' title='Writes the engine blocked or recovered for this worker'>
                 {a.corrections} fix
             </span>}
-            {a.verdict && <span
-                className={`soriku-fleet-verdict soriku-fleet-verdict-${a.verdict.status}`}
-                title={a.verdict.notes ?? ''}
-            >{a.verdict.status === 'approved' ? '✓ approved' : '⟳ changes'}</span>}
-            <span className='soriku-fleet-status'>{a.status}</span>
+            {a.verdict && <span title={a.verdict.notes ?? ''}>
+                <VerifyPill state={a.verdict.status === 'approved' ? 'verified' : 'fixing'} />
+            </span>}
         </div>;
     }
 
     protected renderGeneratedFiles(turn: AssistantTurn): React.ReactNode {
         return <ul className='soriku-generated-files'>
-            {turn.generatedFiles.map(file => <li key={file.path}>
-                <button className='soriku-generated-file' title={file.path}
-                    onClick={() => this.openGeneratedFile(file.path)}>
-                    <span className='codicon codicon-file' />
-                    {file.filename ?? file.path.split('/').pop() ?? file.path}
-                </button>
-            </li>)}
+            {turn.generatedFiles.map(file => {
+                const diff = this.generatedFilesTracker.get(file.path);
+                return <li key={file.path}>
+                    <button className='soriku-generated-file' title={file.path}
+                        onClick={() => this.openGeneratedFile(file.path)}>
+                        <span className='codicon codicon-file' />
+                        {file.filename ?? file.path.split('/').pop() ?? file.path}
+                    </button>
+                    {diff && <span className='soriku-generated-file-stats'>
+                        <DiffBar added={diff.added} removed={diff.removed} />
+                        <span className='soriku-generated-file-counts'>+{diff.added} −{diff.removed}</span>
+                    </span>}
+                </li>;
+            })}
         </ul>;
     }
 
@@ -1489,8 +1568,8 @@ export class SorikuChatWidget extends ReactWidget {
                 Allow always this session
             </label>
             <div className='soriku-inline-approval-actions'>
-                <button className='theia-button secondary' onClick={() => this.respondToolApproval(false)}>Deny</button>
-                <button className='theia-button' onClick={() => this.respondToolApproval(true)}>Allow</button>
+                <Btn variant='secondary' onClick={() => this.respondToolApproval(false)}>Deny</Btn>
+                <Btn onClick={() => this.respondToolApproval(true)}>Allow</Btn>
             </div>
         </div>;
     }

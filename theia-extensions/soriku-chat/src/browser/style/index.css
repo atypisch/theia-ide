@@ -36,6 +36,12 @@
     font-size: var(--theia-ui-font-size0);
 }
 
+.soriku-chat-agent-identity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .soriku-chat-agent {
     font-weight: 600;
 }
@@ -65,6 +71,19 @@
     background-color: var(--theia-editor-inactiveSelectionBackground);
     border-radius: 4px;
     padding: 6px 8px;
+}
+
+.soriku-msg-file-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.soriku-msg-stopped {
+    color: var(--theia-descriptionForeground);
+    font-style: italic;
+    padding: 4px 0;
 }
 
 .soriku-msg-meta {
@@ -586,32 +605,6 @@
     background: var(--theia-toolbar-hoverBackground);
 }
 
-.soriku-fleet-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex: none;
-    background: var(--theia-descriptionForeground);
-}
-
-.soriku-fleet-dot-running {
-    background: var(--theia-progressBar-background, #3794ff);
-    animation: soriku-fleet-pulse 1.2s ease-in-out infinite;
-}
-
-.soriku-fleet-dot-done {
-    background: var(--theia-successBackground, #388a34);
-}
-
-.soriku-fleet-dot-error {
-    background: var(--theia-errorForeground);
-}
-
-@keyframes soriku-fleet-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-}
-
 .soriku-fleet-role {
     font-weight: 600;
     min-width: 120px;
@@ -634,26 +627,6 @@
 .soriku-fleet-fix {
     color: var(--theia-editorWarning-foreground, #b58900);
     font-weight: 600;
-}
-
-.soriku-fleet-verdict {
-    font-weight: 600;
-    font-size: 0.9em;
-}
-
-.soriku-fleet-verdict-approved {
-    color: var(--theia-successBackground, #388a34);
-}
-
-.soriku-fleet-verdict-changes_requested {
-    color: var(--theia-editorWarning-foreground, #b58900);
-}
-
-.soriku-fleet-status {
-    margin-left: auto;
-    color: var(--theia-descriptionForeground);
-    text-transform: uppercase;
-    font-size: 0.85em;
 }
 
 /* Insights panel — what the active agent has learned (Fase E). */
@@ -763,6 +736,12 @@
     gap: 2px;
 }
 
+.soriku-generated-files li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .soriku-generated-file {
     background: transparent;
     border: none;
@@ -773,6 +752,18 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+.soriku-generated-file-stats {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.soriku-generated-file-counts {
+    font-family: var(--theia-code-font-family);
+    font-size: 0.85em;
+    color: var(--theia-descriptionForeground);
 }
 
 /* ─── Markdown messages ───────────────────────────────────────────── */

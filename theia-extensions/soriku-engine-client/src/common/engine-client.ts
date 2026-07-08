@@ -33,6 +33,7 @@ import {
     DiscoverModelsResponse,
     ExecutePlanRequest,
     HealthResponse,
+    TranscribeResponse,
     InstalledModelsResponse,
     MinionSpawnOutcome,
     ModelMutationResponse,
@@ -67,6 +68,9 @@ export interface EngineClient {
     ping(): Promise<HealthResponse>;
     getAuthMode(): Promise<AuthModeResponse>;
     whoami(): Promise<WhoamiResponse>;
+
+    /** Real speech-to-text via core/voice (POST /api/v1/transcribe) — no mock/local fallback. */
+    transcribeAudio(audio: Blob, language?: string, signal?: AbortSignal): Promise<TranscribeResponse>;
 
     // ── Billing / subscription (Fase 6) ──
     getBillingPlans(): Promise<BillingPlansResponse>;
