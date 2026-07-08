@@ -1,0 +1,498 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - generic [ref=f4e5]:
+      - img [ref=f4e10]
+      - generic [ref=f4e25]: Soriku Code
+      - generic [ref=f4e26]:
+        - button "File" [ref=f4e28] [cursor=pointer]
+        - button "Edit" [ref=f4e30] [cursor=pointer]
+        - button "View" [ref=f4e32] [cursor=pointer]
+        - button "Go" [ref=f4e34] [cursor=pointer]
+        - button "Run" [ref=f4e36] [cursor=pointer]
+        - button "Agents" [ref=f4e38] [cursor=pointer]
+        - button "Help" [ref=f4e40] [cursor=pointer]
+      - generic [ref=f4e41]: package.json - soriku-ide
+      - button " Run a command or go to file… ⌘⇧P" [ref=f4e42] [cursor=pointer]:
+        - generic [ref=f4e43]: 
+        - generic [ref=f4e44]: Run a command or go to file…
+        - generic [ref=f4e45]: ⌘⇧P
+      - generic [ref=f4e46]: Engine unreachable
+      - button " Dark" [ref=f4e48] [cursor=pointer]:
+        - generic [ref=f4e49]: 
+        - text: Dark
+      - button "" [ref=f4e50] [cursor=pointer]:
+        - generic [ref=f4e51]: 
+      - button "" [ref=f4e52] [cursor=pointer]:
+        - generic [ref=f4e53]: 
+      - button "" [ref=f4e54] [cursor=pointer]:
+        - generic [ref=f4e55]: 
+    - menu [ref=f4e57]:
+      - group [ref=f4e58]:
+        - button "Go Back" [ref=f4e59]:
+          - button "Go Back" [ref=f4e61]: 
+        - button "Go Forward" [ref=f4e62]:
+          - button "Go Forward" [ref=f4e64]: 
+        - button "Split Editor Right" [ref=f4e66]:
+          - button "Split Editor Right" [ref=f4e68]: 
+      - group [ref=f4e70]
+      - group [ref=f4e72]:
+        - button "Command Palette (⌘⇧P)" [ref=f4e74]:
+          - button "Command Palette (⌘⇧P)" [ref=f4e76] [cursor=pointer]: 
+    - generic [ref=f4e78]:
+      - generic [ref=f4e79]:
+        - text:   
+        - generic:                                                                                        
+      - generic [ref=f4e80]:
+        - generic [ref=f4e81]:
+          - generic [ref=f4e82]:
+            - generic [ref=f4e83]:
+              - tablist [ref=f4e85] [cursor=pointer]:
+                - listitem [ref=f4e86]:
+                  - generic [ref=f4e87]:
+                    - generic [ref=f4e88]: 
+                    - generic [ref=f4e89]: Soriku MCP Servers
+                  - generic "Close" [ref=f4e90]
+                - listitem [ref=f4e91]:
+                  - generic [ref=f4e92]:
+                    - generic [ref=f4e93]: 
+                    - generic [ref=f4e94]: package.json
+                  - generic "Close" [ref=f4e95]: 
+                - listitem [ref=f4e96]:
+                  - generic [ref=f4e97]:
+                    - generic [ref=f4e98]: 
+                    - generic [ref=f4e99]: Soriku Routing Overrides
+                  - generic "Close" [ref=f4e100]
+                - listitem [ref=f4e101]:
+                  - generic [ref=f4e102]:
+                    - generic [ref=f4e103]: 
+                    - generic [ref=f4e104]: Soriku Settings
+                  - generic "Close" [ref=f4e105]
+                - listitem [ref=f4e106]:
+                  - generic [ref=f4e107]:
+                    - generic [ref=f4e108]: 
+                    - generic [ref=f4e109]: Soriku Conversations
+                  - generic "Close" [ref=f4e110]
+                - listitem [ref=f4e111]:
+                  - generic [ref=f4e112]:
+                    - generic [ref=f4e113]: 
+                    - generic [ref=f4e114]: Soriku Agents
+                  - generic "Close" [ref=f4e115]
+                - listitem [ref=f4e116]:
+                  - generic [ref=f4e118]: Welcome
+                  - generic "Close" [ref=f4e119]
+                - listitem [ref=f4e120]:
+                  - generic [ref=f4e121]:
+                    - generic [ref=f4e122]: 
+                    - generic [ref=f4e123]: Manage Models
+                  - generic "Close" [ref=f4e124]
+                - listitem [ref=f4e125]:
+                  - generic [ref=f4e126]:
+                    - generic [ref=f4e127]: 
+                    - generic [ref=f4e128]: Soriku Capability Map
+                  - generic "Close" [ref=f4e129]
+              - generic [ref=f4e132]:
+                - button "Toggle Maximized" [ref=f4e134] [cursor=pointer]: 
+                - button "Move View to Secondary Window" [ref=f4e717] [cursor=pointer]: 
+            - list [ref=f4e720]:
+              - listitem "theia-extensions" [ref=f4e721]:
+                - generic [ref=f4e722]: theia-extensions
+                - text: 
+              - listitem "theia-extensions/soriku-agent-customization" [ref=f4e723]:
+                - generic [ref=f4e724]: soriku-agent-customization
+                - text: 
+              - listitem "theia-extensions/soriku-agent-customization/package.json" [ref=f4e725]:
+                - generic [ref=f4e726]: 
+                - generic [ref=f4e727]: package.json
+                - text: 
+              - listitem "…" [ref=f4e728]:
+                - generic [ref=f4e729]: …
+          - text: 
+          - tabpanel [ref=f4e730]:
+            - code [ref=f4e731]:
+              - generic [ref=f4e732]:
+                - textbox "Editor content" [active]
+                - textbox [ref=f4e733]
+                - generic [ref=f4e736]:
+                  - generic [ref=f4e737]:
+                    - generic [ref=f4e739] [cursor=pointer]: 
+                    - generic [ref=f4e740]: "1"
+                  - generic [ref=f4e742]: "2"
+                  - generic [ref=f4e744]: "3"
+                  - generic [ref=f4e746]: "4"
+                  - generic [ref=f4e747]:
+                    - generic [ref=f4e748] [cursor=pointer]: 
+                    - generic [ref=f4e749]: "5"
+                  - generic [ref=f4e751]: "6"
+                  - generic [ref=f4e753]: "7"
+                  - generic [ref=f4e755]: "8"
+                  - generic [ref=f4e756]:
+                    - generic [ref=f4e757] [cursor=pointer]: 
+                    - generic [ref=f4e758]: "9"
+                  - generic [ref=f4e760]: "10"
+                  - generic [ref=f4e762]: "11"
+                  - generic [ref=f4e764]: "12"
+                  - generic [ref=f4e765]:
+                    - generic [ref=f4e766] [cursor=pointer]: 
+                    - generic [ref=f4e767]: "13"
+                  - generic [ref=f4e769]: "14"
+                  - generic [ref=f4e771]: "15"
+                  - generic [ref=f4e773]: "16"
+                  - generic [ref=f4e775]: "17"
+                  - generic [ref=f4e777]: "18"
+                  - generic [ref=f4e778]:
+                    - generic [ref=f4e779] [cursor=pointer]: 
+                    - generic [ref=f4e780]: "19"
+                  - generic [ref=f4e782]: "20"
+                  - generic [ref=f4e784]: "21"
+                  - generic [ref=f4e786]: "22"
+                - generic [ref=f4e843]:
+                  - generic [ref=f4e845]: "{"
+                  - generic [ref=f4e847]: "\"name\": \"soriku-agent-customization-ext\","
+                  - generic [ref=f4e849]: "\"version\": \"0.1.0\","
+                  - generic [ref=f4e851]: "\"description\": \"Soriku IDE — agent persona editing\","
+                  - generic [ref=f4e853]: "\"keywords\": ["
+                  - generic [ref=f4e855]: "\"theia-extension\""
+                  - generic [ref=f4e857]: "],"
+                  - generic [ref=f4e859]: "\"license\": \"MIT\","
+                  - generic [ref=f4e861]: "\"files\": ["
+                  - generic [ref=f4e863]: "\"lib\","
+                  - generic [ref=f4e865]: "\"src\""
+                  - generic [ref=f4e867]: "],"
+                  - generic [ref=f4e869]: "\"dependencies\": {"
+                  - generic [ref=f4e871]: "\"@theia/core\": \"1.73.0-next.2\","
+                  - generic [ref=f4e873]: "\"inversify\": \"^6.2.2\","
+                  - generic [ref=f4e875]: "\"soriku-engine-client-ext\": \"0.1.0\","
+                  - generic [ref=f4e877]: "\"soriku-theme-ext\": \"0.1.0\""
+                  - generic [ref=f4e879]: "},"
+                  - generic [ref=f4e881]: "\"devDependencies\": {"
+                  - generic [ref=f4e883]: "\"@types/node\": \"^20.0.0\","
+                  - generic [ref=f4e885]: "\"rimraf\": \"^2.7.1\","
+                  - generic [ref=f4e887]: "\"typescript\": \"^4.9.5\""
+          - text:         
+        - generic [ref=f4e155]:
+          - generic [ref=f4e157]:
+            - tablist [ref=f4e159] [cursor=pointer]:
+              - listitem [ref=f4e160]:
+                - generic [ref=f4e161]:
+                  - generic [ref=f4e162]: 
+                  - generic [ref=f4e163]: Problems
+                - generic "Close" [ref=f4e164]: 
+              - listitem [ref=f4e165]:
+                - generic [ref=f4e167]: zsh
+                - generic "Close" [ref=f4e168]
+            - generic [ref=f4e169]:
+              - button "Clear All" [ref=f4e171] [cursor=pointer]: 
+              - button "Maximize Bottom Panel" [ref=f4e173] [cursor=pointer]: 
+              - button "Collapse All" [ref=f4e175] [cursor=pointer]: 
+          - tabpanel [ref=f4e176]:
+            - generic [ref=f4e178]: No problems have been detected in the workspace so far.
+          - text:      
+      - generic [ref=f4e179]:
+        - tablist [ref=f4e184] [cursor=pointer]:
+          - listitem [ref=f4e185]:
+            - generic [ref=f4e187]: 
+          - listitem [ref=f4e188]:
+            - generic [ref=f4e190]: 
+          - listitem [ref=f4e191]
+        - generic [ref=f4e194]:
+          - generic "Soriku Chat" [ref=f4e196]
+          - generic [ref=f4e197]:
+            - text:  
+            - tabpanel " Soriku Chat" [ref=f4e198]:
+              - generic [ref=f4e199]:
+                - generic [ref=f4e200]:
+                  - generic [ref=f4e202]: No agent selected — pick one in the Agents panel.
+                  - button "New chat" [disabled] [ref=f4e204]
+                - generic [ref=f4e206]: Ask the agent a question to start.
+                - generic [ref=f4e207]:
+                  - textbox "Select an agent first" [disabled] [ref=f4e208]
+                  - generic [ref=f4e209]:
+                    - button "" [disabled] [ref=f4e210]:
+                      - generic [ref=f4e211]: 
+                    - button "Send" [disabled] [ref=f4e212]
+      - generic [ref=f4e214]:
+        - button "soriku-ide " [ref=f4e215] [cursor=pointer]:
+          - img [ref=f4e216]
+          - generic [ref=f4e232]: soriku-ide
+          - generic [ref=f4e233]: 
+        - generic [ref=f4e234]: Workspace
+        - list [ref=f4e235]:
+          - listitem [ref=f4e236] [cursor=pointer]:
+            - generic [ref=f4e237]: 
+            - generic [ref=f4e238]: Explorer
+          - listitem [ref=f4e239] [cursor=pointer]:
+            - generic [ref=f4e240]: 
+            - generic [ref=f4e241]: Find in Files
+          - listitem [ref=f4e242] [cursor=pointer]:
+            - generic [ref=f4e243]: 
+            - generic [ref=f4e244]: Source Control
+          - listitem [ref=f4e245] [cursor=pointer]:
+            - generic [ref=f4e246]: 
+            - generic [ref=f4e247]: Agents
+          - listitem [ref=f4e248] [cursor=pointer]:
+            - generic [ref=f4e249]: 
+            - generic [ref=f4e250]: Models
+          - listitem [ref=f4e251] [cursor=pointer]:
+            - generic [ref=f4e252]: 
+            - generic [ref=f4e253]: Capability Map
+          - listitem [ref=f4e254] [cursor=pointer]:
+            - generic [ref=f4e255]: 
+            - generic [ref=f4e256]: MCP Servers
+          - listitem [ref=f4e257] [cursor=pointer]:
+            - generic [ref=f4e258]: 
+            - generic [ref=f4e259]: Routing
+          - listitem [ref=f4e260] [cursor=pointer]:
+            - generic [ref=f4e261]: 
+            - generic [ref=f4e262]: Conversations
+        - generic [ref=f4e264]:
+          - generic [ref=f4e265] [cursor=pointer]:
+            - generic [ref=f4e266]: 
+            - generic [ref=f4e267]: soriku-ide
+          - generic [ref=f4e1045] [cursor=pointer]:
+            - generic [ref=f4e1046]: 
+            - generic [ref=f4e1047]: .browser_modules
+          - generic [ref=f4e268] [cursor=pointer]:
+            - generic [ref=f4e269]: 
+            - generic [ref=f4e270]: .claude
+          - generic [ref=f4e271] [cursor=pointer]:
+            - generic [ref=f4e272]: 
+            - generic [ref=f4e273]: .github
+          - generic [ref=f4e1034] [cursor=pointer]:
+            - generic [ref=f4e1035]: 
+            - generic [ref=f4e1036]: .playwright-mcp
+          - generic [ref=f4e277] [cursor=pointer]:
+            - generic [ref=f4e278]: 
+            - generic [ref=f4e279]: .vscode
+          - generic [ref=f4e280] [cursor=pointer]:
+            - generic [ref=f4e281]: 
+            - generic [ref=f4e282]: applications
+          - generic [ref=f4e283] [cursor=pointer]:
+            - generic [ref=f4e284]: 
+            - generic [ref=f4e285]: cleanup
+          - generic [ref=f4e286] [cursor=pointer]:
+            - generic [ref=f4e287]: 
+            - generic [ref=f4e288]: configs
+          - generic [ref=f4e289] [cursor=pointer]:
+            - generic [ref=f4e290]: 
+            - generic [ref=f4e291]: design
+          - generic [ref=f4e292] [cursor=pointer]:
+            - generic [ref=f4e293]: 
+            - generic [ref=f4e294]: docs
+          - generic [ref=f4e295] [cursor=pointer]:
+            - generic [ref=f4e296]: 
+            - generic [ref=f4e297]: lib
+          - generic [ref=f4e298] [cursor=pointer]:
+            - generic [ref=f4e299]: 
+            - generic [ref=f4e300]: next
+          - generic [ref=f4e301] [cursor=pointer]:
+            - generic [ref=f4e302]: 
+            - generic [ref=f4e303]: node_modules
+          - generic [ref=f4e304] [cursor=pointer]:
+            - generic [ref=f4e305]: 
+            - generic [ref=f4e306]: patches
+          - generic [ref=f4e307] [cursor=pointer]:
+            - generic [ref=f4e308]: 
+            - generic [ref=f4e309]: plugins
+          - generic [ref=f4e310] [cursor=pointer]:
+            - generic [ref=f4e311]: 
+            - generic [ref=f4e312]: releng
+          - generic [ref=f4e313] [cursor=pointer]:
+            - generic [ref=f4e314]: 
+            - generic [ref=f4e315]: scripts
+          - generic [ref=f4e316] [cursor=pointer]:
+            - generic [ref=f4e317]: 
+            - generic [ref=f4e318]: src-gen
+          - generic [ref=f4e319] [cursor=pointer]:
+            - generic [ref=f4e320]: 
+            - generic [ref=f4e321]: theia-extensions
+          - generic [ref=f4e322] [cursor=pointer]:
+            - generic [ref=f4e323]: 
+            - generic [ref=f4e324]: launcher
+          - generic [ref=f4e325] [cursor=pointer]:
+            - generic [ref=f4e326]: 
+            - generic [ref=f4e327]: product
+          - generic [ref=f4e328] [cursor=pointer]:
+            - generic [ref=f4e329]: 
+            - generic [ref=f4e330]: soriku-agent-customization
+          - generic [ref=f4e331] [cursor=pointer]:
+            - generic [ref=f4e332]: 
+            - generic [ref=f4e333]: lib
+          - generic [ref=f4e334] [cursor=pointer]:
+            - generic [ref=f4e335]: 
+            - generic [ref=f4e336]: node_modules
+          - generic [ref=f4e337] [cursor=pointer]:
+            - generic [ref=f4e338]: 
+            - generic [ref=f4e339]: src
+          - generic [ref=f4e340] [cursor=pointer]:
+            - generic [ref=f4e341]: 
+            - generic [ref=f4e342]: .eslintrc.js
+          - generic [ref=f4e343] [cursor=pointer]:
+            - generic [ref=f4e344]: 
+            - generic [ref=f4e345]: package.json
+          - generic [ref=f4e346] [cursor=pointer]:
+            - generic [ref=f4e347]: 
+            - generic [ref=f4e348]: tsconfig.json
+          - generic [ref=f4e349] [cursor=pointer]:
+            - generic [ref=f4e350]: 
+            - generic [ref=f4e351]: tsconfig.tsbuildinfo
+          - generic [ref=f4e352] [cursor=pointer]:
+            - generic [ref=f4e353]: 
+            - generic [ref=f4e354]: soriku-agents
+          - generic [ref=f4e355] [cursor=pointer]:
+            - generic [ref=f4e356]: 
+            - generic [ref=f4e357]: soriku-auth
+          - generic [ref=f4e358] [cursor=pointer]:
+            - generic [ref=f4e359]: 
+            - generic [ref=f4e360]: soriku-capability-map
+          - generic [ref=f4e361] [cursor=pointer]:
+            - generic [ref=f4e362]: 
+            - generic [ref=f4e363]: soriku-chat
+          - generic [ref=f4e364] [cursor=pointer]:
+            - generic [ref=f4e365]: 
+            - generic [ref=f4e366]: soriku-conversations
+          - generic [ref=f4e367] [cursor=pointer]:
+            - generic [ref=f4e368]: 
+            - generic [ref=f4e369]: soriku-engine-client
+          - generic [ref=f4e370] [cursor=pointer]:
+            - generic [ref=f4e371]: 
+            - generic [ref=f4e372]: soriku-mcp
+          - generic [ref=f4e373] [cursor=pointer]:
+            - generic [ref=f4e374]: 
+            - generic [ref=f4e375]: soriku-models
+          - generic [ref=f4e376] [cursor=pointer]:
+            - generic [ref=f4e377]: 
+            - generic [ref=f4e378]: soriku-routing-overrides
+          - generic [ref=f4e379] [cursor=pointer]:
+            - generic [ref=f4e380]: 
+            - generic [ref=f4e381]: soriku-shell
+          - generic [ref=f4e382] [cursor=pointer]:
+            - generic [ref=f4e383]: 
+            - generic [ref=f4e384]: soriku-theme
+          - generic [ref=f4e385] [cursor=pointer]:
+            - generic [ref=f4e386]: 
+            - generic [ref=f4e387]: soriku-tools-bridge
+          - generic [ref=f4e388] [cursor=pointer]:
+            - generic [ref=f4e389]: 
+            - generic [ref=f4e390]: soriku-workbench
+          - generic [ref=f4e391] [cursor=pointer]:
+            - generic [ref=f4e392]: 
+            - generic [ref=f4e393]: updater
+          - generic [ref=f4e394] [cursor=pointer]:
+            - generic [ref=f4e395]: 
+            - generic [ref=f4e396]: TheiaIDE logo
+          - generic [ref=f4e397] [cursor=pointer]:
+            - generic [ref=f4e398]: 
+            - generic [ref=f4e399]: .eslintrc.js
+          - generic [ref=f4e400] [cursor=pointer]:
+            - generic [ref=f4e401]: 
+            - generic [ref=f4e402]: .gitignore
+          - generic [ref=f4e403] [cursor=pointer]:
+            - generic [ref=f4e404]: 
+            - generic [ref=f4e405]: .htaccess
+          - generic [ref=f4e406] [cursor=pointer]:
+            - generic [ref=f4e407]: 
+            - generic [ref=f4e408]: ADOPTER.md
+          - generic [ref=f4e409] [cursor=pointer]:
+            - generic [ref=f4e410]: 
+            - generic "Untracked" [ref=f4e411]: akyru-roadmap.md
+            - generic [ref=f4e412]: U
+          - generic [ref=f4e413] [cursor=pointer]:
+            - generic [ref=f4e414]: 
+            - generic [ref=f4e415]: browser.Dockerfile
+          - generic [ref=f4e416] [cursor=pointer]:
+            - generic [ref=f4e417]: 
+            - generic [ref=f4e418]: CODE_OF_CONDUCT.md
+          - generic [ref=f4e419] [cursor=pointer]:
+            - generic [ref=f4e420]: 
+            - generic [ref=f4e421]: CONTRIBUTING.md
+          - generic [ref=f4e422] [cursor=pointer]:
+            - generic [ref=f4e423]: 
+            - generic [ref=f4e424]: Dockerfile
+          - generic [ref=f4e425] [cursor=pointer]:
+            - generic [ref=f4e426]: 
+            - generic [ref=f4e427]: gen-esbuild.browser.mjs
+          - generic [ref=f4e428] [cursor=pointer]:
+            - generic [ref=f4e429]: 
+            - generic [ref=f4e430]: gen-esbuild.node.mjs
+          - generic [ref=f4e431] [cursor=pointer]:
+            - generic [ref=f4e432]: 
+            - generic [ref=f4e433]: lerna.json
+          - generic [ref=f4e434] [cursor=pointer]:
+            - generic [ref=f4e435]: 
+            - generic [ref=f4e436]: LICENSE
+          - generic [ref=f4e437] [cursor=pointer]:
+            - generic [ref=f4e438]: 
+            - generic [ref=f4e439]: NOTICE.md
+          - generic [ref=f4e440] [cursor=pointer]:
+            - generic [ref=f4e441]: 
+            - generic [ref=f4e442]: package.json
+          - generic [ref=f4e443] [cursor=pointer]:
+            - generic [ref=f4e444]: 
+            - generic [ref=f4e445]: PUBLISHING.md
+          - generic [ref=f4e1041] [cursor=pointer]:
+            - generic [ref=f4e1042]: 
+            - generic "Untracked" [ref=f4e1043]: r9-app-current.png
+            - generic [ref=f4e1044]: U
+          - generic [ref=f4e1037] [cursor=pointer]:
+            - generic [ref=f4e1038]: 
+            - generic "Untracked" [ref=f4e1039]: r9-mockup-default.png
+            - generic [ref=f4e1040]: U
+          - generic [ref=f4e446] [cursor=pointer]:
+            - generic [ref=f4e447]: 
+            - generic [ref=f4e448]: README.md
+          - generic [ref=f4e449] [cursor=pointer]:
+            - generic [ref=f4e450]: 
+            - generic [ref=f4e451]: tsconfig.json
+          - generic [ref=f4e452] [cursor=pointer]:
+            - generic [ref=f4e453]: 
+            - generic [ref=f4e454]: yarn.lock
+        - generic [ref=f4e455]:
+          - generic [ref=f4e456]: "!"
+          - generic [ref=f4e457]:
+            - generic [ref=f4e458]: Account
+            - generic [ref=f4e459]: Connection error
+          - button "" [ref=f4e460] [cursor=pointer]:
+            - generic [ref=f4e461]: 
+    - generic [ref=f4e462]:
+      - generic [ref=f4e463]:
+        - generic "$(git-branch-changes) desktop/design-1to1*, soriku-ide (Git) - desktop/design-1to1*, Checkout Branch/Tag..." [ref=f4e487]:
+          - generic [ref=f4e488]: 
+          - generic [ref=f4e489]: desktop/design-1to1*
+        - generic "$(cloud-upload), soriku-ide (Git) - Publish Branch" [ref=f4e490]:
+          - generic [ref=f4e491]: 
+        - generic "$(codicon-error) 0 $(codicon-warning) 0, No Problems" [ref=f4e464]:
+          - generic [ref=f4e465]: 
+          - generic [ref=f4e466]: "0"
+          - generic [ref=f4e467]: 
+          - generic [ref=f4e468]: "0"
+        - generic "$(codicon-live-share) Collaborate, Start or join collaboration session" [ref=f4e469]:
+          - generic [ref=f4e470]: 
+          - generic [ref=f4e471]: Collaborate
+      - generic [ref=f4e475]:
+        - 'generic "$(debug-disconnect) Engine unreachable, Cannot reach the Soriku engine at http://127.0.0.1:8765: Network error for /api/health: Failed to fetch" [ref=f4e476]':
+          - generic [ref=f4e477]: 
+          - generic [ref=f4e478]: Engine unreachable
+        - 'generic "$(warning) Soriku: auth error, Engine unreachable: Network error for /api/auth/mode: Failed to fetch" [ref=f4e479]':
+          - generic [ref=f4e480]: 
+          - generic [ref=f4e481]: "Soriku: auth error"
+        - generic "Ln 1, Col 1, Go to Line/Column" [ref=f4e896]:
+          - generic [ref=f4e897]: Ln 1, Col 1
+        - generic "LF, Select End of Line Sequence" [ref=f4e898]:
+          - generic [ref=f4e899]: LF
+        - generic "UTF-8, Select Encoding" [ref=f4e900]:
+          - generic [ref=f4e901]: UTF-8
+        - 'generic "Spaces: 2, Select Indentation" [ref=f4e902]':
+          - generic [ref=f4e903]: "Spaces: 2"
+        - generic "$(bracket), [object HTMLDivElement]" [ref=f4e904]:
+          - generic [ref=f4e905]: 
+        - generic "JSON, Select Language Mode" [ref=f4e906]:
+          - generic [ref=f4e907]: JSON
+        - generic "No Notifications" [ref=f4e482]:
+          - generic [ref=f4e483]: 
+        - button "Toggle Bottom Panel" [ref=f4e484]:
+          - generic [ref=f4e485]: 
+  - generic:
+    - generic:  
+  - generic [ref=f4e486]:
+    - alert
+    - alert

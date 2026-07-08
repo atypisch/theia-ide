@@ -121,7 +121,7 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.addClass('soriku-sidebar');
         this.update();
         this.toDispose.push(this.workspaceService.onWorkspaceChanged(() => {
-            void this.refreshWorkspaceIcon();
+            this.refreshWorkspaceIcon().catch(() => { /* ignore */ });
             this.update();
         }));
         this.toDispose.push(this.authService.onDidChangeState(() => this.update()));
@@ -129,8 +129,9 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.toDispose.push(this.engineStatus.onDidChangeState(() => { if (this.activeNav === 'settings') { this.update(); } }));
         this.loadFilesModel();
         this.loadInfo(this.activeNav);
-        void this.refreshWorkspaceIcon();
+        this.refreshWorkspaceIcon().catch(() => { /* ignore */ });
     }
+
     protected async refreshWorkspaceIcon(): Promise<void> {
         const root = this.workspaceService.tryGetRoots()[0]?.resource;
         if (!root) {
@@ -151,7 +152,6 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.workspaceIconUrl = undefined;
         this.update();
     }
-
 
     protected async loadFilesModel(): Promise<void> {
         const widget = await this.widgetManager.getOrCreateWidget<FileNavigatorWidget>(FILE_NAVIGATOR_ID);
@@ -217,14 +217,14 @@ export class SorikuSidebarWidget extends ReactWidget {
         return (
             <div className="soriku-sidebar-inner">
                 <button className="soriku-sidebar-workspace" onClick={() => this.commands.executeCommand('workspace:open')}>
-                    {this.workspaceIconUrl
-                        ? <img
+                    <div className="soriku-sidebar-workspace-icon-slot">
+                        {this.workspaceIconUrl && <img
                             className="soriku-sidebar-workspace-icon"
                             src={this.workspaceIconUrl}
                             alt=""
                             onError={() => { this.workspaceIconUrl = undefined; this.update(); }}
-                        />
-                        : <span className="soriku-sidebar-workspace-fallback">{this.workspaceInitials}</span>}
+                        />}
+                    </div>
                     <div className="soriku-sidebar-workspace-text">
                         <div className="soriku-sidebar-workspace-name">{this.workspaceName}</div>
                     </div>

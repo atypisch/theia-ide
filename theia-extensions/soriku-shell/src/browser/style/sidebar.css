@@ -3,7 +3,7 @@
  * workspace switcher, WORKSPACE nav list, account/settings footer).
  */
 
-/* Hides the left panel's entire icon-rail column (SidePanelHandler#createContainer
+/* Hides the left panel's entire legacy icon-rail / sidebar chrome (SidePanelHandler#createContainer
    groups the tab bar with its top/bottom "..." menus into one
    `.theia-app-sidebar-container` sibling of the actual tree/view content,
    inside the `#theia-left-content-panel` box) — our nav replaces all of it
@@ -11,7 +11,17 @@
    id so the right-hand side (chat dock, Fase 3) is untouched. A CSS rule
    survives Theia's own layout-restore re-showing the tab bar; a JS
    `.hide()` call alone did not (see soriku-sidebar-contribution.ts). */
-#theia-left-content-panel > .theia-app-sidebar-container {
+#theia-left-content-panel > .theia-app-sidebar-container,
+#theia-left-content-panel .theia-app-sidebar-container {
+    display: none !important;
+}
+
+/* Extra hardening: some Theia layouts briefly render the tabbar/top/bottom
+   side menus before our JS cleanup removes the legacy container. */
+#theia-left-content-panel .lm-TabBar.theia-app-left,
+#theia-left-content-panel .lm-TabBar.theia-app-sides,
+#theia-left-content-panel .theia-sidebar-menu,
+#theia-left-content-panel .theia-additional-views-menu {
     display: none !important;
 }
 
@@ -62,29 +72,21 @@
     background: var(--hover);
 }
 
+.soriku-sidebar-workspace-icon-slot {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .soriku-sidebar-workspace-icon {
     width: 22px;
     height: 22px;
     border-radius: 5px;
     object-fit: cover;
     flex-shrink: 0;
-}
-
-.soriku-sidebar-workspace-fallback {
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-m);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--ink);
-    background: var(--bg-el);
-    border: 1px solid var(--line2);
 }
 
 .soriku-sidebar-workspace-text {

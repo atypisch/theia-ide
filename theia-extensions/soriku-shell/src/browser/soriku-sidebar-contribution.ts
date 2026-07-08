@@ -43,6 +43,21 @@ export class SorikuSidebarContribution implements FrontendApplicationContributio
         }
         SplitPanel.setStretch(this.sidebar, 0);
         sideAreas.layout.insertWidget(0, this.sidebar);
+
+        // Hard-remove Theia's legacy left panel so its Explorer/Tree UI cannot
+        // appear (especially when a persisted layout is restored in the
+        // installed desktop app).
+        //
+        // We intentionally do NOT dispose() here: Theia's left-panel toggle
+        // commands still reference the handler/container instance.
+        try {
+            const legacyLeft = this.shell.leftPanelHandler.container;
+            sideAreas.layout.removeWidget(legacyLeft);
+            legacyLeft.hide();
+        } catch (e) {
+            console.warn('soriku-shell: could not remove legacy left panel container', e);
+        }
+
         // The icon-rail column itself is hidden via CSS (sidebar.css) rather
         // than a JS `.hide()` call — Theia's own layout-restore re-shows the
         // tab bar after onStart, which a one-time `.hide()` here can't survive.

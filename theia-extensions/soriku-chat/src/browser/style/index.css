@@ -987,6 +987,8 @@
 /* Right-side dock should be Soriku Chat only (mockup parity). Hide Theia's
    right tab rail (Outline/Memory Inspector/Soriku Chat tabs + icon strip). */
 #theia-right-content-panel .theia-app-sidebar-container,
+#theia-right-content-panel .theia-sidebar-menu,
+#theia-right-content-panel .theia-additional-views-menu,
 #theia-right-content-panel .p-TabBar,
 #theia-right-content-panel .lm-TabBar,
 #theia-right-content-panel .p-TabBar-tab,

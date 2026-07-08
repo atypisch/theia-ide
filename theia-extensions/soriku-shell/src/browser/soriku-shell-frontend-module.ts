@@ -24,6 +24,7 @@ import { SorikuOverlayService } from './soriku-overlay-service';
 import { SorikuOverlayContribution } from './soriku-overlay-contribution';
 import { SorikuQuickActionsContribution } from './soriku-quick-actions-contribution';
 import { SorikuEditorToolbarContribution } from './soriku-editor-toolbar-contribution';
+import { SorikuLegacyCleanupContribution } from './soriku-legacy-cleanup-contribution';
 
 export default new ContainerModule(bind => {
     bind(SorikuTitlebarWidget).toSelf().inSingletonScope();
@@ -34,6 +35,11 @@ export default new ContainerModule(bind => {
     bind(SorikuSidebarWidget).toSelf().inSingletonScope();
     bind(SorikuSidebarContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuSidebarContribution);
+
+    // Final safeguard: remove any remaining Theia legacy chrome so only
+    // Soriku's mockup-equivalent UI is visible in the installed app.
+    bind(SorikuLegacyCleanupContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(SorikuLegacyCleanupContribution);
 
     bind(SorikuOverlayService).toSelf().inSingletonScope();
     bind(SorikuOverlayContribution).toSelf().inSingletonScope();
