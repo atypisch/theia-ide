@@ -984,6 +984,86 @@
     color: var(--ink);
 }
 
+/* Right-side dock should be Soriku Chat only (mockup parity). Hide Theia's
+   right tab rail (Outline/Memory Inspector/Soriku Chat tabs + icon strip). */
+#theia-right-content-panel > .theia-app-sidebar-container {
+    display: none !important;
+}
+
+#theia-right-content-panel {
+    background: var(--bg-sunk) !important;
+}
+
+/* Chat dock shell */
+.soriku-chat-widget {
+    background: var(--bg-sunk);
+    border-left: 1px solid var(--line);
+}
+
+.soriku-chat {
+    min-width: 360px;
+}
+
+/* Header + identity row closer to mockup geometry */
+.soriku-chat-header {
+    min-height: 38px;
+    padding: 7px 10px 7px 12px;
+}
+
+.soriku-chat-header-actions .sk-btn {
+    height: 24px;
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+}
+
+.soriku-chat-agent-identity .sk-avatar {
+    width: 22px;
+    height: 22px;
+}
+
+/* Message cards */
+.soriku-msg-assistant {
+    border-radius: 10px;
+    padding: 11px 12px;
+}
+
+.soriku-msg-user .soriku-msg-text {
+    border-radius: 10px;
+}
+
+/* Tool + plan + fleet cards are visually nested in the same tone family */
+.soriku-plan-approval,
+.soriku-tool-call,
+.soriku-fleet {
+    border-color: var(--line2);
+    background: var(--bg-el);
+    border-radius: 10px;
+}
+
+.soriku-fleet-role {
+    min-width: 104px;
+}
+
+/* Composer row */
+.soriku-chat-input {
+    padding: 10px 10px 10px;
+}
+
+.soriku-chat-input textarea.theia-input {
+    border-radius: 9px;
+    min-height: 84px;
+}
+
+.soriku-chat-actions {
+    margin-top: 8px;
+    justify-content: space-between;
+}
+
+.soriku-chat-actions .sk-btn:last-child {
+    min-width: 72px;
+}
+
 /* ─── Subagent Insight / Promote / Spawn (Fase F5) ───────────────────── */
 
 .soriku-subagent-insight-header {
