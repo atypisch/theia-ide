@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { EngineConnectionState, HEALTH_POLL_MS, computeEngineStatusView, firstRunAction, nextProbeDelay, shortHost } from '../common/engine-status';
+import { EngineConnectionState, HEALTH_POLL_MS, computeEngineStatusView, engineStatusBarLabel, firstRunAction, nextProbeDelay, shortHost } from '../common/engine-status';
 import { SorikuEngineStatusService } from '../browser/soriku-engine-status-service';
 
 describe('shortHost', () => {
@@ -36,6 +36,24 @@ describe('computeEngineStatusView', () => {
     it('idle shows a neutral not-connected label', () => {
         const view = computeEngineStatusView({ status: 'idle', baseUrl: '' });
         assert.equal(view.text, 'Soriku: not connected');
+    });
+});
+
+describe('engineStatusBarLabel', () => {
+    it('connected shows "Engine :port" for a local engine', () => {
+        assert.equal(engineStatusBarLabel({ status: 'connected', baseUrl: 'http://127.0.0.1:8765' }), 'Engine :8765');
+    });
+    it('connected falls back to the host when there is no port', () => {
+        assert.equal(engineStatusBarLabel({ status: 'connected', baseUrl: 'https://soriku.ai/api' }), 'Engine soriku.ai');
+    });
+    it('connecting', () => {
+        assert.equal(engineStatusBarLabel({ status: 'connecting', baseUrl: 'http://127.0.0.1:8765' }), 'Engine connecting…');
+    });
+    it('unreachable', () => {
+        assert.equal(engineStatusBarLabel({ status: 'unreachable', baseUrl: 'http://x:1' }), 'Engine unreachable');
+    });
+    it('idle', () => {
+        assert.equal(engineStatusBarLabel({ status: 'idle', baseUrl: '' }), 'Engine not connected');
     });
 });
 

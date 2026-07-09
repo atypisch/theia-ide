@@ -17,18 +17,40 @@ import { inject, injectable } from '@theia/core/shared/inversify';
 import { BoxLayout, SplitLayout, SplitPanel } from '@theia/core/shared/@lumino/widgets';
 import { ApplicationShell } from '@theia/core/lib/browser/shell/application-shell';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
+import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/common';
+import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { SorikuSidebarWidget } from './soriku-sidebar-widget';
 
 const SIDE_AREAS_PANEL_ID = 'theia-left-right-split-panel';
 
+export namespace SorikuSidebarCommands {
+    export const TOGGLE: Command = { id: 'soriku.sidebar.toggle', category: 'Soriku', label: 'Toggle Workspace Sidebar' };
+}
+
 @injectable()
-export class SorikuSidebarContribution implements FrontendApplicationContribution {
+export class SorikuSidebarContribution implements FrontendApplicationContribution, CommandContribution, KeybindingContribution {
 
     @inject(ApplicationShell)
     protected readonly shell: ApplicationShell;
 
     @inject(SorikuSidebarWidget)
     protected readonly sidebar: SorikuSidebarWidget;
+
+    registerCommands(commands: CommandRegistry): void {
+        commands.registerCommand(SorikuSidebarCommands.TOGGLE, { execute: () => this.toggle() });
+    }
+
+    registerKeybindings(keybindings: KeybindingRegistry): void {
+        keybindings.registerKeybinding({ command: SorikuSidebarCommands.TOGGLE.id, keybinding: 'ctrlcmd+b' });
+    }
+
+    protected toggle(): void {
+        if (this.sidebar.isHidden) {
+            this.sidebar.show();
+        } else {
+            this.sidebar.hide();
+        }
+    }
 
     onStart(): void {
         const outerLayout = this.shell.layout;

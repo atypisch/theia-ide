@@ -33,6 +33,39 @@
    Theia's own icon-only Terminal toggle ($(codicon-window), no text) —
    replaced by soriku-terminal-toggle-status (icon + "Terminal" text,
    matching the mockup exactly) rather than restyled in place. */
+/* Engine block, mockup §13: leftmost, accent-soft background, green status
+   dot, border-right separating it from the rest of the left-hand items. */
+#theia-statusBar #status-bar-soriku-engine-status {
+    border-right: 1px solid var(--line);
+}
+
+#theia-statusBar #status-bar-soriku-engine-status .codicon-circle-filled {
+    font-size: 6px;
+}
+
+#theia-statusBar .soriku-engine-statusbar-connected .codicon-circle-filled {
+    color: var(--ok);
+}
+
+#theia-statusBar .soriku-engine-statusbar-connecting .codicon-circle-filled {
+    color: var(--warn);
+}
+
+#theia-statusBar .soriku-engine-statusbar-unreachable .codicon-circle-filled,
+#theia-statusBar .soriku-engine-statusbar-idle .codicon-circle-filled {
+    color: var(--danger);
+}
+
+/* Warm-model block, mockup §13: "modelid warm" rendered as two adjacent
+   compact-left/compact-right entries so each half keeps its own color. */
+#theia-statusBar #status-bar-soriku-warm-model-status {
+    color: var(--ink2);
+}
+
+#theia-statusBar #status-bar-soriku-warm-model-tag-status {
+    color: var(--ok);
+}
+
 #theia-statusBar #status-bar-scm\.status\.1,
 #theia-statusBar #status-bar-problem-marker-status,
 #theia-statusBar #status-bar-statusBar\.collaboration,

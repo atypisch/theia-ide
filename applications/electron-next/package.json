@@ -30,7 +30,7 @@
         ],
         "reloadOnReconnect": true,
         "preferences": {
-          "toolbar.showToolbar": true,
+          "toolbar.showToolbar": false,
           "updates.channel": "next",
           "ai-features.chat.tokenUsageIndicator.enabled": true
         },

@@ -36,6 +36,8 @@ export default new ContainerModule(bind => {
     bind(SorikuSidebarWidget).toSelf().inSingletonScope();
     bind(SorikuSidebarContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuSidebarContribution);
+    bind(CommandContribution).toService(SorikuSidebarContribution);
+    bind(KeybindingContribution).toService(SorikuSidebarContribution);
 
     // Final safeguard: remove any remaining Theia legacy chrome so only
     // Soriku's mockup-equivalent UI is visible in the installed app.

@@ -26,7 +26,7 @@
         "applicationName": "Soriku Code",
         "reloadOnReconnect": true,
         "preferences": {
-          "toolbar.showToolbar": true,
+          "toolbar.showToolbar": false,
           "workbench.colorTheme": "soriku-dark",
           "window.titleBarStyle": "custom",
           "editor.fontSize": 13,

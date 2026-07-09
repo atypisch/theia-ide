@@ -10,7 +10,7 @@ import { QuickInputService } from '@theia/core/lib/browser';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { StatusBar, StatusBarAlignment } from '@theia/core/lib/browser/status-bar/status-bar';
 import { DEFAULT_ENGINE_BASE_URL, SORIKU_ENGINE_BASE_URL } from 'soriku-engine-client-ext/lib/browser/soriku-engine-preferences';
-import { EngineConnectionState, FirstRunChoice, computeEngineStatusView, firstRunAction } from '../common/engine-status';
+import { EngineConnectionState, FirstRunChoice, computeEngineStatusView, engineStatusBarLabel, firstRunAction } from '../common/engine-status';
 import { SorikuEngineStatusService } from './soriku-engine-status-service';
 import { SORIKU_ENGINE_AUTOCONNECT, SORIKU_ENGINE_FIRST_RUN_COMPLETE } from './soriku-workbench-preferences';
 
@@ -136,23 +136,16 @@ export class SorikuEngineStatusContribution implements FrontendApplicationContri
     }
 
     protected updateStatusBar(state: EngineConnectionState): void {
-        const view = computeEngineStatusView(state);
+        const { tooltip } = computeEngineStatusView(state);
         this.statusBar.setElement(SORIKU_ENGINE_STATUS_ID, {
-            text: `${this.iconFor(state)} ${view.text}`,
-            tooltip: view.tooltip,
-            alignment: StatusBarAlignment.RIGHT,
+            text: `$(circle-filled) ${engineStatusBarLabel(state)}`,
+            tooltip,
+            alignment: StatusBarAlignment.LEFT,
             command: SorikuEngineCommands.MANAGE.id,
-            priority: 200,
+            priority: 110,
+            color: 'var(--acc)',
+            backgroundColor: 'var(--acc-soft)',
+            className: `soriku-engine-statusbar soriku-engine-statusbar-${state.status}`,
         });
-    }
-
-    protected iconFor(state: EngineConnectionState): string {
-        if (state.status === 'connecting') {
-            return '$(sync~spin)';
-        }
-        if (state.status === 'connected') {
-            return '$(plug)';
-        }
-        return '$(debug-disconnect)';
     }
 }

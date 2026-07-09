@@ -23,6 +23,7 @@ import { EngineConnectionState } from '../common/engine-status';
 import { SorikuEngineStatusService } from './soriku-engine-status-service';
 
 const SORIKU_WARM_MODEL_STATUS_ID = 'soriku-warm-model-status';
+const SORIKU_WARM_MODEL_TAG_STATUS_ID = 'soriku-warm-model-tag-status';
 
 @injectable()
 export class SorikuWarmModelStatusContribution implements FrontendApplicationContribution {
@@ -43,10 +44,15 @@ export class SorikuWarmModelStatusContribution implements FrontendApplicationCon
 
     protected onEngineStateChanged(state: EngineConnectionState): void {
         if (state.status !== 'connected') {
-            this.statusBar.removeElement(SORIKU_WARM_MODEL_STATUS_ID);
+            this.remove();
             return;
         }
         this.refresh();
+    }
+
+    protected remove(): void {
+        this.statusBar.removeElement(SORIKU_WARM_MODEL_STATUS_ID);
+        this.statusBar.removeElement(SORIKU_WARM_MODEL_TAG_STATUS_ID);
     }
 
     protected async refresh(): Promise<void> {
@@ -54,17 +60,29 @@ export class SorikuWarmModelStatusContribution implements FrontendApplicationCon
             const res = await this.engineClient.listInstalledModels();
             const warm = (res.models ?? []).find(m => m.is_running);
             if (!warm) {
-                this.statusBar.removeElement(SORIKU_WARM_MODEL_STATUS_ID);
+                this.remove();
                 return;
             }
+            const tooltip = `${warm.name ?? warm.id} is warm and ready`;
+            // Two adjacent compact-left/compact-right entries render as one
+            // mockup block ("modelid warm") with independent colors — a single
+            // StatusBarEntry can only carry one color for its whole text.
             this.statusBar.setElement(SORIKU_WARM_MODEL_STATUS_ID, {
-                text: `$(flame) ${warm.id}`,
-                tooltip: `${warm.name ?? warm.id} is warm and ready`,
+                text: warm.id,
+                tooltip,
+                alignment: StatusBarAlignment.LEFT,
+                priority: 91,
+                className: 'soriku-statusbar-model compact-left',
+            });
+            this.statusBar.setElement(SORIKU_WARM_MODEL_TAG_STATUS_ID, {
+                text: 'warm',
+                tooltip,
                 alignment: StatusBarAlignment.LEFT,
                 priority: 90,
+                className: 'soriku-statusbar-model-tag compact-right',
             });
         } catch {
-            this.statusBar.removeElement(SORIKU_WARM_MODEL_STATUS_ID);
+            this.remove();
         }
     }
 }

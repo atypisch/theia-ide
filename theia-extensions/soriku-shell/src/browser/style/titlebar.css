@@ -7,13 +7,6 @@
     border-bottom: 1px solid var(--line);
 }
 
-/* Hide Theia's editor toolbar strip (back/forward/split icons under titlebar). */
-#main-toolbar,
-#theia-main-content-panel #main-toolbar,
-.theia-main-content-panel #main-toolbar {
-    display: none !important;
-}
-
 /* Theia's stock BrowserMenuBarContribution adds its own logo ("theia:icon")
    and File/Edit/.../Help menu bar ("theia:menubar") widgets to the top
    panel outside Electron (Electron targets swap this for the native OS

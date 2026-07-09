@@ -46,6 +46,26 @@ export function computeEngineStatusView(state: EngineConnectionState): EngineSta
     };
 }
 
+/**
+ * Short statusbar label ("Engine :8765" for a local engine, per mockup §13) —
+ * distinct from computeEngineStatusView's tooltip-oriented "Soriku: host:port"
+ * text used elsewhere.
+ */
+export function engineStatusBarLabel(state: EngineConnectionState): string {
+    if (state.status === 'idle') {
+        return 'Engine not connected';
+    }
+    if (state.status === 'connecting') {
+        return 'Engine connecting…';
+    }
+    if (state.status === 'unreachable') {
+        return 'Engine unreachable';
+    }
+    const host = shortHost(state.baseUrl);
+    const port = host.match(/:\d+$/)?.[0];
+    return port ? `Engine ${port}` : `Engine ${host}`;
+}
+
 /** First-run welcome choice for connecting to the engine. */
 export type FirstRunChoice = 'local' | 'hosted' | 'skip';
 
