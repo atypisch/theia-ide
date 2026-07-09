@@ -8,8 +8,9 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
+import { Btn, PageHeader, categoryColors, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import {
+    bestCategory,
     CapabilitySortKey,
     CapabilityTable,
     columnMaxima,
@@ -33,7 +34,7 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
     protected readonly engineClient: EngineClient;
 
     protected state: MapState = { status: 'loading' };
-    protected sortBy: CapabilitySortKey = 'aggregate';
+    protected sortBy: CapabilitySortKey = 'model';
     protected descending = true;
 
     @postConstruct()
@@ -115,18 +116,21 @@ export class SorikuCapabilityMapWidget extends ReactWidget {
                 <thead>
                     <tr>
                         {this.renderHeader('Model', 'model')}
-                        {this.renderHeader('Aggregate', 'aggregate')}
                         {table.categories.map(cat => this.renderHeader(cat, cat))}
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map(row => <tr key={row.model}>
-                        <td className='soriku-capmap-model'>
-                            {row.model}{row.stale && <span className='soriku-capmap-stale'> stale</span>}
-                        </td>
-                        <td className='soriku-capmap-aggregate'>{row.aggregate ?? '—'}</td>
-                        {table.categories.map(cat => this.renderCell(row.scores[cat], row.scores[cat] === colMax[cat]))}
-                    </tr>)}
+                    {rows.map(row => {
+                        const best = bestCategory(row);
+                        const dotColor = best ? categoryColors(toKnownCategory(best)).c : undefined;
+                        return <tr key={row.model}>
+                            <td className='soriku-capmap-model'>
+                                {dotColor && <span className='soriku-capmap-model-dot' style={{ background: dotColor }} />}
+                                {row.model}{row.stale && <span className='soriku-capmap-stale'> stale</span>}
+                            </td>
+                            {table.categories.map(cat => this.renderCell(row.scores[cat], row.scores[cat] === colMax[cat]))}
+                        </tr>;
+                    })}
                 </tbody>
             </table>
             <div className='soriku-capmap-legend'>

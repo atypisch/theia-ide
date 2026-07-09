@@ -23,7 +23,7 @@ export const DOC_PAGES: ReadonlyArray<DocPage> = [
         slug: 'getting-started',
         label: 'Getting started',
         blocks: [
-            { kind: 'h', text: 'Welcome to Soriku Code' },
+            { kind: 'h', text: 'Welcome to Soriku IDE' },
             { kind: 'p', text: 'Soriku is a local-first AI IDE. Every prompt runs on your machine unless you explicitly opt in to a capped cloud call.' },
             { kind: 'h2', text: 'The three pickers' },
             {
@@ -46,7 +46,10 @@ export const DOC_PAGES: ReadonlyArray<DocPage> = [
             { kind: 'p', text: 'Agents are persistent personas with memory, tone and a specialism. They are not raw models — they work as a team.' },
             { kind: 'h2', text: 'Subagents' },
             { kind: 'p', text: 'A worker can spawn a subagent (minion) for a narrow job. If the engine flags a subagent as having potential, you can promote it to a full agent.' },
-            { kind: 'p', text: 'Potential is decided by the engine, not the IDE, from transparent thresholds such as reuse count and positive-feedback ratio.' },
+            {
+                kind: 'p', text: 'Potential is decided by the engine, not the IDE, from three transparent thresholds: reuse count, ' +
+                    'positive-feedback ratio, and task-type spread.'
+            },
         ],
     },
     {

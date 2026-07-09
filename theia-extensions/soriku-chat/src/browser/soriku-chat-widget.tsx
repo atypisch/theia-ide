@@ -1259,33 +1259,27 @@ export class SorikuChatWidget extends ReactWidget {
                 <div className='soriku-subagent-promote-eyebrow'><span className='codicon codicon-sparkle' />Promotion</div>
                 <div className='soriku-subagent-promote-title'>Promote <span className='sk-em'>{roleLabel(ov.role ?? 'generalist')}</span> to a full agent</div>
                 <div className='soriku-subagent-promote-desc'>
-                    The engine scores every subagent against real thresholds. Soriku Code only reads the result — it never decides eligibility itself.
+                    The engine scores every subagent against three transparent thresholds. Soriku IDE only reads the result — it never decides eligibility itself.
                 </div>
             </div>
             <div className='soriku-subagent-promote-thresholds'>
                 {potential?.thresholds.map(t => <div key={t.key} className={`soriku-subagent-threshold${t.met ? ' met' : ''}`}>
                     <span className={`soriku-subagent-threshold-dot${t.met ? ' met' : ''}`} />
                     <div className='soriku-subagent-threshold-body'>
-                        <div className='soriku-subagent-threshold-label'>
-                            {t.label}
-                            {!t.authoritative && <span
-                                className='soriku-subagent-threshold-derived'
-                                title='Derived signal — does not gate the actual promote action'
-                            > (signal)</span>}
-                        </div>
+                        <div className='soriku-subagent-threshold-label'>{t.label}</div>
                         <div className='soriku-subagent-threshold-target'>target {t.target}</div>
                     </div>
                     <span className='soriku-subagent-threshold-value'>{t.value}</span>
-                    <span className={`soriku-subagent-threshold-chip${t.met ? ' met' : ''}`}>{t.met ? 'MET' : 'BELOW'}</span>
+                    <span className={`soriku-subagent-threshold-chip${t.met ? ' met' : ''}`}>{t.met ? 'met' : 'below'}</span>
                 </div>)}
             </div>
             {this.subagentOverlayError && <div className='soriku-subagent-insight-error'>{this.subagentOverlayError}</div>}
             <div className='soriku-subagent-promote-actions'>
                 <span className='soriku-subagent-promote-note'>
-                    {potential?.eligible_to_promote ? 'Eligible — the engine\'s streak criterion is met.' : 'Not yet eligible — the streak criterion isn\'t met.'}
+                    {potential?.eligible_to_promote ? 'All thresholds met — ready to promote.' : 'One threshold below target — you can still promote with an override.'}
                 </span>
                 <Btn variant='secondary' onClick={this.closeSubagentOverlay}>Cancel</Btn>
-                <Btn disabled={!potential?.eligible_to_promote || this.subagentOverlayLoading}
+                <Btn disabled={this.subagentOverlayLoading}
                     onClick={() => this.doPromoteSubagent()}>
                     <span className='codicon codicon-arrow-up' />Promote to agent
                 </Btn>
@@ -1593,7 +1587,11 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     protected respondToolApproval(approved: boolean): void {
-        this.toolApproval.respond(approved, approved && this.approvalRememberSession);
+        const remember = approved && this.approvalRememberSession;
+        this.toolApproval.respond(approved, remember);
+        if (remember) {
+            this.toast.show('Allowed for this session');
+        }
         this.approvalRememberSession = false;
         this.scheduleUpdate(true);
     }

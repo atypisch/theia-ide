@@ -90,6 +90,19 @@ export function toCapabilityTable(response: CapabilityMapResponse): CapabilityTa
     };
 }
 
+/** The category this model scores highest in — used for the row's category-color dot (a real derivation, not a fabricated field). */
+export function bestCategory(row: CapabilityRow): string | undefined {
+    let best: string | undefined;
+    let bestScore = -Infinity;
+    for (const [category, score] of Object.entries(row.scores)) {
+        if (score !== undefined && score > bestScore) {
+            bestScore = score;
+            best = category;
+        }
+    }
+    return best;
+}
+
 /** Highest real score per category column — the heatmap's "best in category" outline. */
 export function columnMaxima(table: CapabilityTable): Record<string, number> {
     const maxima: Record<string, number> = {};

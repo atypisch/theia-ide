@@ -86,9 +86,12 @@
     white-space: nowrap;
 }
 
-.soriku-capmap-aggregate {
-    color: var(--ink2);
-    font-weight: 600;
+.soriku-capmap-model-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 8px;
 }
 
 .soriku-capmap-cell.best {
