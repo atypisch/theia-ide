@@ -49,6 +49,162 @@
     border-bottom: none;
 }
 
+/* ── Installed models table (Local · Ollama / Remote · opt-in) ──────────── */
+
+.soriku-models-table-block {
+    margin-bottom: 20px;
+}
+
+.soriku-models-table-block:last-child {
+    margin-bottom: 0;
+}
+
+.soriku-models-table-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.soriku-models-table-title {
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink2);
+}
+
+.soriku-models-table-pill {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    color: var(--ink3);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 8px;
+}
+
+.soriku-models-table-pill.ok {
+    color: var(--ok);
+    background: var(--ok-soft);
+    border-color: var(--ok-line);
+}
+
+.soriku-models-table-rule {
+    height: 1px;
+    flex: 1;
+    background: var(--line);
+}
+
+.soriku-models-table {
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+    background: var(--bg-el);
+}
+
+.soriku-models-table-head,
+.soriku-models-table-row {
+    display: grid;
+    grid-template-columns: 1.9fr 96px 74px 82px 60px;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 16px;
+}
+
+.soriku-models-table-head {
+    background: var(--bg-sunk);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink3);
+}
+
+.soriku-models-table-row {
+    border-bottom: 1px solid var(--line);
+}
+
+.soriku-models-table-row:last-child {
+    border-bottom: none;
+}
+
+.soriku-models-table-model {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.soriku-models-table-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--ink3);
+}
+
+.soriku-models-table-dot.warm {
+    background: var(--ok);
+}
+
+.soriku-models-table-name {
+    font-family: var(--font-m);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-models-table-role {
+    font-size: 10.5px;
+    color: var(--ink3);
+    margin-top: 1px;
+}
+
+.soriku-models-table-cat {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    border-radius: 4px;
+    padding: 2px 7px;
+    justify-self: start;
+}
+
+.soriku-models-table-size {
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink2);
+}
+
+.soriku-models-table-status {
+    font-family: var(--font-m);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ink2);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line2);
+    border-radius: 999px;
+    padding: 3px 11px;
+    justify-self: start;
+}
+
+.soriku-models-table-status.warm {
+    color: var(--ok);
+    background: var(--ok-soft);
+    border-color: var(--ok-line);
+}
+
+.soriku-models-table-actions {
+    display: flex;
+    gap: 2px;
+    justify-self: end;
+}
+
 .soriku-models-name {
     overflow: hidden;
     text-overflow: ellipsis;

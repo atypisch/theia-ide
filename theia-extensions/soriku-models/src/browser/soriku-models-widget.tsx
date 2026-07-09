@@ -14,9 +14,9 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import {
     BrowseModel, InstalledModel, ProviderInfo, ProviderPreset, UserProvider,
 } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
+import { Btn, PageHeader, categoryColors, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
-import { formatModelSize, isValidOllamaName, parsePullEvent } from '../common/models-view';
+import { formatModelSize, isRemoteModelId, isValidOllamaName, parsePullEvent } from '../common/models-view';
 
 @injectable()
 export class SorikuModelsWidget extends ReactWidget {
@@ -394,35 +394,84 @@ export class SorikuModelsWidget extends ReactWidget {
         </section>;
     }
 
+    /**
+     * 1:1 the mockup's Local/Remote model tables (Model/Category/Size/Status
+     * columns) — Context and Speed columns are omitted: InstalledModel
+     * (engine-types.ts) has no context-length or throughput fields, so those
+     * two mockup columns have no real data source. Local vs remote is a real
+     * split (isRemoteModelId(), already written+tested but never wired into
+     * this widget) against real provider names (ProviderInfo.is_local),
+     * not a guess.
+     */
     protected renderInstalled(): React.ReactNode {
         const models = this.installed.filter(m => !m.is_embedding);
+        if (this.loading && models.length === 0) {
+            return <section className='soriku-models-section'>
+                <h3>Installed models</h3>
+                <div className='soriku-models-meta'>Loading…</div>
+            </section>;
+        }
+        if (models.length === 0) {
+            return <section className='soriku-models-section'>
+                <h3>Installed models</h3>
+                <div className='soriku-models-meta'>No models installed.</div>
+            </section>;
+        }
+        const remoteProviderNames = this.providers.filter(p => !p.is_local).map(p => p.name);
+        const local = models.filter(m => !isRemoteModelId(m.id, remoteProviderNames));
+        const remote = models.filter(m => isRemoteModelId(m.id, remoteProviderNames));
         return <section className='soriku-models-section'>
-            <h3>Installed models</h3>
-            {this.loading && models.length === 0
-                ? <div className='soriku-models-meta'>Loading…</div>
-                : <ul className='soriku-models-list'>
-                    {models.map(m => {
-                        const busy = this.busyModelIds.has(m.id);
-                        const active = !m.inactive;
-                        return <li key={m.id} className='soriku-models-row'>
-                            <span className='soriku-models-name' title={m.id}>{m.id}</span>
-                            <span className='soriku-models-meta'>
-                                {[m.role, formatModelSize(m.size_gb)].filter(Boolean).join(' · ')}
-                            </span>
-                            <button className='soriku-iconbtn' disabled={busy}
-                                title={active ? 'Deactivate (hide from routing)' : 'Activate'}
-                                onClick={() => this.setActive(m, !active)}>
-                                <span className={`codicon ${active ? 'codicon-eye' : 'codicon-eye-closed'}`} />
-                            </button>
-                            <button className='soriku-iconbtn' disabled={busy} title='Delete from disk'
-                                onClick={() => this.remove(m)}>
-                                <span className='codicon codicon-trash' />
-                            </button>
-                        </li>;
-                    })}
-                    {models.length === 0 && <li className='soriku-models-meta'>No models installed.</li>}
-                </ul>}
+            {local.length > 0 && this.renderModelTable('Local · Ollama', local, `${local.length} installed`, 'ok')}
+            {remote.length > 0 && this.renderModelTable('Remote · opt-in', remote, undefined, undefined)}
         </section>;
+    }
+
+    protected renderModelTable(title: string, models: InstalledModel[], pillText: string | undefined, pillTone: 'ok' | undefined): React.ReactNode {
+        return <div className='soriku-models-table-block'>
+            <div className='soriku-models-table-heading'>
+                <span className='soriku-models-table-title'>{title}</span>
+                {pillText && <span className={`soriku-models-table-pill${pillTone === 'ok' ? ' ok' : ''}`}>{pillText}</span>}
+                <span className='soriku-models-table-rule' />
+            </div>
+            <div className='soriku-models-table'>
+                <div className='soriku-models-table-head'>
+                    <span>Model</span><span>Category</span><span>Size</span><span>Status</span><span />
+                </div>
+                {models.map(m => this.renderModelRow(m))}
+            </div>
+        </div>;
+    }
+
+    protected renderModelRow(m: InstalledModel): React.ReactNode {
+        const busy = this.busyModelIds.has(m.id);
+        const active = !m.inactive;
+        const category = m.role ? toKnownCategory(m.role) : undefined;
+        const catColors = category ? categoryColors(category) : undefined;
+        return <div key={m.id} className='soriku-models-table-row'>
+            <div className='soriku-models-table-model'>
+                <span className={`soriku-models-table-dot${m.is_running ? ' warm' : ''}`} />
+                <div>
+                    <div className='soriku-models-table-name' title={m.id}>{m.id}</div>
+                    {m.role && <div className='soriku-models-table-role'>{m.role}</div>}
+                </div>
+            </div>
+            <span>
+                {m.role && catColors && <span className='soriku-models-table-cat' style={{ color: catColors.c, background: catColors.bg }}>{m.role}</span>}
+            </span>
+            <span className='soriku-models-table-size'>{formatModelSize(m.size_gb) || '—'}</span>
+            <span className={`soriku-models-table-status${m.is_running ? ' warm' : ''}`}>{m.is_running ? 'warm' : 'cold'}</span>
+            <span className='soriku-models-table-actions'>
+                <button className='soriku-iconbtn' disabled={busy}
+                    title={active ? 'Deactivate (hide from routing)' : 'Activate'}
+                    onClick={() => this.setActive(m, !active)}>
+                    <span className={`codicon ${active ? 'codicon-eye' : 'codicon-eye-closed'}`} />
+                </button>
+                <button className='soriku-iconbtn' disabled={busy} title='Delete from disk'
+                    onClick={() => this.remove(m)}>
+                    <span className='codicon codicon-trash' />
+                </button>
+            </span>
+        </div>;
     }
 
     protected renderBrowse(): React.ReactNode {
