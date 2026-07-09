@@ -69,6 +69,7 @@ export function SorikuSidebarSearchPanel({ searchService, openerService }: Sorik
 
     return (
         <div className="soriku-sidebar-search-panel">
+            <span className="soriku-sidebar-search-eyebrow">Find in files</span>
             <input
                 className="soriku-sidebar-search-input"
                 placeholder="Search"

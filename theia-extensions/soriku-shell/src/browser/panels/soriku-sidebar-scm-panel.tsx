@@ -49,6 +49,7 @@ export function SorikuSidebarScmPanel({ repository, commands }: SorikuSidebarScm
 
     return (
         <div className="soriku-sidebar-scm-panel">
+            <span className="soriku-sidebar-scm-eyebrow">Source Control</span>
             <textarea
                 className="soriku-sidebar-scm-input"
                 placeholder={repository.input.placeholder ?? 'Message'}
@@ -60,7 +61,10 @@ export function SorikuSidebarScmPanel({ repository, commands }: SorikuSidebarScm
             )}
             {repository.provider.groups.map(group => group.resources.length > 0 && (
                 <div className="soriku-sidebar-scm-group" key={group.id}>
-                    <div className="soriku-sidebar-scm-group-label">{group.label}</div>
+                    <div className="soriku-sidebar-scm-group-label">
+                        {group.label}
+                        <span className="soriku-sidebar-scm-group-count">{group.resources.length}</span>
+                    </div>
                     {group.resources.map(resource => (
                         <div
                             className="soriku-sidebar-scm-resource"
