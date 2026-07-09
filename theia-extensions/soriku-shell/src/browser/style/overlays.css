@@ -1,5 +1,41 @@
 /* Soriku IDE — global overlays (Keyboard shortcuts, New window), 1:1 from the mockup. */
 
+/*
+ * Theia's stock ConfirmDialog (used e.g. for Models/Conversations delete
+ * confirmations) is otherwise fully unstyled — no .theia-dialog-* override
+ * existed anywhere before this. Real classnames confirmed from
+ * @theia/core's dialog.css: .dialogOverlay (backdrop), .dialogBlock (panel),
+ * .dialogTitle, .dialogContent, .dialogControl (button row). Match the
+ * mockup's overlay convention (14px radius, sk-rise, same shadow as the
+ * command palette / New Window / Shortcuts overlays).
+ */
+.lm-Widget.dialogOverlay {
+    background: rgba(0, 0, 0, 0.46) !important;
+}
+
+.lm-Widget.dialogOverlay .dialogBlock {
+    background: var(--bg-el) !important;
+    border: 1px solid var(--line2) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .7) !important;
+    animation: sk-rise .18s ease;
+}
+
+.lm-Widget.dialogOverlay .dialogTitle {
+    background: transparent !important;
+    color: var(--ink) !important;
+    font-family: var(--font-s);
+    font-size: 15px;
+    border-bottom: 1px solid var(--line);
+    padding: 15px 18px !important;
+}
+
+.lm-Widget.dialogOverlay .dialogContent {
+    color: var(--ink2);
+    font-family: var(--font-s);
+    font-size: 13px;
+}
+
 .soriku-overlay-header {
     display: flex;
     align-items: center;
