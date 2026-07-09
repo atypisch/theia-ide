@@ -253,7 +253,7 @@ export class SorikuSidebarWidget extends ReactWidget {
         switch (this.activeNav) {
             case 'explorer':
                 return this.filesModel
-                    ? <SorikuSidebarFilesPanel model={this.filesModel} decorations={this.decorationsService} />
+                    ? <SorikuSidebarFilesPanel model={this.filesModel} decorations={this.decorationsService} commands={this.commands} />
                     : <div className="soriku-sidebar-files-empty">Loading…</div>;
             case 'search':
                 return <SorikuSidebarSearchPanel searchService={this.searchService} openerService={this.openerService} />;

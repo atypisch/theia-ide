@@ -191,6 +191,52 @@
     padding: 6px 0;
 }
 
+.soriku-sidebar-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px 6px 14px;
+    flex-shrink: 0;
+}
+
+.soriku-sidebar-files-eyebrow {
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-files-header-actions {
+    display: flex;
+    gap: 1px;
+    color: var(--ink3);
+}
+
+.soriku-sidebar-files-header-btn {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: inherit;
+}
+
+.soriku-sidebar-files-header-btn:hover:not(:disabled) {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-sidebar-files-header-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .soriku-sidebar-files-empty {
     padding: 12px 16px;
     font-size: 11.5px;
