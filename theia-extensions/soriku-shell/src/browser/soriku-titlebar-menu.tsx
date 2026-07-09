@@ -118,18 +118,43 @@ export interface SorikuTitlebarMenuProps {
     executeCommand: (commandId: string) => void;
 }
 
+/**
+ * Matches .soriku-titlebar-menu-dropdown's min-width in titlebar.css — used
+ * as the clamping estimate before the portalled dropdown has actually
+ * rendered (and thus has no real measured width yet).
+ */
+const DROPDOWN_MIN_WIDTH = 230;
+/** Minimum gap kept between the dropdown and the viewport edge. */
+const VIEWPORT_MARGIN = 8;
+
 export function SorikuTitlebarMenu(props: SorikuTitlebarMenuProps): React.ReactElement {
     const [openMenu, setOpenMenu] = React.useState<string | undefined>(undefined);
     // eslint-disable-next-line no-null/no-null
     const rootRef = React.useRef<HTMLDivElement>(null);
+    // eslint-disable-next-line no-null/no-null
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
     const buttonRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map());
     const [dropdownPos, setDropdownPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+    const reposition = React.useCallback((label: string): void => {
+        const btn = buttonRefs.current.get(label);
+        if (!btn) {
+            return;
+        }
+        const rect = btn.getBoundingClientRect();
+        const menuWidth = dropdownRef.current?.getBoundingClientRect().width ?? DROPDOWN_MIN_WIDTH;
+        const left = Math.min(Math.max(rect.left, VIEWPORT_MARGIN), window.innerWidth - menuWidth - VIEWPORT_MARGIN);
+        setDropdownPos({ top: rect.bottom, left });
+    }, []);
 
     // The dropdown is portalled to document.body (see below) because the
     // titlebar row uses `overflow: hidden` for text-truncation elsewhere,
     // which would otherwise clip an absolutely-positioned child dropdown
     // even though its computed layout rect is correct — a real, verified
-    // rendering bug, not just a styling nicety.
+    // rendering bug, not just a styling nicety. Because of the portal, the
+    // dropdown's position is computed in JS (top/left) rather than pure CSS,
+    // so it must be recomputed on resize/scroll — a stale one-shot position
+    // is wrong the moment the window changes size or a panel scrolls under it.
     React.useEffect(() => {
         if (!openMenu) {
             return undefined;
@@ -142,16 +167,27 @@ export function SorikuTitlebarMenu(props: SorikuTitlebarMenuProps): React.ReactE
                 setOpenMenu(undefined);
             }
         };
+        const onReposition = (): void => reposition(openMenu);
         document.addEventListener('mousedown', onDocMouseDown, true);
-        return () => document.removeEventListener('mousedown', onDocMouseDown, true);
-    }, [openMenu]);
+        window.addEventListener('resize', onReposition);
+        window.addEventListener('scroll', onReposition, true);
+        return () => {
+            document.removeEventListener('mousedown', onDocMouseDown, true);
+            window.removeEventListener('resize', onReposition);
+            window.removeEventListener('scroll', onReposition, true);
+        };
+    }, [openMenu, reposition]);
+
+    // Re-clamp once the dropdown has actually rendered and its real width
+    // (which can exceed DROPDOWN_MIN_WIDTH for longer item labels) is known.
+    React.useLayoutEffect(() => {
+        if (openMenu) {
+            reposition(openMenu);
+        }
+    }, [openMenu, reposition]);
 
     const openAt = (label: string): void => {
-        const btn = buttonRefs.current.get(label);
-        if (btn) {
-            const rect = btn.getBoundingClientRect();
-            setDropdownPos({ top: rect.bottom, left: rect.left });
-        }
+        reposition(label);
         setOpenMenu(label);
     };
 
@@ -174,7 +210,7 @@ export function SorikuTitlebarMenu(props: SorikuTitlebarMenuProps): React.ReactE
             </button>
         </div>)}
         {activeMenu && createPortal(
-            <div className='soriku-titlebar-menu-dropdown' style={{ top: dropdownPos.top, left: dropdownPos.left }}>
+            <div ref={dropdownRef} className='soriku-titlebar-menu-dropdown' style={{ top: dropdownPos.top, left: dropdownPos.left }}>
                 {activeMenu.items.map((entry, i) => 'separator' in entry
                     ? <div key={i} className='soriku-titlebar-menu-sep' />
                     : <button key={entry.label} className='soriku-titlebar-menu-row' onClick={() => invoke(entry.commandId)}>

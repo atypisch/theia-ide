@@ -69,11 +69,12 @@ body.soriku-light {
     --theia-titleBar-inactiveBackground: var(--bg-sunk) !important;
     --theia-titleBar-inactiveForeground: var(--ink3) !important;
     --theia-titleBar-border: var(--line) !important;
-    --theia-menu-background: var(--raise) !important;
+    --theia-menu-background: var(--bg-el) !important;
     --theia-menu-foreground: var(--ink) !important;
     --theia-menu-border: var(--line2) !important;
     --theia-menu-selectionBackground: var(--hover) !important;
     --theia-menu-selectionForeground: var(--ink) !important;
+    --theia-menu-separatorBackground: var(--line) !important;
     --theia-menubar-selectionBackground: var(--hover) !important;
 
     /* ── Status bar ───────────────────────────────────────────────────── */
@@ -99,7 +100,7 @@ body.soriku-light {
     --theia-input-placeholderForeground: var(--ink3) !important;
     --theia-inputValidation-warningBorder: var(--warn) !important;
     --theia-inputValidation-errorBorder: var(--danger) !important;
-    --theia-dropdown-background: var(--bg-sunk) !important;
+    --theia-dropdown-background: var(--bg-el) !important;
     --theia-dropdown-border: var(--line2) !important;
     --theia-button-background: var(--acc) !important;
     --theia-button-foreground: var(--on-acc) !important;
@@ -179,4 +180,42 @@ body.soriku-light .theia-button.secondary {
 body.soriku-dark .theia-button.secondary:hover,
 body.soriku-light .theia-button.secondary:hover {
     background: var(--hover) !important;
+}
+
+/*
+ * Theia's stock @lumino/widgets .lm-Menu rule (right-click context menus,
+ * the Electron-less menu bar's dropdowns) hardcodes shape — border-radius,
+ * padding and box-shadow are not exposed as `--theia-*` variables, so they
+ * need their own override here to match the mockup's panel look (same
+ * shadow/radius as SorikuTitlebarMenu's own dropdown in titlebar.css).
+ */
+body.soriku-dark .lm-Menu,
+body.soriku-light .lm-Menu {
+    border-radius: 10px !important;
+    padding: 6px !important;
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6) !important;
+}
+
+body.soriku-dark .lm-Menu-itemShortcut,
+body.soriku-light .lm-Menu-itemShortcut {
+    font-family: var(--font-m);
+    color: var(--ink3);
+    font-size: 10.5px;
+}
+
+/*
+ * `.theia-select`'s colors (--theia-dropdown-*) are already mapped above;
+ * shape (radius, focus ring) is not exposed as a variable, matching the
+ * mockup's input convention (--rs corner) instead of Theia's stock 2px.
+ * The native OS popup list is left as-is — no custom dropdown-list
+ * component in this pass (see Fase P2 plan notes).
+ */
+body.soriku-dark .theia-select,
+body.soriku-light .theia-select {
+    border-radius: var(--rs);
+}
+
+body.soriku-dark .theia-select:focus,
+body.soriku-light .theia-select:focus {
+    border-color: var(--acc-line);
 }
