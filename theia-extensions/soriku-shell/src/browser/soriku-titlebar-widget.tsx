@@ -17,7 +17,6 @@ import { environment } from '@theia/application-package/lib/environment';
 import { Pill, SorikuLogo } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuEngineStatusService } from 'soriku-workbench-ext/lib/browser/soriku-engine-status-service';
 import { EngineConnectionState } from 'soriku-workbench-ext/lib/common/engine-status';
-import { SORIKU_DARK_THEME_ID } from 'soriku-theme-ext/lib/browser/soriku-theme-contribution';
 import { SorikuTitlebarMenu } from './soriku-titlebar-menu';
 
 const COMMAND_PALETTE_COMMAND_ID = 'workbench.action.showCommands';
@@ -91,14 +90,6 @@ export class SorikuTitlebarWidget extends ReactWidget {
         this.commandService.executeCommand(TOGGLE_THEME_COMMAND_ID);
     };
 
-    protected toggleLeftPanel = (): void => {
-        this.commandService.executeCommand(CommonCommands.TOGGLE_LEFT_PANEL.id);
-    };
-
-    protected toggleBottomPanel = (): void => {
-        this.commandService.executeCommand(CommonCommands.TOGGLE_BOTTOM_PANEL.id);
-    };
-
     protected toggleRightPanel = (): void => {
         this.commandService.executeCommand(CommonCommands.TOGGLE_RIGHT_PANEL.id);
     };
@@ -116,7 +107,6 @@ export class SorikuTitlebarWidget extends ReactWidget {
     };
 
     protected render(): React.ReactNode {
-        const isDark = this.themeService.getCurrentTheme().id === SORIKU_DARK_THEME_ID;
         const state = this.engineStatus.getState();
         return (
             <div className="soriku-titlebar-row">
@@ -142,18 +132,11 @@ export class SorikuTitlebarWidget extends ReactWidget {
                     <span className="soriku-titlebar-dot" />
                     {engineText(state)}
                 </Pill>
-                <button className="soriku-titlebar-icon-btn" title="Toggle theme" onClick={this.toggleTheme}>
-                    <span className="codicon codicon-color-mode" />
-                    {isDark ? 'Dark' : 'Light'}
-                </button>
-                <button className="soriku-titlebar-icon-btn" title="Toggle Sidebar" onClick={this.toggleLeftPanel}>
-                    <span className="codicon codicon-layout-sidebar-left" />
-                </button>
-                <button className="soriku-titlebar-icon-btn" title="Toggle Panel" onClick={this.toggleBottomPanel}>
-                    <span className="codicon codicon-layout-panel" />
-                </button>
                 <button className="soriku-titlebar-icon-btn" title="Toggle Chat" onClick={this.toggleRightPanel}>
                     <span className="codicon codicon-layout-sidebar-right" />
+                </button>
+                <button className="soriku-titlebar-icon-btn" title="Toggle theme" onClick={this.toggleTheme}>
+                    <span className="codicon codicon-color-mode" />
                 </button>
             </div>
         );
