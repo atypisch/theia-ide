@@ -92,17 +92,6 @@
     -webkit-app-region: no-drag;
 }
 
-.soriku-titlebar-word {
-    flex: 0 0 auto;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-}
-
-.soriku-titlebar-word-accent {
-    color: var(--acc);
-}
-
 .soriku-titlebar-breadcrumb {
     flex: 0 1 auto;
     min-width: 0;

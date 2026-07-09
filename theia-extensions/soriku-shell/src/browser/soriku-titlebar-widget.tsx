@@ -116,9 +116,6 @@ export class SorikuTitlebarWidget extends ReactWidget {
                     <span className="soriku-titlebar-fake-dot soriku-titlebar-fake-dot-max" />
                 </div>
                 <SorikuLogo height={19} className="soriku-titlebar-logo" />
-                <span className="soriku-titlebar-word">
-                    <span className="soriku-titlebar-word-accent">Code</span>
-                </span>
                 <SorikuTitlebarMenu keybindingFor={this.keybindingFor} executeCommand={id => this.commandService.executeCommand(id)} />
                 <span className="soriku-titlebar-breadcrumb">{this.windowTitleService.title}</span>
                 <div className="soriku-titlebar-spacer" />
