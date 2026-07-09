@@ -51,6 +51,11 @@ export function projectLabel(projectId?: string | null): string | undefined {
     return parts.slice(-2).join('/');
 }
 
+/** Title-cases a hyphenated engine role ("tool-result" -> "Tool Result") for the detail pane. */
+export function roleLabel(role: string): string {
+    return role.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
 /**
  * 1-2 letter avatar initials for a conversation row — from the persona id
  * (the agent it was with) when known, else the cleaned title. No category

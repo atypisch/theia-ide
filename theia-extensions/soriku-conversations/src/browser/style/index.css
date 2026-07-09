@@ -213,3 +213,81 @@
 .soriku-conversations-empty-mark {
     opacity: 0.45;
 }
+
+/* ── Right: real conversation preview (selection), a deliberate extension
+   beyond the mockup's static empty-state demo ─────────────────────────── */
+
+.soriku-conversations-detail-pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--bg-el);
+}
+
+.soriku-conversations-detail-header {
+    padding: 20px 22px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+}
+
+.soriku-conversations-detail-title {
+    font-family: var(--font-d);
+    font-size: 19px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+.soriku-conversations-detail-meta {
+    margin-top: 6px;
+    font-family: var(--font-m);
+    font-size: 11px;
+    color: var(--ink3);
+}
+
+.soriku-conversations-detail-error {
+    color: var(--danger);
+    font-size: 12px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.soriku-conversations-detail-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.soriku-conversations-detail-message {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.soriku-conversations-detail-message-role {
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink3);
+}
+
+.soriku-conversations-detail-message-user .soriku-conversations-detail-message-role {
+    color: var(--acc);
+}
+
+.soriku-conversations-detail-message-content {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+}

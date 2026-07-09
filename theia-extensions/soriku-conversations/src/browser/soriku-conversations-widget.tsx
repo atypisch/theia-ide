@@ -1,5 +1,9 @@
 /********************************************************************************
- * Soriku IDE — conversation history panel (list / open / rename / delete)
+ * Soriku IDE — conversation history panel (list / preview / open in chat /
+ * rename / delete). Selecting a row fetches its real messages/project
+ * context into the right-hand pane (a deliberate extension beyond the
+ * mockup's static empty-state demo); "Open in Chat" remains the separate
+ * action that loads a conversation into the live Chat view.
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -13,10 +17,10 @@ import { QuickInputService } from '@theia/core/lib/browser';
 import { ConfirmDialog } from '@theia/core/lib/browser/dialogs';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
-import { ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { ConversationDetail, ConversationSummary } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { Btn, SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
-import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
+import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge, roleLabel } from '../common/conversation-view';
 
 /** Chat view command (registered by soriku-chat) used to reveal the chat. */
 const SORIKU_CHAT_OPEN = 'soriku.chat.open';
@@ -51,6 +55,15 @@ export class SorikuConversationsWidget extends ReactWidget {
     protected busyIds = new Set<string>();
     protected activeConversationId?: string;
     protected refreshRetryTimer: number | undefined;
+
+    /**
+     * Conversation currently previewed in the right-hand pane (distinct from
+     * activeConversationId, which tracks what's loaded into the Chat view).
+     */
+    protected selectedId?: string;
+    protected detail?: ConversationDetail;
+    protected detailLoading = false;
+    protected detailError?: string;
 
     @postConstruct()
     protected init(): void {
@@ -104,6 +117,36 @@ export class SorikuConversationsWidget extends ReactWidget {
         }
         this.loading = false;
         this.update();
+    }
+
+    /** Preview a conversation's real messages/project context in the right pane. */
+    protected select(item: ConversationSummary): void {
+        this.selectedId = item.id;
+        this.detail = undefined;
+        this.detailError = undefined;
+        this.update();
+        this.loadDetail(item.id);
+    }
+
+    protected async loadDetail(id: string): Promise<void> {
+        this.detailLoading = true;
+        this.update();
+        try {
+            const detail = await this.engineClient.getConversation(id);
+            // The user may have already selected a different row while this was in flight.
+            if (this.selectedId === id) {
+                this.detail = detail;
+            }
+        } catch (e) {
+            if (this.selectedId === id) {
+                this.detailError = (e as Error).message;
+            }
+        } finally {
+            if (this.selectedId === id) {
+                this.detailLoading = false;
+                this.update();
+            }
+        }
     }
 
     /** Reveal the chat and load this conversation (the chat widget owns the load). */
@@ -172,9 +215,46 @@ export class SorikuConversationsWidget extends ReactWidget {
                 </div>
                 {this.renderList()}
             </div>
-            <div className='soriku-conversations-empty-pane'>
+            {this.selectedId ? this.renderDetail() : <div className='soriku-conversations-empty-pane'>
                 <SorikuMark size={46} className='soriku-conversations-empty-mark' />
                 <span>Open a conversation to continue</span>
+            </div>}
+        </div>;
+    }
+
+    protected renderDetail(): React.ReactNode {
+        const item = this.items.find(i => i.id === this.selectedId);
+        if (this.detailError) {
+            return <div className='soriku-conversations-detail-pane'>
+                <div className='soriku-conversations-detail-error'>
+                    {this.detailError}
+                    <Btn variant='secondary' onClick={() => this.selectedId && this.loadDetail(this.selectedId)}>Retry</Btn>
+                </div>
+            </div>;
+        }
+        if (this.detailLoading && !this.detail) {
+            return <div className='soriku-conversations-detail-pane'>
+                <div className='soriku-conversations-meta'>Loading…</div>
+            </div>;
+        }
+        if (!this.detail) {
+            return <div className='soriku-conversations-detail-pane' />;
+        }
+        const project = projectLabel(this.detail.project_id);
+        return <div className='soriku-conversations-detail-pane'>
+            <div className='soriku-conversations-detail-header'>
+                <div className='soriku-conversations-detail-title'>{cleanTitle(this.detail.title)}</div>
+                {(project || item) && <div className='soriku-conversations-detail-meta'>
+                    {[project, item && `${item.message_count} msg`].filter(Boolean).join(' · ')}
+                </div>}
+            </div>
+            <div className='soriku-conversations-detail-messages sk-scroll'>
+                {this.detail.messages.length === 0
+                    ? <div className='soriku-conversations-meta'>No messages in this conversation.</div>
+                    : this.detail.messages.map((m, i) => <div key={i} className={`soriku-conversations-detail-message soriku-conversations-detail-message-${m.role}`}>
+                        <span className='soriku-conversations-detail-message-role'>{roleLabel(m.role)}</span>
+                        <span className='soriku-conversations-detail-message-content'>{m.content}</span>
+                    </div>)}
             </div>
         </div>;
     }
@@ -193,10 +273,10 @@ export class SorikuConversationsWidget extends ReactWidget {
                         const busy = this.busyIds.has(item.id);
                         const mode = modeFromTitle(item.title);
                         const project = projectLabel(item.project_id);
-                        const active = item.id === this.activeConversationId;
+                        const active = item.id === this.activeConversationId || item.id === this.selectedId;
                         return <li key={item.id} className={`soriku-conversations-row${active ? ' active' : ''}`}>
-                            <button className='soriku-conversations-open' title='Open conversation' disabled={busy}
-                                onClick={() => this.open(item)}>
+                            <button className='soriku-conversations-open' title='Preview conversation' disabled={busy}
+                                onClick={() => this.select(item)}>
                                 <span className='soriku-conversations-avatar'>{conversationInitials(item.persona_id, item.title)}</span>
                                 <span className='soriku-conversations-row-body'>
                                     <span className='soriku-conversations-row-head'>
@@ -210,6 +290,9 @@ export class SorikuConversationsWidget extends ReactWidget {
                                         {[`${item.message_count} msg`, project].filter(Boolean).join(' · ')}
                                     </span>
                                 </span>
+                            </button>
+                            <button className='soriku-iconbtn' title='Open in Chat' disabled={busy} onClick={() => this.open(item)}>
+                                <span className='codicon codicon-comment-discussion' />
                             </button>
                             <button className='soriku-iconbtn' title='Rename' disabled={busy} onClick={() => this.rename(item)}>
                                 <span className='codicon codicon-edit' />

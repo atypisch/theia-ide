@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge } from '../common/conversation-view';
+import { cleanTitle, conversationInitials, modeFromTitle, projectLabel, relativeAge, roleLabel } from '../common/conversation-view';
 
 describe('relativeAge', () => {
     const now = Date.parse('2026-06-18T12:00:00Z');
@@ -52,6 +52,16 @@ describe('projectLabel', () => {
     });
     it('returns undefined for empty', () => {
         assert.equal(projectLabel(undefined), undefined);
+    });
+});
+
+describe('roleLabel', () => {
+    it('title-cases a plain role', () => {
+        assert.equal(roleLabel('user'), 'User');
+        assert.equal(roleLabel('assistant'), 'Assistant');
+    });
+    it('title-cases each hyphen-separated word', () => {
+        assert.equal(roleLabel('tool-result'), 'Tool Result');
     });
 });
 
