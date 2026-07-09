@@ -133,7 +133,7 @@ export class SorikuTitlebarWidget extends ReactWidget {
                     {engineText(state)}
                 </Pill>
                 <button className="soriku-titlebar-icon-btn" title="Toggle Chat" onClick={this.toggleRightPanel}>
-                    <span className="codicon codicon-layout-sidebar-right" />
+                    <span className="codicon codicon-comment" />
                 </button>
                 <button className="soriku-titlebar-icon-btn" title="Toggle theme" onClick={this.toggleTheme}>
                     <span className="codicon codicon-color-mode" />
