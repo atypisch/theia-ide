@@ -43,7 +43,7 @@ export class SorikuQuickActionsContribution implements CommandContribution {
             { label: 'Routing Overrides', commandId: 'soriku.routing.overrides.open', iconClasses: ['soriku-qp-icon', 'soriku-qp-icon-reason'] },
             { label: 'Toggle Terminal', commandId: 'workbench.action.terminal.toggleTerminal', iconClasses: ['soriku-qp-icon', 'soriku-qp-icon-neutral'] },
             { label: 'Toggle Theme', commandId: 'soriku.theme.toggle', iconClasses: ['soriku-qp-icon', 'soriku-qp-icon-neutral'] },
-            { label: 'Open Settings', commandId: 'preferences:open', iconClasses: ['soriku-qp-icon', 'soriku-qp-icon-neutral'] },
+            { label: 'Open Settings', commandId: 'soriku.settings.open', iconClasses: ['soriku-qp-icon', 'soriku-qp-icon-neutral'] },
         ];
     }
 
