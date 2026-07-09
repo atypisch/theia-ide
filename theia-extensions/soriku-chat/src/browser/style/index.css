@@ -207,17 +207,122 @@
 }
 
 .soriku-plan-detail-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 16px 18px;
+    padding: 16px 18px 12px;
     border-bottom: 1px solid var(--line);
     flex-shrink: 0;
 }
 
-.soriku-plan-detail-title {
+.soriku-plan-detail-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.soriku-plan-detail-header-spacer {
     flex: 1;
+}
+
+.soriku-plan-detail-title {
     font-size: 19px;
+}
+
+.soriku-plan-detail-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink2);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line2);
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.soriku-plan-detail-pill.running {
+    color: var(--acc);
+    background: var(--acc-soft);
+    border-color: var(--acc-line);
+}
+
+.soriku-plan-detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink3);
+}
+
+.soriku-plan-detail-meta-mp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.soriku-plan-detail-mp-badge {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--cat-reason) 20%, transparent);
+    color: var(--cat-reason);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+}
+
+.soriku-plan-detail-banner {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-sunk);
+    font-size: 12.5px;
+    color: var(--ink2);
+    line-height: 1.6;
+    flex-shrink: 0;
+}
+
+.soriku-plan-detail-banner b {
+    color: var(--ink);
+}
+
+.soriku-plan-detail-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+}
+
+.soriku-plan-detail-footer-caption {
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-plan-detail-footer-spacer {
+    flex: 1;
+}
+
+.soriku-plan-detail-running {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-m);
+    font-size: 12px;
+    color: var(--acc);
+}
+
+.soriku-plan-detail-spinner {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1.7px solid var(--acc);
+    border-top-color: transparent;
+    animation: sk-spin 0.8s linear infinite;
 }
 
 .soriku-plan-detail-close {
