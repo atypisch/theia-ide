@@ -9,10 +9,19 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandRegistry, MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
-import { AgentAvatar, AgentCategory, Badge, Btn, Card, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
+import { AgentAvatar, AgentCategory, Btn, categoryColors, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
+import { LearningSummary, summarizeLearning } from 'soriku-agent-customization-ext/lib/common/agent-form';
 import { AgentItem, toAgentItems } from '../common/agent-view';
 import { SorikuAgentSelectionService } from './soriku-agent-selection';
 import { SorikuAgentCatalog } from './soriku-agent-catalog';
+
+const DETAIL_TABS = ['Persona', 'Specialisms', 'Memory', 'Activity'] as const;
+
+interface DetailState {
+    status: 'loading' | 'error' | 'ready';
+    learning?: LearningSummary;
+    error?: string;
+}
 
 type AgentFilter = 'all' | AgentCategory;
 const AGENT_FILTERS: ReadonlyArray<{ value: AgentFilter; label: string }> = [
@@ -57,6 +66,9 @@ export class SorikuAgentsWidget extends ReactWidget {
 
     protected state: AgentsState = { status: 'loading', items: [] };
     protected categoryFilter: AgentFilter = 'all';
+    protected detailAgentId: string | undefined;
+    protected detailState: DetailState | undefined;
+    protected detailTab: typeof DETAIL_TABS[number] = 'Persona';
 
     @postConstruct()
     protected init(): void {
@@ -99,6 +111,21 @@ export class SorikuAgentsWidget extends ReactWidget {
         if (this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND)) {
             this.commands.executeCommand(SORIKU_AGENT_EDIT_COMMAND, item.id);
         }
+    }
+
+    /** Selects a card for the master-detail panel and loads its real learning summary. */
+    protected async selectForDetail(item: AgentItem): Promise<void> {
+        this.detailAgentId = item.id;
+        this.detailTab = 'Persona';
+        this.detailState = { status: 'loading' };
+        this.update();
+        try {
+            const response = await this.engineClient.getAgent(item.id);
+            this.detailState = { status: 'ready', learning: summarizeLearning(response.data) };
+        } catch (e) {
+            this.detailState = { status: 'error', error: (e as Error).message };
+        }
+        this.update();
     }
 
     protected render(): React.ReactNode {
@@ -159,32 +186,110 @@ export class SorikuAgentsWidget extends ReactWidget {
             return <div className='soriku-agents-message'>No agents found. Create one in Soriku, then refresh.</div>;
         }
         const visible = this.categoryFilter === 'all' ? items : items.filter(i => toKnownCategory(i.category) === this.categoryFilter);
-        const activeId = this.selection.getActiveId();
-        return <div className='soriku-agents-grid'>
-            {visible.map(item => this.renderAgent(item, item.id === activeId))}
+        const selected = items.find(i => i.id === this.detailAgentId);
+        return <div className='soriku-agents-split'>
+            <div className='soriku-agents-grid-wrap sk-scroll'>
+                <div className='soriku-agents-grid'>
+                    {visible.map(item => this.renderAgent(item, item.id === this.detailAgentId))}
+                </div>
+            </div>
+            {selected && this.renderDetailPanel(selected)}
         </div>;
     }
 
+    /**
+     * 1:1 the mockup's card: plain uppercase category text (not a Badge pill), no
+     * per-card buttons — clicking selects the card for the master-detail panel.
+     * Skills chips and Open-chat/Edit actions moved into that panel instead.
+     */
     protected renderAgent(item: AgentItem, active: boolean): React.ReactNode {
         const category = toKnownCategory(item.category);
-        return <Card key={item.id} className={`soriku-agent-card${active ? ' active' : ''}`}>
+        return <div
+            key={item.id}
+            className={`soriku-agent-card${active ? ' active' : ''}`}
+            onClick={() => this.selectForDetail(item)}
+        >
             <div className='soriku-agent-card-head'>
                 <AgentAvatar initials={item.avatarText} category={category} size='md' />
                 <div className='soriku-agent-card-title'>
                     <div className='soriku-agent-name'>{item.name}</div>
-                    {item.category && <Badge tone='acc'>{item.category}</Badge>}
+                    {item.category && <div className='soriku-agent-card-category' style={{ color: categoryColors(category).c }}>{item.category}</div>}
                 </div>
             </div>
             {item.description && <div className='soriku-agent-description'>{item.description}</div>}
-            {item.skills.length > 0 && <div className='soriku-agent-skills'>
-                {item.skills.map(skill => <Badge key={skill}>{skill}</Badge>)}
-            </div>}
             <div className='soriku-agent-card-footer'>
                 {item.preferredModel && <span className='soriku-agent-model'>{item.preferredModel}</span>}
-                <span className='soriku-agent-card-spacer' />
-                <Btn variant='primary' onClick={() => this.openChat(item)}>Open chat</Btn>
-                {this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND) && <Btn variant='secondary' onClick={() => this.editAgent(item)}>Edit</Btn>}
             </div>
-        </Card>;
+        </div>;
+    }
+
+    /**
+     * Master-detail panel, 1:1 the mockup (392px, right of the grid). "Allowed
+     * tools" (mockup: per-tool toggle switches) is deliberately omitted — per-
+     * agent tool whitelisting has no real engine persistence yet (same gap
+     * documented in Fase R2 / soriku-agent-edit-widget.tsx). "runs this week"/
+     * "verified clean" stat tiles are replaced with real equivalents this
+     * agent's own learning data actually has: lifetime interaction count and
+     * positive-feedback ratio (reusing summarizeLearning(), the same parsing
+     * already used by the agent editor's "What this agent has learned"
+     * section) — not a time-windowed run count or a "clean" verdict, since
+     * neither exists as real data.
+     */
+    protected renderDetailPanel(item: AgentItem): React.ReactNode {
+        const category = toKnownCategory(item.category);
+        const d = this.detailState;
+        const l = d?.status === 'ready' ? d.learning : undefined;
+        const positivePct = l && (l.positive + l.negative) > 0 ? Math.round((l.positive / (l.positive + l.negative)) * 100) : undefined;
+        const catColors = categoryColors(category);
+        return <div className='soriku-agent-detail sk-scroll'>
+            <div className='soriku-agent-detail-header'>
+                <div className='soriku-agent-detail-head-row'>
+                    <AgentAvatar initials={item.avatarText} category={category} size='lg' />
+                    <div className='soriku-agent-detail-title'>
+                        <div className='soriku-agent-detail-name'>{item.name}</div>
+                        <div className='soriku-agent-detail-meta'>
+                            {item.category && <span className='soriku-agent-detail-cat' style={{ color: catColors.c, background: catColors.bg }}>{item.category}</span>}
+                            {item.preferredModel && <span className='soriku-agent-detail-model'>{item.preferredModel}</span>}
+                        </div>
+                    </div>
+                </div>
+                <div className='soriku-agent-detail-actions'>
+                    <Btn variant='primary' onClick={() => this.openChat(item)}>
+                        <span className='codicon codicon-comment' />Open chat
+                    </Btn>
+                    {this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND) && <Btn variant='secondary' onClick={() => this.editAgent(item)}>Edit</Btn>}
+                </div>
+            </div>
+            <div className='soriku-agent-detail-tabs'>
+                {DETAIL_TABS.map(tab => <button
+                    key={tab}
+                    className={`soriku-agent-detail-tab${this.detailTab === tab ? ' active' : ''}`}
+                    onClick={() => { this.detailTab = tab; this.update(); }}
+                >{tab}</button>)}
+            </div>
+            <div className='soriku-agent-detail-body'>
+                {item.systemPrompt && <div className='soriku-agent-detail-section'>
+                    <div className='soriku-agent-detail-section-title'>System prompt</div>
+                    <div className='soriku-agent-detail-prompt'>{item.systemPrompt}</div>
+                </div>}
+                {item.skills.length > 0 && <div className='soriku-agent-detail-section'>
+                    <div className='soriku-agent-detail-section-title'>Specialisms</div>
+                    <div className='soriku-agent-detail-skills'>
+                        {item.skills.map(skill => <span key={skill} className='soriku-agent-detail-skill'>{skill}</span>)}
+                    </div>
+                </div>}
+                {d?.status === 'loading' && <div className='soriku-agents-message'>Loading activity…</div>}
+                {l && (l.interactions > 0 || positivePct !== undefined) && <div className='soriku-agent-detail-stats'>
+                    <div className='soriku-agent-detail-stat'>
+                        <div className='soriku-agent-detail-stat-value'>{l.interactions}</div>
+                        <div className='soriku-agent-detail-stat-label'>interactions</div>
+                    </div>
+                    {positivePct !== undefined && <div className='soriku-agent-detail-stat'>
+                        <div className='soriku-agent-detail-stat-value soriku-agent-detail-stat-ok'>{positivePct}%</div>
+                        <div className='soriku-agent-detail-stat-label'>positive feedback</div>
+                    </div>}
+                </div>}
+            </div>
+        </div>;
     }
 }

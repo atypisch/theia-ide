@@ -60,7 +60,21 @@ describe('toAgentItem', () => {
             category: '',
             skills: [],
             preferredModel: undefined,
+            systemPrompt: undefined,
         });
+    });
+
+    it('maps a real system prompt for the master-detail panel', () => {
+        const item = toAgentItem(persona({
+            id: 'a4',
+            intelligence: { system_prompt: '  You are a careful reviewer.  ' },
+        }));
+        assert.equal(item.systemPrompt, 'You are a careful reviewer.');
+    });
+
+    it('leaves systemPrompt undefined for a blank system prompt', () => {
+        const item = toAgentItem(persona({ id: 'a5', intelligence: { system_prompt: '   ' } }));
+        assert.equal(item.systemPrompt, undefined);
     });
 
     it('maps category, specialization names and preferred model', () => {
