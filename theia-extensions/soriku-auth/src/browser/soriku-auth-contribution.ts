@@ -37,11 +37,13 @@ export class SorikuAuthContribution implements FrontendApplicationContribution, 
     @inject(MessageService)
     protected readonly messages: MessageService;
 
-    async onStart(): Promise<void> {
+    onStart(): void {
         this.auth.onDidChangeState(state => this.updateStatusBar(state));
         this.updateStatusBar(this.auth.getState());
-        // Token load + first engine query; failures degrade gracefully to "engine unknown".
-        await this.auth.initialize();
+        // Fire-and-forget: keychain read + engine auth-mode/whoami query must not
+        // block Theia's sequential onStart chain. Failures degrade gracefully to
+        // "engine unknown" and the status bar updates again via onDidChangeState.
+        this.auth.initialize().catch(() => { /* initialize() never rejects; guards future changes */ });
     }
 
     registerCommands(commands: CommandRegistry): void {

@@ -25,7 +25,7 @@
 /* Mockup §13 status bar is a closed list: Engine :8765 → branch → warm model
    → worker/minion count → spacer → Terminal-toggle → Ln/Col → Spaces →
    language → verified. Anything else Theia/bundled extensions register
-   (SCM sync arrows, Problems marker counts, real-time Collaborate, EOL,
+   (SCM sync arrows, Problems marker counts, EOL,
    encoding, the generic language-status entrypoint, the notification bell,
    and — since it has no mockup-specified slot — the Soriku auth-status item,
    which is still fully functional via the sidebar footer) is hidden here
@@ -68,7 +68,6 @@
 
 #theia-statusBar #status-bar-scm\.status\.1,
 #theia-statusBar #status-bar-problem-marker-status,
-#theia-statusBar #status-bar-statusBar\.collaboration,
 #theia-statusBar #status-bar-editor-status-eol,
 #theia-statusBar #status-bar-editor-status-encoding,
 #theia-statusBar #status-bar-editor-language-status-items,

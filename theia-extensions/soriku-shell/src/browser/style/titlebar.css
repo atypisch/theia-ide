@@ -170,9 +170,8 @@
     border-radius: 10px;
     box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
     padding: 6px;
-    /* Must clear Theia's own floating widgets (e.g. the editor tab-bar's
-       #main-toolbar sits at z-index:1001) — reuse Theia's own menu z-index
-       so this always paints above any internal chrome. */
+    /* Must clear Theia's own floating widgets — reuse Theia's own menu
+       z-index so this always paints above any internal chrome. */
     z-index: var(--theia-menu-z-index, 10000);
 }
 

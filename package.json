@@ -65,14 +65,36 @@
   },
   "theiaPluginsDir": "plugins",
   "theiaPlugins": {
-    "vscode-builtin-extensions": "https://github.com/eclipse-theia/vscode-builtin-extensions/releases/download/1.108.2/vscode-builtin-extensions-1.108.2.tar.gz",
-    "vscjava.vscode-java-pack": "https://open-vsx.org/api/vscjava/vscode-java-pack/0.30.5/file/vscjava.vscode-java-pack-0.30.5.vsix",
-    "vscjava.vscode-java-dependency": "https://open-vsx.org/api/vscjava/vscode-java-dependency/0.27.0/file/vscjava.vscode-java-dependency-0.27.0.vsix"
+    "vscode-builtin-extensions": "https://github.com/eclipse-theia/vscode-builtin-extensions/releases/download/1.108.2/vscode-builtin-extensions-1.108.2.tar.gz"
   },
   "theiaPluginsExcludeIds": [
     "ms-vscode.js-debug-companion",
     "vscode.extension-editing",
-    "vscode.microsoft-authentication"
+    "vscode.microsoft-authentication",
+    "vscode.ipynb",
+    "vscode.builtin-notebook-renderers",
+    "vscode.theme-abyss",
+    "vscode.theme-kimbie-dark",
+    "vscode.theme-monokai",
+    "vscode.theme-monokai-dimmed",
+    "vscode.theme-quietlight",
+    "vscode.theme-red",
+    "vscode.theme-solarized-dark",
+    "vscode.theme-solarized-light",
+    "vscode.theme-tomorrow-night-blue",
+    "vscode.npm",
+    "vscode.grunt",
+    "vscode.gulp",
+    "vscode.jake",
+    "vscode.docker",
+    "vscode.github",
+    "vscode.github-authentication",
+    "vscode.simple-browser",
+    "vscode.tunnel-forwarding",
+    "vscode.media-preview",
+    "vscode.markdown-math",
+    "vscode.references-view",
+    "vscode.mermaid-chat-features"
   ],
   "workspaces": [
     "applications/*",

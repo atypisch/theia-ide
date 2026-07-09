@@ -57,7 +57,11 @@ export class SorikuEngineStatusContribution implements FrontendApplicationContri
             await this.promptFirstRun();
             return;
         }
-        await this.autoConnect();
+        // Fire-and-forget: the engine ping is a network round-trip that must not
+        // block Theia's sequential onStart chain — the status bar already
+        // reflects "connecting…" and updates again via onDidChangeState once the
+        // ping settles, so nothing downstream needs this to be awaited.
+        this.autoConnect().catch(() => { /* connect() never rejects; guards future changes */ });
     }
 
     protected async autoConnect(): Promise<void> {
