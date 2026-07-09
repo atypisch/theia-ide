@@ -29,7 +29,10 @@
    encoding, the generic language-status entrypoint, the notification bell,
    and — since it has no mockup-specified slot — the Soriku auth-status item,
    which is still fully functional via the sidebar footer) is hidden here
-   rather than left as leftover default chrome. */
+   rather than left as leftover default chrome. bottom-panel-toggle is
+   Theia's own icon-only Terminal toggle ($(codicon-window), no text) —
+   replaced by soriku-terminal-toggle-status (icon + "Terminal" text,
+   matching the mockup exactly) rather than restyled in place. */
 #theia-statusBar #status-bar-scm\.status\.1,
 #theia-statusBar #status-bar-problem-marker-status,
 #theia-statusBar #status-bar-statusBar\.collaboration,
@@ -37,6 +40,7 @@
 #theia-statusBar #status-bar-editor-status-encoding,
 #theia-statusBar #status-bar-editor-language-status-items,
 #theia-statusBar #status-bar-theia-notification-center,
-#theia-statusBar #status-bar-soriku-auth-status {
+#theia-statusBar #status-bar-soriku-auth-status,
+#theia-statusBar #status-bar-bottom-panel-toggle {
     display: none !important;
 }
