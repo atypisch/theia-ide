@@ -1024,11 +1024,28 @@
     padding: 7px 10px 7px 12px;
 }
 
-.soriku-chat-header-actions .sk-btn {
+/* History / New chat / Maximize — icon-only, 1:1 from the mockup's chat-dock header row. */
+.soriku-chat-header-icon-btn {
+    width: 24px;
     height: 24px;
-    min-height: 24px;
-    padding: 0 8px;
-    font-size: 11px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.soriku-chat-header-icon-btn:hover:not(:disabled) {
+    background: var(--hover);
+}
+
+.soriku-chat-header-icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .soriku-chat-agent-identity .sk-avatar {

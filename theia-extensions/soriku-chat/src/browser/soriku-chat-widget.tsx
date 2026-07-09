@@ -10,6 +10,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
 import { OpenerService } from '@theia/core/lib/browser/opener-service';
+import { ApplicationShell } from '@theia/core/lib/browser/shell/application-shell';
 import URI from '@theia/core/lib/common/uri';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
@@ -146,6 +147,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(CommandService)
     protected readonly commands: CommandService;
+
+    @inject(ApplicationShell)
+    protected readonly shell: ApplicationShell;
 
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
@@ -827,13 +831,27 @@ export class SorikuChatWidget extends ReactWidget {
                     {this.conversationTitle && <span className='soriku-chat-conv-title' title={this.conversationTitle}>{this.conversationTitle}</span>}
                 </div>
                 <div className='soriku-chat-header-actions'>
-                    {agentId && <Btn variant='secondary' title='What this agent has learned' onClick={() => this.toggleInsights()}>
-                        <span className='codicon codicon-lightbulb' /> Insights
-                    </Btn>}
-                    <Btn variant='secondary' title='Start a new conversation'
+                    <button className='soriku-chat-header-icon-btn' title='History'
+                        onClick={() => this.commands.executeCommand('soriku.conversations.open')}>
+                        <span className='codicon codicon-history' />
+                    </button>
+                    <button className='soriku-chat-header-icon-btn' title='New chat'
                         disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
-                        New chat
-                    </Btn>
+                        <span className='codicon codicon-add' />
+                    </button>
+                    <button className='soriku-chat-header-icon-btn' title='Maximize chat'
+                        onClick={() => this.shell.toggleMaximized(this)}>
+                        <span className='codicon codicon-screen-full' />
+                    </button>
+                    {/* Not part of the mockup's 3-icon header row (History/New chat/Maximize) —
+                        a real, working feature (per-agent learned-pattern summary) kept as a
+                        4th icon in the same minimal style rather than dropped, matching the
+                        "Quick Actions" precedent of preserving real functionality without
+                        reintroducing mockup-foreign chrome (labelled buttons, extra text). */}
+                    {agentId && <button className='soriku-chat-header-icon-btn' title='What this agent has learned'
+                        onClick={() => this.toggleInsights()}>
+                        <span className='codicon codicon-lightbulb' />
+                    </button>}
                 </div>
             </div>
             {agentId && this.insightsOpen && this.renderInsights()}
