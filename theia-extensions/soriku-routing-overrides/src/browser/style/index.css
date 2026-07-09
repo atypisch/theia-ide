@@ -56,6 +56,19 @@
     border-bottom: none;
 }
 
+.soriku-routing-row-cat {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.soriku-routing-row-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
 .soriku-routing-row-name {
     font-size: 13px;
     font-weight: 600;
@@ -63,7 +76,39 @@
 }
 
 .soriku-routing-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
     width: 100%;
+    padding: 0 12px;
+    border-radius: var(--rs);
+    cursor: pointer;
+    font-family: var(--font-m);
+    font-size: 11.5px;
+    border: 1px solid var(--line2);
+    background: var(--bg);
+    color: var(--ink2);
+}
+
+.soriku-routing-pick.forced {
+    border: 1px solid var(--acc-line);
+    background: var(--acc-soft);
+    color: var(--acc);
+    font-weight: 600;
+}
+
+.soriku-routing-pick:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.soriku-routing-pick-label {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .soriku-routing-hint {

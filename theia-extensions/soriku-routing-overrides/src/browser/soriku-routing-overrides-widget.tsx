@@ -8,9 +8,10 @@ import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
+import { QuickInputService, QuickPickItem } from '@theia/core/lib/browser';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { toCapabilityTable } from 'soriku-capability-map-ext/lib/common/capability-table';
-import { Btn, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
+import { Btn, PageHeader, categoryColors, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import {
     OverrideRow,
     RoutingCategoryRow,
@@ -38,6 +39,9 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
 
     @inject(MessageService)
     protected readonly messages: MessageService;
+
+    @inject(QuickInputService)
+    protected readonly quickInput: QuickInputService;
 
     protected state: OverridesState = { status: 'loading', overrides: [], categories: [], models: [] };
     protected busy = false;
@@ -145,18 +149,45 @@ export class SorikuRoutingOverridesWidget extends ReactWidget {
         </>;
     }
 
+    /**
+     * Mockup cycles through a small, fixed per-category option list on click
+     * (opts[idx % opts.length]). Real installed-model lists can be much
+     * longer, where blind cycling would take many clicks to reach a specific
+     * model — so this opens a quick-pick instead (same one-click-to-change
+     * goal, scales to any real model count). No per-category description is
+     * shown (mockup's r.desc is invented prose with no engine data source).
+     */
+    protected async pickOverride(category: string, models: string[]): Promise<void> {
+        if (this.busy) {
+            return;
+        }
+        const items: QuickPickItem[] = [
+            { label: 'Auto', description: 'Follow the capability map' },
+            ...models.map(m => ({ label: m })),
+        ];
+        const pick = await this.quickInput.showQuickPick(items, { placeholder: `Model override for ${category}` });
+        if (pick) {
+            await this.setOverride(category, pick.label === 'Auto' ? '' : pick.label);
+        }
+    }
+
     protected renderRow(row: RoutingCategoryRow, models: string[]): React.ReactNode {
+        const forced = !!row.override;
+        const dotColor = categoryColors(toKnownCategory(row.category)).c;
         return <div key={row.category} className='soriku-routing-row'>
-            <span className='soriku-routing-row-name'>{row.category}</span>
-            <select
-                className='theia-select soriku-routing-pick'
+            <div className='soriku-routing-row-cat'>
+                <span className='soriku-routing-row-dot' style={{ background: dotColor }} />
+                <span className='soriku-routing-row-name'>{row.category}</span>
+            </div>
+            <button
+                className={`soriku-routing-pick${forced ? ' forced' : ''}`}
                 disabled={this.busy}
-                value={row.override ?? ''}
-                onChange={e => this.setOverride(row.category, e.target.value)}
+                onClick={() => this.pickOverride(row.category, models)}
             >
-                <option value=''>Auto</option>
-                {models.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+                <span className={`codicon ${forced ? 'codicon-pinned' : 'codicon-zap'}`} />
+                <span className='soriku-routing-pick-label'>{row.override ?? 'Auto'}</span>
+                <span className='codicon codicon-chevron-down' />
+            </button>
         </div>;
     }
 }
