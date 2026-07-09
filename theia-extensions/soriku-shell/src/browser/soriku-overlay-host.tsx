@@ -18,7 +18,6 @@ export interface SorikuOverlayHostProps {
     onClose: () => void;
     /** Live keybinding text for a command id, e.g. "⌘L", or undefined if unbound. */
     keybindingFor: (commandId: string) => string | undefined;
-    onOpenAllShortcuts: () => void;
     onConfirmNewWindow: () => void;
     /** Creates a workspace-relative file and opens it. Returns an error message on failure. */
     onCreateFile: (relativePath: string) => Promise<string | undefined>;
@@ -62,14 +61,11 @@ function renderShortcuts(props: SorikuOverlayHostProps): React.ReactElement {
         <div className='soriku-overlay-shortcuts-grid sk-scroll'>
             {SHORTCUT_GROUPS.map(group => <div key={group.title}>
                 <div className='soriku-overlay-shortcuts-group-title'>{group.title}</div>
-                {group.items.map(item => <div key={item.commandId} className='soriku-overlay-shortcuts-row'>
+                {group.items.map(item => <div key={item.label} className='soriku-overlay-shortcuts-row'>
                     <span className='soriku-overlay-shortcuts-label'>{item.label}</span>
-                    <span className='soriku-overlay-shortcuts-keys'>{props.keybindingFor(item.commandId) ?? '—'}</span>
+                    <span className='soriku-overlay-shortcuts-keys'>{item.staticHint ?? props.keybindingFor(item.commandId) ?? '—'}</span>
                 </div>)}
             </div>)}
-        </div>
-        <div className='soriku-overlay-shortcuts-footer'>
-            <button className='soriku-overlay-link' onClick={props.onOpenAllShortcuts}>All keyboard shortcuts…</button>
         </div>
     </div>;
 }

@@ -10,7 +10,7 @@ import { createRoot, Root } from '@theia/core/shared/react-dom/client';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/common';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
-import { KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
+import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { open, OpenerService } from '@theia/core/lib/browser/opener-service';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
@@ -26,7 +26,7 @@ export namespace SorikuOverlayCommands {
 }
 
 @injectable()
-export class SorikuOverlayContribution implements FrontendApplicationContribution, CommandContribution {
+export class SorikuOverlayContribution implements FrontendApplicationContribution, CommandContribution, KeybindingContribution {
 
     @inject(SorikuOverlayService)
     protected readonly overlayService: SorikuOverlayService;
@@ -69,10 +69,6 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
             kind: this.overlayService.getKind(),
             onClose: () => this.overlayService.close(),
             keybindingFor: (commandId: string) => this.keybindingFor(commandId),
-            onOpenAllShortcuts: () => {
-                this.overlayService.close();
-                this.commands.executeCommand('keymaps:open');
-            },
             onConfirmNewWindow: () => {
                 this.overlayService.close();
                 this.commands.executeCommand('workbench.action.newWindow');
@@ -121,5 +117,9 @@ export class SorikuOverlayContribution implements FrontendApplicationContributio
         commands.registerCommand(SorikuOverlayCommands.OPEN_DOCS, {
             execute: () => this.overlayService.open('docs'),
         });
+    }
+
+    registerKeybindings(keybindings: KeybindingRegistry): void {
+        keybindings.registerKeybinding({ command: SorikuOverlayCommands.SHORTCUTS.id, keybinding: 'ctrlcmd+/' });
     }
 }

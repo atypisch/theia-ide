@@ -14,6 +14,7 @@ import '../../src/browser/style/editor-chrome.css';
 
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { CommandContribution } from '@theia/core/lib/common';
+import { KeybindingContribution } from '@theia/core/lib/browser/keybinding';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import { TabBarToolbarContribution } from '@theia/core/lib/browser/shell/tab-bar-toolbar';
 import { SorikuTitlebarWidget } from './soriku-titlebar-widget';
@@ -45,6 +46,7 @@ export default new ContainerModule(bind => {
     bind(SorikuOverlayContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuOverlayContribution);
     bind(CommandContribution).toService(SorikuOverlayContribution);
+    bind(KeybindingContribution).toService(SorikuOverlayContribution);
 
     bind(SorikuQuickActionsContribution).toSelf().inSingletonScope();
     bind(CommandContribution).toService(SorikuQuickActionsContribution);
