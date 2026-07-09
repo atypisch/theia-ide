@@ -37,6 +37,8 @@ import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client'
 import { SorikuEngineStatusService } from 'soriku-workbench-ext/lib/browser/soriku-engine-status-service';
 import { shortHost } from 'soriku-workbench-ext/lib/common/engine-status';
 import { SorikuAuthService } from 'soriku-auth-ext/lib/browser/soriku-auth-service';
+import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
+import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { sidebarAccountView } from '../common/sidebar-account-view';
 import { SorikuSidebarFilesPanel } from './panels/soriku-sidebar-files-panel';
 import { SorikuSidebarSearchPanel } from './panels/soriku-sidebar-search-panel';
@@ -110,6 +112,12 @@ export class SorikuSidebarWidget extends ReactWidget {
     @inject(SorikuEngineStatusService)
     protected readonly engineStatus: SorikuEngineStatusService;
 
+    @inject(SorikuGeneratedFilesTracker)
+    protected readonly generatedFiles: SorikuGeneratedFilesTracker;
+
+    @inject(SorikuEditorRevealService)
+    protected readonly editorReveal: SorikuEditorRevealService;
+
     protected activeNav = 'explorer';
     protected filesModel: FileNavigatorModel | undefined;
     protected infoState: Partial<Record<string, InfoState>> = {};
@@ -127,6 +135,7 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.toDispose.push(this.authService.onDidChangeState(() => this.update()));
         this.toDispose.push(this.scmService.onDidChangeSelectedRepository(() => this.update()));
         this.toDispose.push(this.engineStatus.onDidChangeState(() => { if (this.activeNav === 'settings') { this.update(); } }));
+        this.toDispose.push(this.generatedFiles.onDidChange(() => { if (this.activeNav === 'explorer') { this.update(); } }));
         this.loadFilesModel();
         this.loadInfo(this.activeNav);
         this.refreshWorkspaceIcon().catch(() => { /* ignore */ });
@@ -253,7 +262,13 @@ export class SorikuSidebarWidget extends ReactWidget {
         switch (this.activeNav) {
             case 'explorer':
                 return this.filesModel
-                    ? <SorikuSidebarFilesPanel model={this.filesModel} decorations={this.decorationsService} commands={this.commands} />
+                    ? <SorikuSidebarFilesPanel
+                        model={this.filesModel}
+                        decorations={this.decorationsService}
+                        commands={this.commands}
+                        generatedFiles={this.generatedFiles}
+                        editorReveal={this.editorReveal}
+                    />
                     : <div className="soriku-sidebar-files-empty">Loading…</div>;
             case 'search':
                 return <SorikuSidebarSearchPanel searchService={this.searchService} openerService={this.openerService} />;

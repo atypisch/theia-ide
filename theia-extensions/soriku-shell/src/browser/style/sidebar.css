@@ -282,6 +282,63 @@
     font-weight: 600;
 }
 
+/* Generated · run — files the agent fleet wrote this session, 1:1 from the mockup. */
+
+.soriku-sidebar-generated-eyebrow {
+    margin: 14px 6px 8px;
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--acc);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.soriku-sidebar-generated-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--acc);
+}
+
+.soriku-sidebar-generated-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 25px;
+    padding: 0 8px 0 22px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--ink2);
+    cursor: pointer;
+}
+
+.soriku-sidebar-generated-row:hover {
+    background: var(--hover);
+}
+
+.soriku-sidebar-generated-icon {
+    flex-shrink: 0;
+    color: var(--add);
+}
+
+.soriku-sidebar-generated-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soriku-sidebar-generated-diff {
+    flex-shrink: 0;
+    font-family: var(--font-m);
+    font-size: 9px;
+    color: var(--add);
+}
+
 /* Find in Files */
 
 .soriku-sidebar-search-panel {

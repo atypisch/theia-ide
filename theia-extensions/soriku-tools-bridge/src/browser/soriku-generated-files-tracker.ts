@@ -26,4 +26,9 @@ export class SorikuGeneratedFilesTracker {
     get(path: string): LineDiffStats | undefined {
         return this.stats.get(path);
     }
+
+    /** All files written this session, most-recently-recorded first (for the Explorer sidebar's "Generated · run" section). */
+    entries(): Array<[string, LineDiffStats]> {
+        return Array.from(this.stats.entries()).reverse();
+    }
 }

@@ -17,18 +17,26 @@ import { DecorationsService } from '@theia/core/lib/browser/decorations-service'
 import { CommandService } from '@theia/core/lib/common/command';
 import { FileNavigatorModel } from '@theia/navigator/lib/browser/navigator-model';
 import { FileStatNode } from '@theia/filesystem/lib/browser/file-tree';
+import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
+import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 
 export interface SorikuSidebarFilesPanelProps {
     model: FileNavigatorModel;
     decorations: DecorationsService;
     commands: CommandService;
+    generatedFiles: SorikuGeneratedFilesTracker;
+    editorReveal: SorikuEditorRevealService;
+}
+
+function fileName(path: string): string {
+    return path.split(/[\\/]/).pop() ?? path;
 }
 
 function colorVar(colorId: string): string {
     return `var(--theia-${colorId.replace(/\./g, '-')})`;
 }
 
-export function SorikuSidebarFilesPanel({ model, decorations, commands }: SorikuSidebarFilesPanelProps): React.ReactElement {
+export function SorikuSidebarFilesPanel({ model, decorations, commands, generatedFiles, editorReveal }: SorikuSidebarFilesPanelProps): React.ReactElement {
     const [, forceUpdate] = React.useState(0);
 
     React.useEffect(() => {
@@ -37,9 +45,10 @@ export function SorikuSidebarFilesPanel({ model, decorations, commands }: Soriku
             model.onExpansionChanged(() => forceUpdate(n => n + 1)),
             model.onSelectionChanged(() => forceUpdate(n => n + 1)),
             decorations.onDidChangeDecorations(() => forceUpdate(n => n + 1)),
+            generatedFiles.onDidChange(() => forceUpdate(n => n + 1)),
         ];
         return () => toDispose.forEach(d => d.dispose());
-    }, [model, decorations]);
+    }, [model, decorations, generatedFiles]);
 
     const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
         const isDir = FileStatNode.is(node) && node.fileStat.isDirectory;
@@ -112,6 +121,28 @@ export function SorikuSidebarFilesPanel({ model, decorations, commands }: Soriku
             {!root || !CompositeTreeNode.is(root)
                 ? <div className="soriku-sidebar-files-empty">No workspace open.</div>
                 : root.children.map(child => renderNode(child, 0))}
+            {generatedFiles.entries().length > 0 && (
+                <>
+                    <div className="soriku-sidebar-generated-eyebrow">
+                        <span className="soriku-sidebar-generated-dot" />
+                        Generated · run
+                    </div>
+                    {generatedFiles.entries().map(([path, diff]) => (
+                        <div
+                            key={path}
+                            className="soriku-sidebar-generated-row"
+                            title={path}
+                            onClick={() => { editorReveal.resetDedup(); editorReveal.revealPath(path).catch(() => { /* ignore */ }); }}
+                        >
+                            <span className="codicon codicon-new-file soriku-sidebar-generated-icon" />
+                            <span className="soriku-sidebar-generated-name">{fileName(path)}</span>
+                            <span className="soriku-sidebar-generated-diff">
+                                {diff.added > 0 && `+${diff.added}`}{diff.added > 0 && diff.removed > 0 && ' '}{diff.removed > 0 && `-${diff.removed}`}
+                            </span>
+                        </div>
+                    ))}
+                </>
+            )}
         </div>
     );
 }
