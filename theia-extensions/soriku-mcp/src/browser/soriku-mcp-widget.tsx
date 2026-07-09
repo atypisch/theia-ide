@@ -25,6 +25,8 @@ interface McpState {
     error?: string;
 }
 
+type ToolsState = { status: 'loading' } | { status: 'ready'; tools: string[] } | { status: 'error' };
+
 @injectable()
 export class SorikuMcpWidget extends ReactWidget {
 
@@ -40,6 +42,13 @@ export class SorikuMcpWidget extends ReactWidget {
     protected state: McpState = { status: 'loading', servers: [], health: {} };
     protected draft: ServerDraft = emptyDraft();
     protected busy = false;
+    protected addFormOpen = false;
+    /**
+     * Per-server real tool list, fetched lazily via the same testMcpServer() call used for
+     * drafts — listMcpServers() itself carries no tool data for already-configured servers,
+     * so this is the only real source rather than fabricating a count.
+     */
+    protected tools: Record<string, ToolsState> = {};
     protected readonly nameInputRef = React.createRef<HTMLInputElement>();
 
     @postConstruct()
@@ -60,13 +69,24 @@ export class SorikuMcpWidget extends ReactWidget {
         this.update();
         try {
             const res = await this.engineClient.listMcpServers();
-            this.state = {
-                status: 'ready',
-                servers: Array.isArray(res.servers) ? res.servers : [],
-                health: res.health ?? {},
-            };
+            const servers = Array.isArray(res.servers) ? res.servers : [];
+            this.state = { status: 'ready', servers, health: res.health ?? {} };
+            this.tools = {};
+            servers.forEach(s => this.loadTools(s));
         } catch (e) {
             this.state = { ...this.state, status: 'error', error: (e as Error).message };
+        }
+        this.update();
+    }
+
+    protected async loadTools(server: McpServer): Promise<void> {
+        this.tools = { ...this.tools, [server.name]: { status: 'loading' } };
+        this.update();
+        try {
+            const res = await this.engineClient.testMcpServer(server);
+            this.tools = { ...this.tools, [server.name]: res.ok ? { status: 'ready', tools: res.tools } : { status: 'error' } };
+        } catch {
+            this.tools = { ...this.tools, [server.name]: { status: 'error' } };
         }
         this.update();
     }
@@ -104,6 +124,8 @@ export class SorikuMcpWidget extends ReactWidget {
         const server = draftToServer(this.draft);
         await this.save([...this.state.servers, server], `Added "${server.name}".`);
         this.draft = emptyDraft();
+        this.addFormOpen = false;
+        this.loadTools(server);
         this.update();
     }
 
@@ -141,8 +163,12 @@ export class SorikuMcpWidget extends ReactWidget {
     }
 
     protected focusAddForm = (): void => {
-        this.nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        this.nameInputRef.current?.focus();
+        this.addFormOpen = true;
+        this.update();
+        window.setTimeout(() => {
+            this.nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            this.nameInputRef.current?.focus();
+        }, 0);
     };
 
     protected render(): React.ReactNode {
@@ -164,7 +190,7 @@ export class SorikuMcpWidget extends ReactWidget {
                     Their tools become available to your workers, agents and models (namespaced{' '}
                     <code>mcp__server__tool</code>), and require confirmation by default.
                 </div>
-                {this.renderAddForm()}
+                {this.addFormOpen && this.renderAddForm()}
                 {this.renderBody()}
             </div>
         </div>;
@@ -226,6 +252,7 @@ export class SorikuMcpWidget extends ReactWidget {
                     /> require confirmation
                 </label>
                 <span className='soriku-mcp-spacer' />
+                <Btn variant='secondary' disabled={this.busy} onClick={() => { this.addFormOpen = false; this.update(); }}>Cancel</Btn>
                 <Btn variant='secondary' disabled={this.busy} onClick={() => this.test()}>Test</Btn>
                 <Btn disabled={this.busy} onClick={() => this.add()}>Add</Btn>
             </div>
@@ -254,24 +281,34 @@ export class SorikuMcpWidget extends ReactWidget {
 
     protected renderServer(s: McpServer, health: Record<string, string>): React.ReactNode {
         const target = s.transport === 'sse' ? (s.url ?? '') : `${s.command ?? ''} ${(s.args ?? []).join(' ')}`.trim();
+        const tools = this.tools[s.name];
         return <div key={s.name} className='soriku-mcp-card'>
-            <div className='soriku-mcp-card-icon'>
-                <span className='codicon codicon-plug' />
-            </div>
-            <div className='soriku-mcp-card-body'>
-                <div className='soriku-mcp-card-head'>
-                    <span className='soriku-mcp-card-name'>{s.name}</span>
-                    <span className={`soriku-mcp-health ${isHealthy(health, s.name) ? 'ok' : 'bad'}`}>
-                        {healthLabel(health, s.name)}
-                    </span>
+            <div className='soriku-mcp-card-row'>
+                <div className='soriku-mcp-card-icon'>
+                    <span className='codicon codicon-plug' />
                 </div>
-                <div className='soriku-mcp-card-target'>{s.transport ?? 'stdio'} · {target}</div>
+                <div className='soriku-mcp-card-body'>
+                    <div className='soriku-mcp-card-head'>
+                        <span className='soriku-mcp-card-name'>{s.name}</span>
+                        <span className={`soriku-mcp-health ${isHealthy(health, s.name) ? 'ok' : 'bad'}`}>
+                            {healthLabel(health, s.name)}
+                        </span>
+                    </div>
+                    <div className='soriku-mcp-card-target'>{s.transport ?? 'stdio'} · {target}</div>
+                </div>
+                {tools?.status === 'ready' && <div className='soriku-mcp-tool-stat'>
+                    <div className='soriku-mcp-tool-stat-value'>{tools.tools.length}</div>
+                    <div className='soriku-mcp-tool-stat-label'>tools</div>
+                </div>}
+                <Btn
+                    variant='secondary'
+                    disabled={this.busy}
+                    onClick={() => this.remove(s.name)}
+                >Remove</Btn>
             </div>
-            <Btn
-                variant='secondary'
-                disabled={this.busy}
-                onClick={() => this.remove(s.name)}
-            >Remove</Btn>
+            {tools?.status === 'ready' && tools.tools.length > 0 && <div className='soriku-mcp-tool-chips'>
+                {tools.tools.map(t => <span key={t} className='soriku-mcp-tool-chip'>{t}</span>)}
+            </div>}
         </div>;
     }
 }

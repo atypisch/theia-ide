@@ -67,13 +67,50 @@
 }
 
 .soriku-mcp-card {
-    display: flex;
-    align-items: center;
-    gap: 13px;
     border: 1px solid var(--line);
     border-radius: var(--r);
     background: var(--bg-el);
+}
+
+.soriku-mcp-card-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
     padding: 14px 16px;
+}
+
+.soriku-mcp-tool-stat {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.soriku-mcp-tool-stat-value {
+    font-family: var(--font-d);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.soriku-mcp-tool-stat-label {
+    font-size: 10px;
+    color: var(--ink3);
+}
+
+.soriku-mcp-tool-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 16px 14px 67px;
+}
+
+.soriku-mcp-tool-chip {
+    font-family: var(--font-m);
+    font-size: 10.5px;
+    color: var(--ink2);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 3px 8px;
 }
 
 .soriku-mcp-card-icon {
