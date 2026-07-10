@@ -3,6 +3,13 @@
  * accent border, mono breadcrumb, bottom-panel tab sizing, Problems badge.
  */
 
+:root {
+    /* Theia's stock main-area tab row is 35px, the breadcrumb row 22px —
+       the mockup's editor chrome (~L273/288) is 38px/30px. */
+    --theia-private-horizontal-tab-height: 38px;
+    --theia-breadcrumbs-height: 30px;
+}
+
 /* ── Editor tab bar — active tab gets the 2px accent top border ──────────
    Theia's own active-tab styling is generated at runtime by
    TabbarStylingParticipant (interpolates a resolved color, not a CSS var),
