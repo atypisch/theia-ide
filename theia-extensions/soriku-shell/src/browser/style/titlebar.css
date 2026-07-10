@@ -2,7 +2,17 @@
  * Soriku IDE — custom titlebar, 1:1 from the mockup's 42px titlebar row.
  */
 
+:root {
+    /* Theia's own menus.css hardcodes this to 32px and uses it as
+       #theia-top-panel's min-height — our titlebar row is 42px, so the
+       stock value clamped the panel short and clipped/overlapped the tab
+       bar beneath it (measured this session: tabbar.top=32 vs
+       titlebar.bottom=42, a real −10px overlap). */
+    --theia-private-menubar-height: 42px;
+}
+
 #theia-top-panel {
+    height: 42px;
     background: var(--bg-sunk);
     border-bottom: 1px solid var(--line);
 }
@@ -83,51 +93,85 @@
 .soriku-titlebar-logo {
     flex: 0 0 auto;
     -webkit-app-region: no-drag;
+    margin-left: 2px;
 }
 
-.soriku-titlebar-breadcrumb {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: var(--font-m);
-    font-size: 11px;
-    color: var(--ink3);
-    margin-left: 6px;
+.soriku-titlebar-separator {
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+    width: 1px;
+    height: 16px;
+    background: var(--line2);
 }
 
 .soriku-titlebar-spacer {
     flex: 1 1 auto;
 }
 
-.soriku-titlebar-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    display: inline-block;
-}
+/* ── Engine mode pill ─────────────────────────────────────────────────── */
 
-.soriku-titlebar-icon-btn {
+.soriku-titlebar-mode-pill {
     flex: 0 0 auto;
     -webkit-app-region: no-drag;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    height: 26px;
-    padding: 0 8px;
-    border-radius: var(--rs);
-    background: transparent;
-    border: none;
-    color: var(--ink2);
+    gap: 7px;
+    height: 24px;
+    padding: 0 11px 0 9px;
+    border-radius: 999px;
     font-family: var(--font-m);
-    font-size: 11px;
-    cursor: pointer;
+    font-size: 10.5px;
+    white-space: nowrap;
 }
 
-.soriku-titlebar-icon-btn:hover {
+.soriku-titlebar-mode-pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: 0 0 auto;
+    animation: sk-pulse 2.4s ease-in-out infinite;
+}
+
+.soriku-titlebar-mode-pill-ok { color: var(--ok); border: 1px solid var(--ok-line); background: var(--ok-soft); }
+.soriku-titlebar-mode-pill-warn { color: var(--warn); border: 1px solid var(--warn); background: var(--warn-soft); }
+.soriku-titlebar-mode-pill-danger { color: var(--danger); border: 1px solid var(--danger); background: var(--danger-soft); }
+.soriku-titlebar-mode-pill-default { color: var(--ink3); border: 1px solid var(--line2); background: var(--bg-sunk); }
+
+/* ── Uniform titlebar icon buttons (sidebar / chat / theme toggles) ─────── */
+
+.soriku-titlebar-icon-btn2 {
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    border-radius: var(--rs);
+    cursor: pointer;
+    border: 1px solid var(--line2);
+    background: var(--bg-el);
+    color: var(--ink2);
+}
+
+.soriku-titlebar-icon-btn2:hover {
     background: var(--hover);
     color: var(--ink);
+}
+
+.soriku-titlebar-icon-btn2.active {
+    border-color: var(--acc-line);
+    background: var(--acc-soft);
+    color: var(--acc);
+}
+
+.soriku-titlebar-theme-glyph {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--acc);
+    background: linear-gradient(90deg, var(--acc) 50%, transparent 50%);
 }
 
 /* ── In-window menu (File/Edit/View/Go/Run/Agents/Help) ─────────────────── */
@@ -136,6 +180,7 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+    gap: 1px;
     -webkit-app-region: no-drag;
     margin-left: 4px;
 }
@@ -150,9 +195,8 @@
     color: var(--ink2);
     font-family: var(--font-s);
     font-size: 12.5px;
-    height: 28px;
-    padding: 0 9px;
-    border-radius: var(--rs);
+    padding: 5px 9px;
+    border-radius: 5px;
     cursor: pointer;
 }
 
@@ -178,15 +222,16 @@
 .soriku-titlebar-menu-row {
     display: flex;
     align-items: center;
+    gap: 20px;
     width: 100%;
     background: transparent;
     border: none;
-    color: var(--ink);
+    color: var(--ink2);
     font-family: var(--font-s);
     font-size: 12.5px;
     text-align: left;
-    padding: 6px 8px;
-    border-radius: var(--rs);
+    padding: 7px 12px;
+    border-radius: 6px;
     cursor: pointer;
 }
 
@@ -218,13 +263,13 @@
     -webkit-app-region: no-drag;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     width: 320px;
     max-width: 40vw;
     height: 26px;
     padding: 0 10px;
-    border-radius: var(--rs);
-    background: var(--bg-sunk);
+    border-radius: 7px;
+    background: var(--bg-el);
     border: 1px solid var(--line2);
     color: var(--ink3);
     font-family: var(--font-s);
@@ -246,7 +291,11 @@
 }
 
 .soriku-titlebar-palette-trigger-hint {
+    flex: 0 0 auto;
     font-family: var(--font-m);
     font-size: 10px;
     color: var(--ink3);
+    border: 1px solid var(--line2);
+    border-radius: 4px;
+    padding: 1px 5px;
 }
