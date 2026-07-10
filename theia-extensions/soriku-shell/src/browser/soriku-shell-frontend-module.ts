@@ -21,6 +21,7 @@ import { SorikuTitlebarWidget } from './soriku-titlebar-widget';
 import { SorikuTitlebarContribution } from './soriku-titlebar-contribution';
 import { SorikuSidebarWidget } from './soriku-sidebar-widget';
 import { SorikuSidebarContribution } from './soriku-sidebar-contribution';
+import { SorikuSidebarStateService } from './soriku-sidebar-state-service';
 import { SorikuOverlayService } from './soriku-overlay-service';
 import { SorikuOverlayContribution } from './soriku-overlay-contribution';
 import { SorikuQuickActionsContribution } from './soriku-quick-actions-contribution';
@@ -32,6 +33,8 @@ export default new ContainerModule(bind => {
     bind(SorikuTitlebarContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuTitlebarContribution);
     bind(CommandContribution).toService(SorikuTitlebarContribution);
+
+    bind(SorikuSidebarStateService).toSelf().inSingletonScope();
 
     bind(SorikuSidebarWidget).toSelf().inSingletonScope();
     bind(SorikuSidebarContribution).toSelf().inSingletonScope();

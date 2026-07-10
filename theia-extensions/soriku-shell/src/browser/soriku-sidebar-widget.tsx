@@ -4,7 +4,8 @@
  * live search box for Find in Files, commit UI for Source Control, and a
  * real-stats side-info card for Agents/Models/Capability Map/MCP/Routing/
  * Settings), plus an account/settings footer — 1:1 from the mockup's left
- * sidebar.
+ * sidebar. Also renders the 52px minimized icon rail (SorikuSidebarStateService)
+ * in place of the full column when minimized.
  *
  * Explorer/Find/SCM render straight from the real, root-bound
  * FileNavigatorModel/SearchInWorkspaceService/ScmService rather than
@@ -39,11 +40,13 @@ import { shortHost } from 'soriku-workbench-ext/lib/common/engine-status';
 import { SorikuAuthService } from 'soriku-auth-ext/lib/browser/soriku-auth-service';
 import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
+import { SorikuMark } from 'soriku-theme-ext/lib/browser/ui';
 import { sidebarAccountView } from '../common/sidebar-account-view';
 import { SorikuSidebarFilesPanel } from './panels/soriku-sidebar-files-panel';
 import { SorikuSidebarSearchPanel } from './panels/soriku-sidebar-search-panel';
 import { SorikuSidebarScmPanel } from './panels/soriku-sidebar-scm-panel';
 import { SorikuSidebarInfoPanel, InfoPanelStat } from './panels/soriku-sidebar-info-panel';
+import { SorikuSidebarStateService } from './soriku-sidebar-state-service';
 
 interface NavItem {
     id: string;
@@ -118,6 +121,9 @@ export class SorikuSidebarWidget extends ReactWidget {
     @inject(SorikuEditorRevealService)
     protected readonly editorReveal: SorikuEditorRevealService;
 
+    @inject(SorikuSidebarStateService)
+    protected readonly sidebarState: SorikuSidebarStateService;
+
     protected activeNav = 'explorer';
     protected filesModel: FileNavigatorModel | undefined;
     protected infoState: Partial<Record<string, InfoState>> = {};
@@ -136,6 +142,14 @@ export class SorikuSidebarWidget extends ReactWidget {
         this.toDispose.push(this.scmService.onDidChangeSelectedRepository(() => this.update()));
         this.toDispose.push(this.engineStatus.onDidChangeState(() => { if (this.activeNav === 'settings') { this.update(); } }));
         this.toDispose.push(this.generatedFiles.onDidChange(() => { if (this.activeNav === 'explorer') { this.update(); } }));
+        this.toDispose.push(this.sidebarState.onDidChange(rail => {
+            // Width is entirely CSS-driven (fixed 246px full vs 52px rail via
+            // this class) — Lumino's SplitLayout re-measures the column from
+            // the DOM on its own relayout pass, same as the proven
+            // hide()/show() collapse from the ⌘B toggle.
+            this.toggleClass('soriku-sidebar-rail', rail);
+            this.update();
+        }));
         this.loadFilesModel();
         this.loadInfo(this.activeNav);
         this.refreshWorkspaceIcon().catch(() => { /* ignore */ });
@@ -222,7 +236,14 @@ export class SorikuSidebarWidget extends ReactWidget {
         return name.slice(0, 2).toUpperCase();
     }
 
+    protected toggleRail = (): void => {
+        this.sidebarState.toggleRail();
+    };
+
     protected render(): React.ReactNode {
+        if (this.sidebarState.isRail) {
+            return this.renderRail();
+        }
         return (
             <div className="soriku-sidebar-inner">
                 <button className="soriku-sidebar-workspace" onClick={() => this.commands.executeCommand('workspace:open')}>
@@ -304,7 +325,46 @@ export class SorikuSidebarWidget extends ReactWidget {
                     <div className="soriku-sidebar-footer-name">{view.name}</div>
                     <div className="soriku-sidebar-footer-plan">{view.subtitle}</div>
                 </div>
+                <button className="soriku-sidebar-minimize-btn" title="Minimize sidebar" onClick={this.toggleRail}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                        <path d="M15 6l-6 6 6 6" />
+                        <line x1="4" y1="4" x2="4" y2="20" />
+                    </svg>
+                </button>
                 <button className="soriku-sidebar-settings-btn" title="Settings" onClick={this.openSettings}>
+                    <span className="codicon codicon-settings-gear" />
+                </button>
+            </div>
+        );
+    }
+
+    /** 52px icon rail (mockup's `sideRail`), shown while sideOpen && sideMin. */
+    protected renderRail(): React.ReactNode {
+        return (
+            <div className="soriku-sidebar-rail-inner">
+                <button className="soriku-sidebar-rail-header" title="Expand sidebar" onClick={this.toggleRail}>
+                    <SorikuMark size={22} />
+                </button>
+                <div className="soriku-sidebar-rail-nav">
+                    {NAV_ITEMS.map(item => (
+                        <button
+                            key={item.id}
+                            className={`soriku-sidebar-rail-item${item.id === this.activeNav ? ' active' : ''}`}
+                            title={item.label}
+                            onClick={() => this.selectNav(item)}
+                        >
+                            <span className={`codicon ${item.icon}`} />
+                        </button>
+                    ))}
+                </div>
+                <div className="soriku-sidebar-rail-spacer" />
+                <button className="soriku-sidebar-rail-expand" title="Expand sidebar" onClick={this.toggleRail}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                        <path d="M9 6l6 6-6 6" />
+                        <line x1="20" y1="4" x2="20" y2="20" />
+                    </svg>
+                </button>
+                <button className="soriku-sidebar-rail-settings" title="Settings" onClick={this.openSettings}>
                     <span className="codicon codicon-settings-gear" />
                 </button>
             </div>

@@ -5,9 +5,10 @@
  * left blank (never guessed) when nothing is bound. Mockup items with no real
  * backing command (New Agent…, Run Tests, Approve Plan, Stop Fleet) are
  * omitted rather than wired to nothing — same precedent as the Agents grid's
- * intentionally-omitted "New agent" button. "Toggle Workspace Sidebar" in the
- * View menu is a deliberate addition beyond the mockup's menu, backing the
- * user-requested ⌘B sidebar-hide command (soriku.sidebar.toggle).
+ * intentionally-omitted "New agent" button. "Toggle Workspace Sidebar" and
+ * "Minimize Sidebar" in the View menu are deliberate additions beyond the
+ * mockup's menu, backing the ⌘B sidebar-hide command (soriku.sidebar.toggle)
+ * and the sidebar footer's minimize-to-rail command (soriku.sidebar.minimize).
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -65,6 +66,7 @@ export const TITLEBAR_MENUS: ReadonlyArray<TitlebarMenuDef> = [
             { label: 'Command Palette…', commandId: 'workbench.action.showCommands' },
             { separator: true },
             { label: 'Toggle Workspace Sidebar', commandId: 'soriku.sidebar.toggle' },
+            { label: 'Minimize Sidebar', commandId: 'soriku.sidebar.minimize' },
             { label: 'Explorer', commandId: 'fileNavigator:toggle' },
             { label: 'Agents', commandId: 'soriku.agents.toggle' },
             { label: 'Models', commandId: 'soriku.models.open' },

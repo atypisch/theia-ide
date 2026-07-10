@@ -1,6 +1,7 @@
 /********************************************************************************
  * Soriku IDE — the Soriku beeldmerk (flame pinwheel), inlined verbatim from
- * the brand asset so it can be styled/sized without a separate asset loader.
+ * `design/Soriku IDE development/assets/soriku_beeldmerk.svg` so it can be
+ * styled/sized without a separate asset loader.
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -28,6 +29,13 @@ export function SorikuMark({ size = 20, className }: SorikuMarkProps): React.Rea
                     <stop offset="0" stopColor="rgb(255,37,0)" stopOpacity={1} />
                     <stop offset="1" stopColor="rgb(255,113,0)" stopOpacity={1} />
                 </linearGradient>
+                {/* The center circle uses its own, smaller/more-centered gradient
+                    transform in the source asset — the outer 12 petals share one
+                    transform, the circle does not. */}
+                <linearGradient id="soriku-mark-grad-center" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(203.594317,2.20102,-2.20102,203.594317,61.168768,165.937525)">
+                    <stop offset="0" stopColor="rgb(255,37,0)" stopOpacity={1} />
+                    <stop offset="1" stopColor="rgb(255,113,0)" stopOpacity={1} />
+                </linearGradient>
             </defs>
             <g fill="url(#soriku-mark-grad)">
                 <path d="M164.628,291.087C212.811,291.324 209.727,257.136 221.381,209.759C226.033,238.515 224.451,260.472 220.04,282.757C213.102,317.718 188.448,301.087 164.628,291.087" />
@@ -42,9 +50,9 @@ export function SorikuMark({ size = 20, className }: SorikuMarkProps): React.Rea
                 <path d="M44.414,162.13C44.177,210.309 78.365,207.232 125.746,218.88C96.986,223.531 75.033,221.953 52.748,217.534C17.78,210.604 34.414,185.957 44.414,162.13" />
                 <path d="M58.921,225.004C82.8,266.855 110.874,247.096 157.734,233.499C135.149,251.898 115.343,261.504 93.838,268.827C60.095,280.307 62.169,250.636 58.921,225.004" />
                 <path d="M102.92,272.211C144.527,296.509 158.952,265.361 192.743,230.153C182.389,257.381 170.031,275.609 155.073,292.692C131.582,319.512 118.552,292.783 102.92,272.211" />
-                <path d="M168.996,212.915C194.561,212.915 215.413,192.065 215.413,166.498C215.413,140.939 194.561,120.084 168.996,120.084C143.437,120.084 122.582,140.939 122.582,166.498C122.582,192.065 143.437,212.915 168.996,212.915" />
-                {/* eslint-enable max-len */}
             </g>
+            <path fill="url(#soriku-mark-grad-center)" d="M168.996,212.915C194.561,212.915 215.413,192.065 215.413,166.498C215.413,140.939 194.561,120.084 168.996,120.084C143.437,120.084 122.582,140.939 122.582,166.498C122.582,192.065 143.437,212.915 168.996,212.915" />
+            {/* eslint-enable max-len */}
         </svg>
     );
 }

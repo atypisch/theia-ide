@@ -43,6 +43,15 @@
     border-right: 1px solid var(--line);
 }
 
+/* Minimized icon rail (mockup's `sideRail`) — same column, just narrower;
+   Lumino's SplitLayout re-measures from the DOM on its own relayout pass,
+   same mechanism already proven by the ⌘B hide()/show() collapse. */
+.soriku-sidebar.soriku-sidebar-rail {
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+}
+
 .soriku-sidebar-inner {
     height: 100%;
     display: flex;
@@ -633,6 +642,7 @@
     color: var(--ink3);
 }
 
+.soriku-sidebar-minimize-btn,
 .soriku-sidebar-settings-btn {
     width: 30px;
     height: 30px;
@@ -647,7 +657,111 @@
     background: transparent;
 }
 
+.soriku-sidebar-minimize-btn:hover,
 .soriku-sidebar-settings-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+/* ── Minimized icon rail (52px) ──────────────────────────────────────────── */
+
+.soriku-sidebar-rail-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+}
+
+.soriku-sidebar-rail-header {
+    height: 46px;
+    width: 100%;
+    flex-shrink: 0;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.soriku-sidebar-rail-nav {
+    padding: 8px 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+}
+
+.soriku-sidebar-rail-item {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--ink2);
+    transition: background 0.1s, color 0.1s;
+}
+
+.soriku-sidebar-rail-item .codicon {
+    font-size: 17px;
+}
+
+.soriku-sidebar-rail-item:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.soriku-sidebar-rail-item.active {
+    background: var(--acc-soft);
+    color: var(--acc);
+}
+
+.soriku-sidebar-rail-item.active:hover {
+    background: color-mix(in srgb, var(--acc) 16%, transparent);
+}
+
+.soriku-sidebar-rail-spacer {
+    flex: 1;
+}
+
+.soriku-sidebar-rail-expand {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 6px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.soriku-sidebar-rail-settings {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.soriku-sidebar-rail-expand:hover,
+.soriku-sidebar-rail-settings:hover {
     background: var(--hover);
     color: var(--ink);
 }

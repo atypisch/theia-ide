@@ -20,11 +20,13 @@ import { FrontendApplicationContribution } from '@theia/core/lib/browser/fronten
 import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/common';
 import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { SorikuSidebarWidget } from './soriku-sidebar-widget';
+import { SorikuSidebarStateService } from './soriku-sidebar-state-service';
 
 const SIDE_AREAS_PANEL_ID = 'theia-left-right-split-panel';
 
 export namespace SorikuSidebarCommands {
     export const TOGGLE: Command = { id: 'soriku.sidebar.toggle', category: 'Soriku', label: 'Toggle Workspace Sidebar' };
+    export const MINIMIZE: Command = { id: 'soriku.sidebar.minimize', category: 'Soriku', label: 'Minimize/Expand Workspace Sidebar' };
 }
 
 @injectable()
@@ -36,8 +38,12 @@ export class SorikuSidebarContribution implements FrontendApplicationContributio
     @inject(SorikuSidebarWidget)
     protected readonly sidebar: SorikuSidebarWidget;
 
+    @inject(SorikuSidebarStateService)
+    protected readonly sidebarState: SorikuSidebarStateService;
+
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(SorikuSidebarCommands.TOGGLE, { execute: () => this.toggle() });
+        commands.registerCommand(SorikuSidebarCommands.MINIMIZE, { execute: () => this.sidebarState.toggleRail() });
     }
 
     registerKeybindings(keybindings: KeybindingRegistry): void {
