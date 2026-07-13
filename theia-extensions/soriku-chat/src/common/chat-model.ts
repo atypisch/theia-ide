@@ -5,6 +5,12 @@
  ********************************************************************************/
 
 import { AgentPersona, ConversationMessage, SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { detectMimeTypeFromBase64 } from './chat-images';
+
+export interface ChatMessageImage {
+    base64: string;
+    mimeType: string;
+}
 
 export type ToolOutcome = 'ok' | 'blocked' | 'salvaged' | 'denied' | 'error' | 'verify_failed' | 'verified';
 
@@ -33,6 +39,8 @@ export interface PendingPlan {
     planId: string;
     tasks: PlanTaskView[];
     costEur?: number;
+    /** Claude-Code-style markdown plan document (Context/Approach/Files/Steps/Verification). */
+    document?: string;
 }
 
 export interface GeneratedFileView {
@@ -130,6 +138,7 @@ export interface UserMessage {
     id: string;
     text: string;
     fileMentions?: string[];
+    images?: ChatMessageImage[];
 }
 
 export type ChatMessage = UserMessage | AssistantTurn;
@@ -329,8 +338,13 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             const planId = asString(event.plan_id);
             if (planId) {
                 next.planId = planId;
-                next.pendingPlan = { planId, tasks, costEur: next.pendingPlan?.costEur };
+                next.pendingPlan = { planId, tasks, costEur: next.pendingPlan?.costEur, document: asString(event.plan_document) };
             }
+            break;
+        }
+        case 'plan_drafts': {
+            const count = typeof event.draft_count === 'number' ? event.draft_count : undefined;
+            next.phase = count ? `Comparing ${count} plan drafts…` : 'Comparing plan drafts…';
             break;
         }
         case 'deprecated_mode_translation':
@@ -631,12 +645,22 @@ function parseHistoryWorkers(raw: unknown): string[] {
     return models;
 }
 
+/** Reads a stored message's `images` (bare base64 strings) into thumbnail-ready view images. */
+function parseHistoryImages(images: unknown): ChatMessageImage[] | undefined {
+    if (!Array.isArray(images) || images.length === 0) {
+        return undefined;
+    }
+    const parsed = images.filter((v): v is string => typeof v === 'string' && v.length > 0)
+        .map(base64 => ({ base64, mimeType: detectMimeTypeFromBase64(base64) }));
+    return parsed.length > 0 ? parsed : undefined;
+}
+
 export function fromEngineMessages(messages: ConversationMessage[]): ChatMessage[] {
     const out: ChatMessage[] = [];
     messages.forEach((m, i) => {
         const text = typeof m.content === 'string' ? m.content : '';
         if (m.role === 'user') {
-            out.push({ role: 'user', id: `h${i}`, text });
+            out.push({ role: 'user', id: `h${i}`, text, images: parseHistoryImages(m.images) });
         } else if (m.role === 'assistant' && (text || Array.isArray(m.steps) || Array.isArray(m.workers))) {
             out.push({
                 role: 'assistant',

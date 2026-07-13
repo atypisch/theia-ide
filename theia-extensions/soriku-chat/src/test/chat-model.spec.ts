@@ -247,6 +247,47 @@ describe('reduceSseEvent', () => {
         assert.equal(running.planId, 'pl_1', 'planId must survive later events in the same run');
     });
 
+    it('captures the plan_document markdown alongside the task list', () => {
+        const turn = fold([
+            { type: 'plan_generated', plan_id: 'pl_doc', tasks: [{ id: 't1', role: 'researcher', goal: 'gather' }], plan_document: '## Context\nx\n\n## Approach\ny' },
+        ]);
+        assert.equal(turn.pendingPlan?.document, '## Context\nx\n\n## Approach\ny');
+    });
+
+    it('leaves the plan document undefined for an older engine that omits it (back-compat)', () => {
+        const turn = fold([
+            { type: 'plan_generated', plan_id: 'pl_nodoc', tasks: [{ id: 't1', role: 'researcher', goal: 'gather' }] },
+        ]);
+        assert.equal(turn.pendingPlan?.document, undefined);
+    });
+
+    it('plan_cost_estimated still merges onto a documented plan', () => {
+        const turn = fold([
+            { type: 'plan_generated', plan_id: 'pl_doc2', tasks: [], plan_document: '## Context\nx' },
+            { type: 'plan_cost_estimated', estimated_cost_eur: 0.05 },
+        ]);
+        assert.equal(turn.pendingPlan?.document, '## Context\nx');
+        assert.equal(turn.pendingPlan?.costEur, 0.05);
+    });
+
+    it('plan_drafts sets a "comparing" phase without touching the pending plan', () => {
+        const turn = fold([
+            { type: 'plan_drafts', models: ['m1', 'm2'], winner_model: 'm2', draft_count: 2, reason: 'more thorough' },
+        ]);
+        assert.equal(turn.phase, 'Comparing 2 plan drafts…');
+        assert.equal(turn.pendingPlan, undefined);
+    });
+
+    it('plan_drafts does not corrupt a turn already in progress', () => {
+        const turn = fold([
+            { type: 'plan_drafts', draft_count: 3 },
+            { type: 'plan_generated', plan_id: 'pl_after_drafts', tasks: [], plan_document: '## Context\nz' },
+        ]);
+        assert.equal(turn.phase, 'Planning…');
+        assert.equal(turn.pendingPlan?.planId, 'pl_after_drafts');
+        assert.equal(turn.pendingPlan?.document, '## Context\nz');
+    });
+
     it('treats a cancelled plan as a finished (non-error) turn', () => {
         const turn = fold([
             { type: 'plan_generated', plan_id: 'pl_2', tasks: [] },
@@ -300,6 +341,20 @@ describe('fromEngineMessages', () => {
         assert.equal(a.toolCalls[0].tool, 'file_write');
         assert.equal(a.generatedFiles[0].path, '/tmp/a.txt');
         assert.deepEqual(a.workers, ['qwen3.5:4b']);
+    });
+    it('hydrates a user message\'s images from stored history, detecting mime type', () => {
+        const msgs = fromEngineMessages([
+            { role: 'user', content: 'what is this?', images: ['iVBORw0KGgoAAAANSUhEUgAA'] },
+        ]);
+        const user = msgs[0] as { images?: { base64: string; mimeType: string }[] };
+        assert.equal(user.images?.length, 1);
+        assert.equal(user.images?.[0].base64, 'iVBORw0KGgoAAAANSUhEUgAA');
+        assert.equal(user.images?.[0].mimeType, 'image/png');
+    });
+    it('leaves images undefined when the stored message has none', () => {
+        const msgs = fromEngineMessages([{ role: 'user', content: 'hi', images: [] }]);
+        const user = msgs[0] as { images?: unknown };
+        assert.equal(user.images, undefined);
     });
 });
 

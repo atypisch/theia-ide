@@ -7,13 +7,15 @@
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { CommandRegistry, MessageService } from '@theia/core/lib/common';
+import { CommandRegistry, MessageService, PreferenceService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { AgentAvatar, AgentCategory, Btn, categoryColors, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import { LearningSummary, summarizeLearning } from 'soriku-agent-customization-ext/lib/common/agent-form';
 import { AgentItem, toAgentItems } from '../common/agent-view';
 import { SorikuAgentSelectionService } from './soriku-agent-selection';
 import { SorikuAgentCatalog } from './soriku-agent-catalog';
+import { SorikuDefaultAgentResolver } from './soriku-default-agent-resolver';
+import { SORIKU_DEFAULT_AGENT_ID } from './soriku-agents-preferences';
 
 const DETAIL_TABS = ['Persona', 'Specialisms', 'Memory', 'Activity'] as const;
 
@@ -64,6 +66,12 @@ export class SorikuAgentsWidget extends ReactWidget {
     @inject(MessageService)
     protected readonly messages: MessageService;
 
+    @inject(SorikuDefaultAgentResolver)
+    protected readonly defaultAgentResolver: SorikuDefaultAgentResolver;
+
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
+
     protected state: AgentsState = { status: 'loading', items: [] };
     protected categoryFilter: AgentFilter = 'all';
     protected detailAgentId: string | undefined;
@@ -80,6 +88,11 @@ export class SorikuAgentsWidget extends ReactWidget {
         this.node.tabIndex = 0;
         this.addClass('soriku-agents-widget');
         this.toDispose.push(this.selection.onDidChangeActive(() => this.update()));
+        this.toDispose.push(this.preferences.onPreferenceChanged(e => {
+            if (e.preferenceName === SORIKU_DEFAULT_AGENT_ID) {
+                this.update();
+            }
+        }));
         this.update();
         this.refresh();
     }
@@ -111,6 +124,12 @@ export class SorikuAgentsWidget extends ReactWidget {
         if (this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND)) {
             this.commands.executeCommand(SORIKU_AGENT_EDIT_COMMAND, item.id);
         }
+    }
+
+    protected async setAsDefault(item: AgentItem): Promise<void> {
+        await this.defaultAgentResolver.setDefaultAgent(item.id);
+        this.messages.info(`“${item.name}” is now the default agent — used automatically when no agent is active.`);
+        this.update();
     }
 
     /** Selects a card for the master-detail panel and loads its real learning summary. */
@@ -241,6 +260,7 @@ export class SorikuAgentsWidget extends ReactWidget {
         const l = d?.status === 'ready' ? d.learning : undefined;
         const positivePct = l && (l.positive + l.negative) > 0 ? Math.round((l.positive / (l.positive + l.negative)) * 100) : undefined;
         const catColors = categoryColors(category);
+        const isDefault = item.id === this.defaultAgentResolver.getDefaultAgentId();
         return <div className='soriku-agent-detail sk-scroll'>
             <div className='soriku-agent-detail-header'>
                 <div className='soriku-agent-detail-head-row'>
@@ -250,6 +270,9 @@ export class SorikuAgentsWidget extends ReactWidget {
                         <div className='soriku-agent-detail-meta'>
                             {item.category && <span className='soriku-agent-detail-cat' style={{ color: catColors.c, background: catColors.bg }}>{item.category}</span>}
                             {item.preferredModel && <span className='soriku-agent-detail-model'>{item.preferredModel}</span>}
+                            {isDefault && <span className='soriku-agent-detail-default-badge'>
+                                <span className='codicon codicon-star-full' />Default
+                            </span>}
                         </div>
                     </div>
                 </div>
@@ -258,6 +281,9 @@ export class SorikuAgentsWidget extends ReactWidget {
                         <span className='codicon codicon-comment' />Open chat
                     </Btn>
                     {this.commands.getCommand(SORIKU_AGENT_EDIT_COMMAND) && <Btn variant='secondary' onClick={() => this.editAgent(item)}>Edit</Btn>}
+                    <Btn variant='secondary' disabled={isDefault} onClick={() => this.setAsDefault(item)}>
+                        <span className='codicon codicon-star-empty' />{isDefault ? 'Default agent' : 'Set as default'}
+                    </Btn>
                 </div>
             </div>
             <div className='soriku-agent-detail-tabs'>

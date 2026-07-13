@@ -24,6 +24,7 @@ import {
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
+import { SorikuDefaultAgentResolver } from 'soriku-agents-ext/lib/browser/soriku-default-agent-resolver';
 import { initials } from 'soriku-agents-ext/lib/common/agent-view';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
@@ -35,6 +36,9 @@ import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-se
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
 import { ChatSessionService } from './chat-session-service';
+import { MIN_MAXIMIZED_WIDTH, maximizedPanelWidth } from '../common/panel-sizing';
+import { ChatImageAttachment, canAddAttachment, isSupportedImageType } from '../common/chat-images';
+import { processImageBlob } from './chat-image-processor';
 import {
     AgentActivity,
     AgentInsights,
@@ -130,6 +134,21 @@ const ROUTING_OPTIONS: RoutingOption[] = [
     { value: 'prefer_quality', label: 'Best', hint: 'Best quality — pick the best model regardless of locality or cost (cloud allowed).' },
 ];
 
+/** Which model(s) author the PLAN itself, when behaviour is 'plan'. Independent of the answer-model pickers above. */
+type PlanModelMode = 'auto' | 'single' | 'multi';
+
+interface PlanModelModeOption {
+    value: PlanModelMode;
+    label: string;
+    hint: string;
+}
+
+const PLAN_MODEL_MODE_OPTIONS: PlanModelModeOption[] = [
+    { value: 'auto', label: 'Auto', hint: 'Auto model — the router picks a reasoning model to write the plan.' },
+    { value: 'single', label: 'Single', hint: 'One model you pick writes the plan.' },
+    { value: 'multi', label: 'Multi', hint: '2-3 models each draft a competing plan; the best one wins. Slower.' },
+];
+
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
 
@@ -141,6 +160,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(SorikuAgentSelectionService)
     protected readonly selection: SorikuAgentSelectionService;
+
+    @inject(SorikuDefaultAgentResolver)
+    protected readonly defaultAgentResolver: SorikuDefaultAgentResolver;
 
     @inject(MessageService)
     protected readonly messages: MessageService;
@@ -225,6 +247,11 @@ export class SorikuChatWidget extends ReactWidget {
         this.session.conversationTitle = value;
     }
     protected inputRef = React.createRef<HTMLTextAreaElement>();
+    protected fileInputRef = React.createRef<HTMLInputElement>();
+
+    /** Images attached to the NEXT message (paste/drop/attach), cleared once sent. */
+    protected pendingImages: ChatImageAttachment[] = [];
+    protected dragOver = false;
 
     /** Mic dictation state, backed by the real POST /api/v1/transcribe endpoint (core/voice) — no mock. */
     protected recording: 'idle' | 'recording' | 'transcribing' = 'idle';
@@ -246,6 +273,10 @@ export class SorikuChatWidget extends ReactWidget {
     protected routingStrategy: RoutingStrategy = 'prefer_local';
     protected modelId = '';
     protected workerModels: string[] = [];
+    /** Which model(s) author the plan itself (behavior === 'plan' only) — independent of the answer-model pickers above. */
+    protected planModelMode: PlanModelMode = 'auto';
+    protected planModelId = '';
+    protected planModels: string[] = [];
     protected models: V1ModelDescriptor[] = [];
     protected providers: ProviderInfo[] = [];
     /** Plan id currently being approved/cancelled (to disable the buttons). */
@@ -268,6 +299,9 @@ export class SorikuChatWidget extends ReactWidget {
     protected spawning = false;
     /** Coalesce React re-renders during SSE streaming (Cursor-style ~60fps cap). */
     protected updateScheduled = false;
+    /** Right-panel maximize toggle (Fase: header button fix) — `resize`/`expandPanel` are ApplicationShell's public API for side panels; `toggleMaximized` only supports main/bottom areas. */
+    protected panelMaximized = false;
+    protected panelWidthBeforeMaximize: number | undefined;
 
     protected scheduleUpdate(immediate = false): void {
         if (this.isDisposed) {
@@ -354,6 +388,14 @@ export class SorikuChatWidget extends ReactWidget {
         if (state?.conversationId) {
             await this.loadConversation(state.conversationId, state.agentId, state.agentName).catch(() => { /* stale id — ignore */ });
         }
+        // The restore above may have re-selected the conversation's own agent; only
+        // fall back to the default agent if that left nothing active (fresh start,
+        // stale/missing pointer). Resolving BEFORE the restore settles would fire
+        // onAgentChanged() and wipe the conversation being restored.
+        if (!this.selection.getActiveId()) {
+            await this.defaultAgentResolver.ensureActiveAgent();
+            this.update();
+        }
     }
 
     /** Load a stored conversation (messages + context) into the chat. */
@@ -376,8 +418,34 @@ export class SorikuChatWidget extends ReactWidget {
 
     /** Start a fresh conversation (keeps the active agent). */
     protected startNewConversation(): void {
+        const hadMessages = this.conversation.length > 0;
         this.streamController.abort();
         this.session.reset();
+        this.pendingImages = [];
+        void this.defaultAgentResolver.ensureActiveAgent();
+        this.update();
+        if (hadMessages) {
+            this.toast.show('New chat');
+        }
+        requestAnimationFrame(() => this.inputRef.current?.focus());
+    }
+
+    /**
+     * Maximize/restore the chat's right-side panel. Theia's `toggleMaximized` only
+     * handles main/bottom-area widgets (silently no-ops for a right-area widget like
+     * this one), so this resizes the panel directly via ApplicationShell's public
+     * `expandPanel`/`resize` API instead of moving the widget between shell areas.
+     */
+    protected togglePanelMaximize(): void {
+        this.shell.expandPanel('right');
+        if (this.panelMaximized) {
+            this.shell.resize(this.panelWidthBeforeMaximize ?? MIN_MAXIMIZED_WIDTH, 'right');
+            this.panelMaximized = false;
+        } else {
+            this.panelWidthBeforeMaximize = this.node.clientWidth || undefined;
+            this.shell.resize(maximizedPanelWidth(window.innerWidth), 'right');
+            this.panelMaximized = true;
+        }
         this.update();
     }
 
@@ -518,22 +586,100 @@ export class SorikuChatWidget extends ReactWidget {
         }
     }
 
+    /** Adds one dropped/pasted/attached image, downscaling it and enforcing the caps. */
+    protected async addImageBlob(blob: Blob, name?: string): Promise<void> {
+        if (blob.type && !isSupportedImageType(blob.type)) {
+            this.messages.warn(`Unsupported image type: ${blob.type || 'unknown'}`);
+            return;
+        }
+        const gate = canAddAttachment(this.pendingImages.length, blob.size);
+        if (!gate.ok) {
+            this.messages.warn(gate.reason ?? 'Could not attach that image.');
+            return;
+        }
+        try {
+            const attachment = await processImageBlob(blob, name);
+            this.pendingImages.push(attachment);
+            this.update();
+        } catch (e) {
+            this.messages.error((e as Error).message);
+        }
+    }
+
+    protected removeImage(id: string): void {
+        this.pendingImages = this.pendingImages.filter(a => a.id !== id);
+        this.update();
+    }
+
+    protected onInputPaste(e: React.ClipboardEvent<HTMLTextAreaElement>): void {
+        const items = e.clipboardData?.items;
+        if (!items) {
+            return;
+        }
+        for (const item of Array.from(items)) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (file) {
+                    void this.addImageBlob(file, file.name);
+                }
+            }
+        }
+    }
+
+    protected onChatDragOver(e: React.DragEvent<HTMLDivElement>): void {
+        if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault();
+            if (!this.dragOver) {
+                this.dragOver = true;
+                this.update();
+            }
+        }
+    }
+
+    protected onChatDragLeave(): void {
+        if (this.dragOver) {
+            this.dragOver = false;
+            this.update();
+        }
+    }
+
+    protected onChatDrop(e: React.DragEvent<HTMLDivElement>): void {
+        e.preventDefault();
+        this.dragOver = false;
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        for (const file of files) {
+            void this.addImageBlob(file, file.name);
+        }
+        this.update();
+    }
+
+    protected onFileInputChange(e: React.ChangeEvent<HTMLInputElement>): void {
+        const files = Array.from(e.target.files ?? []);
+        for (const file of files) {
+            void this.addImageBlob(file, file.name);
+        }
+        e.target.value = '';
+    }
+
     protected submitFromInput(): void {
         const textarea = this.inputRef.current;
         if (!textarea) {
             return;
         }
         const text = textarea.value;
-        if (text.trim()) {
+        if (text.trim() || this.pendingImages.length > 0) {
             textarea.value = '';
-            this.send(text.trim()).catch(() => { /* errors are captured into the assistant turn */ });
+            const images = this.pendingImages;
+            this.pendingImages = [];
+            this.send(text.trim(), images).catch(() => { /* errors are captured into the assistant turn */ });
         }
     }
 
-    async send(text: string): Promise<void> {
-        const agentId = this.selection.getActiveId();
+    async send(text: string, images: ChatImageAttachment[] = []): Promise<void> {
+        const agentId = this.selection.getActiveId() ?? await this.defaultAgentResolver.ensureActiveAgent();
         if (!agentId) {
-            this.messages.info('Select an agent in the Soriku Agents panel first.');
+            this.messages.error('No agent available — is the Soriku engine running?');
             return;
         }
         if (this.streaming) {
@@ -541,12 +687,18 @@ export class SorikuChatWidget extends ReactWidget {
         }
         this.resolvingPlans.clear();
         const fileMentions = parseFileMentions(text);
-        this.conversation.push({ role: 'user', id: this.nextId(), text, fileMentions: fileMentions.length > 0 ? fileMentions : undefined });
+        this.conversation.push({
+            role: 'user',
+            id: this.nextId(),
+            text,
+            fileMentions: fileMentions.length > 0 ? fileMentions : undefined,
+            images: images.length > 0 ? images.map(({ base64, mimeType }) => ({ base64, mimeType })) : undefined,
+        });
         const initialTurn = createAssistantTurn(this.nextId());
         const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
         this.scheduleUpdate(true);
-        const params = await this.buildStreamParams(text, agentId);
+        const params = await this.buildStreamParams(text, agentId, images);
         // The controller owns the lifecycle (P4-a): abort, reduce, typed errors,
         // tool/plan fan-out. This widget only renders the turns it hands back.
         const finalTurn = await this.streamController.run({
@@ -576,14 +728,17 @@ export class SorikuChatWidget extends ReactWidget {
         for (let i = turnIndex - 1; i >= 0; i--) {
             const entry = this.conversation[i];
             if (entry.role === 'user') {
-                void this.send(entry.text);
+                const images: ChatImageAttachment[] = (entry.images ?? []).map((img, idx) => ({
+                    id: `retry-${turnId}-${idx}`, base64: img.base64, mimeType: 'image/jpeg', width: 0, height: 0,
+                }));
+                void this.send(entry.text, images);
                 return;
             }
         }
     }
 
     /** Translate the two pickers (behaviour + models) into engine stream params. */
-    protected async buildStreamParams(text: string, agentId: string): Promise<ChatStreamParams> {
+    protected async buildStreamParams(text: string, agentId: string, images: ChatImageAttachment[] = []): Promise<ChatStreamParams> {
         const editsEnabled = this.behavior !== 'chat';
         const ensemble = this.orchestration === 'ensemble' && this.workerModels.length >= 2;
         const single = this.orchestration === 'single' && !!this.modelId;
@@ -627,6 +782,12 @@ export class SorikuChatWidget extends ReactWidget {
             planAutoExecute: this.behavior === 'plan' ? false : undefined,
             routingStrategy: this.routingStrategy,
             cloudCostCapEur: this.getCloudCostCap(),
+            images: images.length > 0 ? images.map(a => a.base64) : undefined,
+            planModelId: this.behavior === 'plan' && this.planModelMode === 'single'
+                && this.planModelId && this.modelAvailability(this.planModelId).ok
+                ? this.planModelId : undefined,
+            planModels: this.behavior === 'plan' && this.planModelMode === 'multi' && this.planModels.length >= 2
+                ? this.planModels : undefined,
         };
     }
 
@@ -818,7 +979,12 @@ export class SorikuChatWidget extends ReactWidget {
         const agentId = active.id;
         const agentName = active.name;
         const category = active.category ? toKnownCategory(active.category) : undefined;
-        return <div className='soriku-chat'>
+        return <div
+            className={`soriku-chat${this.dragOver ? ' soriku-chat-dragover' : ''}`}
+            onDragOver={e => this.onChatDragOver(e)}
+            onDragLeave={() => this.onChatDragLeave()}
+            onDrop={e => this.onChatDrop(e)}
+        >
             <div className='soriku-chat-header'>
                 <div className='soriku-chat-header-main'>
                     {agentId
@@ -836,12 +1002,12 @@ export class SorikuChatWidget extends ReactWidget {
                         <span className='codicon codicon-history' />
                     </button>
                     <button className='soriku-chat-header-icon-btn' title='New chat'
-                        disabled={this.streaming || !agentId} onClick={() => this.startNewConversation()}>
+                        disabled={this.streaming} onClick={() => this.startNewConversation()}>
                         <span className='codicon codicon-add' />
                     </button>
-                    <button className='soriku-chat-header-icon-btn' title='Maximize chat'
-                        onClick={() => this.shell.toggleMaximized(this)}>
-                        <span className='codicon codicon-screen-full' />
+                    <button className='soriku-chat-header-icon-btn' title={this.panelMaximized ? 'Restore chat size' : 'Maximize chat'}
+                        onClick={() => this.togglePanelMaximize()}>
+                        <span className={`codicon ${this.panelMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'}`} />
                     </button>
                     {/* Not part of the mockup's 3-icon header row (History/New chat/Maximize) —
                         a real, working feature (per-agent learned-pattern summary) kept as a
@@ -863,12 +1029,25 @@ export class SorikuChatWidget extends ReactWidget {
             </div>
             {this.renderInlineToolApproval()}
             <div className='soriku-chat-input'>
+                {this.pendingImages.length > 0 && <div className='soriku-chat-attachments'>
+                    {this.pendingImages.map(a => <div key={a.id} className='soriku-chat-attachment'>
+                        <img src={`data:${a.mimeType};base64,${a.base64}`} alt={a.name ?? 'attached image'} />
+                        <button
+                            className='soriku-chat-attachment-remove'
+                            title='Remove image'
+                            disabled={this.streaming}
+                            onClick={() => this.removeImage(a.id)}
+                        >
+                            <span className='codicon codicon-close' />
+                        </button>
+                    </div>)}
+                </div>}
                 <textarea
                     ref={this.inputRef}
                     className='theia-input'
                     rows={3}
-                    placeholder={agentId ? 'Message the agent…  (Enter to send, Shift+Enter for newline)' : 'Select an agent first'}
-                    disabled={!agentId}
+                    placeholder={agentId ? 'Message the agent…  (Enter to send, Shift+Enter for newline)' : 'Message Soriku…  (Enter to send, Shift+Enter for newline)'}
+                    onPaste={e => this.onInputPaste(e)}
                     onKeyDown={e => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -877,9 +1056,24 @@ export class SorikuChatWidget extends ReactWidget {
                     }}
                 />
                 <div className='soriku-chat-actions'>
+                    <input
+                        ref={this.fileInputRef}
+                        type='file'
+                        accept='image/png,image/jpeg,image/webp,image/gif'
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={e => this.onFileInputChange(e)}
+                    />
+                    <Btn
+                        variant='secondary'
+                        title='Attach an image'
+                        onClick={() => this.fileInputRef.current?.click()}
+                    >
+                        <span className='codicon codicon-attach' />
+                    </Btn>
                     <Btn
                         variant={this.recording === 'recording' ? 'danger' : 'secondary'}
-                        disabled={!agentId || this.recording === 'transcribing'}
+                        disabled={this.recording === 'transcribing'}
                         title={this.recording === 'recording' ? 'Stop recording' : 'Dictate a message'}
                         onClick={() => this.toggleRecording()}
                     >
@@ -887,7 +1081,7 @@ export class SorikuChatWidget extends ReactWidget {
                     </Btn>
                     {this.streaming
                         ? <Btn variant='secondary' onClick={() => this.stop()}>Stop</Btn>
-                        : <Btn disabled={!agentId} onClick={() => this.submitFromInput()}>Send</Btn>}
+                        : <Btn onClick={() => this.submitFromInput()}>Send</Btn>}
                 </div>
             </div>
         </div>;
@@ -896,6 +1090,9 @@ export class SorikuChatWidget extends ReactWidget {
     protected renderMessage(message: ChatMessage): React.ReactNode {
         if (message.role === 'user') {
             return <div key={message.id} className='soriku-msg soriku-msg-user'>
+                {message.images && message.images.length > 0 && <div className='soriku-msg-images'>
+                    {message.images.map((img, i) => <img key={i} src={`data:${img.mimeType};base64,${img.base64}`} alt='attached' />)}
+                </div>}
                 <div className='soriku-msg-text'>{message.text}</div>
                 {message.fileMentions && message.fileMentions.length > 0 && <div className='soriku-msg-file-chips'>
                     {message.fileMentions.map(f => <Pill key={f}>{f}</Pill>)}
@@ -977,9 +1174,31 @@ export class SorikuChatWidget extends ReactWidget {
                     <span className='codicon codicon-screen-full' />
                 </button>
             </div>
-            {this.renderPlanTaskList(plan, resolving)}
+            {this.renderPlanDocumentSection(plan)}
+            {this.renderPlanTasksSection(plan, resolving)}
             {this.renderPlanActions(plan, resolving)}
         </div>;
+    }
+
+    /** The engine-rendered markdown plan document — reads first, Claude-Code style. Undefined for a plan loaded before this feature shipped (back-compat). */
+    protected renderPlanDocumentSection(plan: PendingPlan): React.ReactNode {
+        if (!plan.document) {
+            return undefined;
+        }
+        return <div className='soriku-plan-document sk-scroll'>
+            <ChatMarkdown text={plan.document} />
+        </div>;
+    }
+
+    /** Once a document is shown, the editable task list moves into a collapsible section beneath it. */
+    protected renderPlanTasksSection(plan: PendingPlan, resolving: boolean): React.ReactNode {
+        if (!plan.document) {
+            return this.renderPlanTaskList(plan, resolving);
+        }
+        return <details className='soriku-plan-tasks-details'>
+            <summary>Tasks (editable)</summary>
+            {this.renderPlanTaskList(plan, resolving)}
+        </details>;
     }
 
     /** Shared with the full-size Plan detail overlay — same real data, same edit affordance. */
@@ -1089,7 +1308,8 @@ export class SorikuChatWidget extends ReactWidget {
                         Review it, then run the whole plan or step through it.
                     </div>
                     <div className='soriku-plan-detail-body sk-scroll'>
-                        {this.renderPlanTaskList(plan, resolving)}
+                        {this.renderPlanDocumentSection(plan)}
+                        {this.renderPlanTasksSection(plan, resolving)}
                     </div>
                     {this.renderPlanDetailFooter(plan, resolving)}
                 </div>
@@ -1452,7 +1672,69 @@ export class SorikuChatWidget extends ReactWidget {
                         })}
                 </div>
             </div>}
+            {this.behavior === 'plan' && this.renderPlanModelControls()}
         </div>;
+    }
+
+    /** Which model(s) author the plan itself — separate from the answer-model pickers above (behaviour === 'plan' only). */
+    protected renderPlanModelControls(): React.ReactNode {
+        const planMode = PLAN_MODEL_MODE_OPTIONS.find(o => o.value === this.planModelMode) ?? PLAN_MODEL_MODE_OPTIONS[0];
+        return <div className='soriku-control-row soriku-plan-model-row'>
+            <SegmentedPicker
+                label='Plan by'
+                title={planMode.hint}
+                options={PLAN_MODEL_MODE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                value={this.planModelMode}
+                disabled={this.streaming}
+                onChange={next => { this.planModelMode = next; this.update(); }}
+            />
+            {this.planModelMode === 'single' && <select
+                className='theia-select soriku-model-select'
+                title='Model that writes the plan'
+                value={this.planModelId}
+                disabled={this.streaming}
+                onChange={e => { this.planModelId = e.target.value; this.update(); }}
+            >
+                <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
+                {this.models.map(m => {
+                    const avail = this.modelAvailability(m.id);
+                    return <option key={m.id} value={m.id} disabled={!avail.ok}>
+                        {m.id}{avail.ok ? '' : ` — ${avail.reason}`}
+                    </option>;
+                })}
+            </select>}
+            {this.planModelMode === 'multi' && <div className='soriku-worker-models'>
+                <div className='soriku-worker-models-hint'>
+                    {this.planModels.length >= 2
+                        ? `${this.planModels.length} models will draft competing plans — slower`
+                        : 'Tick 2-3 models to draft competing plans'}
+                </div>
+                <div className='soriku-model-checklist'>
+                    {this.models.length === 0
+                        ? <div className='soriku-worker-models-hint'>No models available</div>
+                        : this.models.map(m => {
+                            const avail = this.modelAvailability(m.id);
+                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
+                                <input
+                                    type='checkbox'
+                                    checked={this.planModels.includes(m.id)}
+                                    disabled={this.streaming || !avail.ok}
+                                    onChange={() => this.togglePlanModel(m.id)}
+                                />
+                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
+                            </label>;
+                        })}
+                </div>
+            </div>}
+        </div>;
+    }
+
+    /** Toggle a model in the plan-drafting collaboration set. */
+    protected togglePlanModel(modelId: string): void {
+        this.planModels = this.planModels.includes(modelId)
+            ? this.planModels.filter(id => id !== modelId)
+            : [...this.planModels, modelId];
+        this.update();
     }
 
     /** Toggle a model in the ensemble collaboration set. */

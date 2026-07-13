@@ -199,6 +199,32 @@
     color: var(--theia-foreground);
 }
 
+.soriku-plan-document {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--bg-sunk);
+    font-size: var(--theia-ui-font-size0);
+}
+
+.soriku-plan-tasks-details {
+    margin-bottom: 8px;
+}
+
+.soriku-plan-tasks-details summary {
+    cursor: pointer;
+    font-size: var(--theia-ui-font-size0);
+    color: var(--theia-descriptionForeground);
+    margin-bottom: 6px;
+}
+
+.soriku-plan-tasks-details .soriku-plan-tasks {
+    margin-top: 4px;
+}
+
 /* ─── Plan detail overlay (expanded view of the same plan card above) ──── */
 
 .soriku-plan-detail {
@@ -1201,6 +1227,73 @@
 
 .soriku-chat-actions .sk-btn:last-child {
     min-width: 72px;
+}
+
+/* ─── Image attachments (paste / drag-drop / attach button) ──────────── */
+
+.soriku-chat-dragover {
+    outline: 2px dashed var(--acc-line);
+    outline-offset: -2px;
+    background: var(--acc-soft);
+}
+
+.soriku-chat-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.soriku-chat-attachment {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--line2);
+}
+
+.soriku-chat-attachment img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.soriku-chat-attachment-remove {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    cursor: pointer;
+}
+
+.soriku-chat-attachment-remove .codicon {
+    font-size: 11px;
+}
+
+.soriku-msg-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.soriku-msg-images img {
+    max-width: 160px;
+    max-height: 160px;
+    border-radius: 6px;
+    border: 1px solid var(--line2);
+    object-fit: cover;
 }
 
 /* ─── Subagent Insight / Promote / Spawn (Fase F5) ───────────────────── */

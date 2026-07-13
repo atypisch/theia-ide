@@ -280,6 +280,21 @@
     color: var(--ink3);
 }
 
+.soriku-agent-detail-default-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-m);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--acc);
+}
+
+.soriku-agent-detail-default-badge .codicon {
+    font-size: 11px;
+}
+
 .soriku-agent-detail-actions {
     display: flex;
     gap: 8px;

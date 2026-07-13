@@ -133,6 +133,10 @@ export interface ChatRequest {
      * models are free, so this caps cloud usage: 0 blocks any paid plan.
      */
     cloud_cost_cap_eur?: number | null;
+    /** Plan-authoring model choice (mode="plan" only) — one model writes the plan. */
+    plan_model_id?: string | null;
+    /** Plan-authoring model choice (mode="plan" only) — 2+ models draft, a judge picks the best. */
+    plan_models?: string[] | null;
 }
 
 /**
@@ -597,6 +601,12 @@ export interface ChatStreamParams {
      * plan. Omitted → engine's saved/default cap.
      */
     cloudCostCapEur?: number;
+    /** Base64-encoded images (no `data:` prefix) attached to this message. */
+    images?: string[];
+    /** Plan mode only: one model to author the plan. */
+    planModelId?: string;
+    /** Plan mode only: 2+ models draft competing plans; a judge picks the best. */
+    planModels?: string[];
 }
 
 export interface EngineClientConfig {
