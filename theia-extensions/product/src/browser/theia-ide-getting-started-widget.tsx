@@ -16,14 +16,10 @@ import { renderCollaboration } from './branding-util';
 import { Btn, Card, PageHeader } from 'soriku-theme-ext/lib/browser/ui';
 
 import { GettingStartedWidget } from '@theia/getting-started/lib/browser/getting-started-widget';
-import { VSXEnvironment } from '@theia/vsx-registry/lib/common/vsx-environment';
 import { WindowService } from '@theia/core/lib/browser/window/window-service';
 
 @injectable()
 export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
-
-    @inject(VSXEnvironment)
-    protected readonly environment: VSXEnvironment;
 
     @inject(WindowService)
     protected readonly windowService: WindowService;
@@ -34,11 +30,8 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
     @inject(CommandService)
     protected readonly commandService: CommandService;
 
-    protected vscodeApiVersion: string;
-
     protected async doInit(): Promise<void> {
         super.doInit();
-        this.vscodeApiVersion = await this.environment.getVscodeApiVersion();
         await this.preferenceService.ready;
         this.update();
     }
@@ -101,7 +94,6 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
     }
 
     protected renderVersion(): string {
-        const version = this.applicationInfo ? `v${this.applicationInfo.version}` : '';
-        return [version, `VS Code API ${this.vscodeApiVersion}`].filter(Boolean).join(' · ');
+        return this.applicationInfo ? `v${this.applicationInfo.version}` : '';
     }
 }

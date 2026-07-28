@@ -10,7 +10,7 @@
 import * as React from '@theia/core/shared/react';
 import { Btn, Overlay } from 'soriku-theme-ext/lib/browser/ui';
 import { SHORTCUT_GROUPS } from '../common/shortcuts-view';
-import { DOC_PAGES } from '../common/docs-content';
+import { DOC_PAGES, DOCS_LAST_REVIEWED } from '../common/docs-content';
 import { SorikuOverlayKind } from './soriku-overlay-service';
 
 export interface SorikuOverlayHostProps {
@@ -152,6 +152,8 @@ function renderDocs(props: SorikuOverlayHostProps): React.ReactElement {
             </button>)}
             <div className='soriku-overlay-docs-nav-footer'>
                 Same source as soriku.com/docs — cached locally, works offline.
+                <br />
+                Content reviewed {DOCS_LAST_REVIEWED} — may lag the engine you're actually running.
             </div>
         </div>
         <div className='soriku-overlay-docs-content'>

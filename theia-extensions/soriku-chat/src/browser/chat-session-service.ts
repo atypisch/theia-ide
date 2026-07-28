@@ -21,7 +21,7 @@ import { StorageService } from '@theia/core/lib/browser/storage-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
-import { AssistantTurn, ChatMessage, createAssistantTurn, fromEngineMessages, reduceSseEvent } from '../common/chat-model';
+import { AssistantTurn, ChatMessage, capConversation, createAssistantTurn, fromEngineMessages, reduceSseEvent } from '../common/chat-model';
 import { ChatStreamController } from './chat-stream-controller';
 
 /** Persisted (across reloads) pointer to the chat the user was last in. */
@@ -93,7 +93,9 @@ export class ChatSessionService {
      */
     async loadConversation(id: string): Promise<string | undefined> {
         const conv = await this.engineClient.getConversation(id);
-        this.conversation = fromEngineMessages(conv.messages ?? []);
+        // Phase 6.4: an old, very long persisted conversation must not load
+        // unbounded into memory — cap it the same way live growth is capped.
+        this.conversation = capConversation(fromEngineMessages(conv.messages ?? []));
         this.conversationId = conv.id;
         this.conversationTitle = conv.title;
         this.feedbackByTurn.clear();
@@ -160,7 +162,7 @@ export class ChatSessionService {
         this.externalFollowConvId = convId;
         try {
             const conv = await this.engineClient.getConversation(convId);
-            this.conversation = fromEngineMessages(conv.messages ?? []);
+            this.conversation = capConversation(fromEngineMessages(conv.messages ?? []));
             this.conversationId = conv.id;
             this.conversationTitle = conv.title;
             let idx = this.conversation.length - 1;

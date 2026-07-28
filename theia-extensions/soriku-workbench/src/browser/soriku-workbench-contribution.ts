@@ -19,7 +19,10 @@ import { SorikuInlineEditWidget } from './soriku-inline-edit-widget';
 
 export namespace SorikuWorkbenchCommands {
     const CATEGORY = 'Soriku';
-    export const INLINE_EDIT: Command = { id: 'soriku.inlineEdit.placeholder', category: CATEGORY, label: 'Inline Edit' };
+    // Phase 6.5: renamed from 'soriku.inlineEdit.placeholder' — the command was
+    // always fully wired (verified end to end: QuickInput -> proposeInlineEdit
+    // -> review/accept/discard state machine), the id just read like a stub.
+    export const INLINE_EDIT: Command = { id: 'soriku.inlineEdit.open', category: CATEGORY, label: 'Inline Edit' };
     export const SWITCH_AGENT: Command = { id: 'soriku.agents.switchActive', category: CATEGORY, label: 'Switch Active Agent' };
     export const INLINE_EDIT_NEXT: Command = { id: 'soriku.inlineEdit.next', category: CATEGORY, label: 'Inline Edit: Next Change' };
     export const INLINE_EDIT_PREVIOUS: Command = { id: 'soriku.inlineEdit.previous', category: CATEGORY, label: 'Inline Edit: Previous Change' };

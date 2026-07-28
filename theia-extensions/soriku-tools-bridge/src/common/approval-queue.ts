@@ -36,7 +36,8 @@ export class ApprovalQueue<P, D> {
     private queue: QueuedApproval<P, D>[] = [];
     private readonly denied: () => D;
     private readonly onChange: () => void;
-    private readonly timeoutMs: number;
+    /** 0 = never auto-deny (a long unattended autonomous run). Mutable via {@link setTimeoutMs}. */
+    private timeoutMs: number;
     private readonly onAutoDeny?: (payload: unknown) => void;
     private readonly setTimer: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
     private readonly clearTimer: (t: ReturnType<typeof setTimeout>) => void;
@@ -59,10 +60,21 @@ export class ApprovalQueue<P, D> {
         return this.queue.length;
     }
 
-    /** Enqueue an approval; resolves when answered/auto-denied/flushed. */
+    /**
+     * Change the auto-deny timeout (e.g. from a live preference change).
+     * Only affects approvals enqueued AFTER this call — an already-queued
+     * approval keeps the timer it was given.
+     */
+    setTimeoutMs(timeoutMs: number): void {
+        this.timeoutMs = timeoutMs;
+    }
+
+    /** Enqueue an approval; resolves when answered/auto-denied/flushed. 0 timeout = never auto-deny. */
     enqueue(payload: P, resolve: (decision: D) => void): void {
         const item: QueuedApproval<P, D> = { payload, resolve };
-        item.timer = this.setTimer(() => this.expire(item), this.timeoutMs);
+        if (this.timeoutMs > 0) {
+            item.timer = this.setTimer(() => this.expire(item), this.timeoutMs);
+        }
         this.queue.push(item);
         this.onChange();
     }

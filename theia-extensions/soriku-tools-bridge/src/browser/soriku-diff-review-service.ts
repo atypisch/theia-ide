@@ -46,15 +46,26 @@ export class SorikuDiffReviewService {
 
     /**
      * Show a diff of the current file (or empty for a new file) against the
-     * proposed content and ask the user to Accept or Reject.
+     * proposed content and ask the user to Accept, "Always apply this
+     * session", or Reject.
      *
-     * @returns true when the user accepts (caller should perform the write),
-     *          false when they reject (caller should deny the tool call).
+     * `opts.blocking = false` (Phase 2 `soriku.tools.autoApplyEdits`) skips
+     * the Accept/Reject prompt entirely — the diff still opens (`reveal`,
+     * not `activate`, so it doesn't steal focus) purely for visual
+     * after-the-fact review, and the write is approved immediately.
+     *
+     * @returns `approved` (caller should perform the write when true) and
+     *          `rememberSession` (caller should session-allowlist the tool
+     *          so future writes skip review for the rest of this session).
      */
-    async reviewProposedWrite(targetUri: URI, proposedContent: string, toolLabel = 'file_write'): Promise<boolean> {
+    async reviewProposedWrite(
+        targetUri: URI, proposedContent: string, toolLabel = 'file_write',
+        opts?: { blocking?: boolean },
+    ): Promise<{ approved: boolean; rememberSession: boolean }> {
         const base = targetUri.path.base || 'file';
         const exists = await this.safeExists(targetUri);
         const id = ++this.reviewCounter;
+        const blocking = opts?.blocking !== false;
 
         // Proposed (right) side — always in-memory; never touches disk. Start
         // blank and grow it live (Fase 1B) so the code appears "typewriter"-style.
@@ -77,21 +88,28 @@ export class SorikuDiffReviewService {
         const label = `${exists ? 'Edit' : 'New'} · ${base} (${toolLabel})`;
         try {
             const diffUri = DiffUris.encode(originalUri, proposedUri, label);
-            await open(this.openerService, diffUri, { mode: 'activate' });
+            await open(this.openerService, diffUri, { mode: blocking ? 'activate' : 'reveal' });
 
             // Grow the proposed side live so the diff fills in as if typed.
             await this.revealProgressively(proposedUri, frames);
+
+            if (!blocking) {
+                this.conversationLink.notifyReviewWrite(true, base);
+                return { approved: true, rememberSession: false };
+            }
 
             const verb = exists ? 'changes to' : 'creation of';
             const action = await this.messages.info(
                 `Review the proposed ${verb} ${base}, then Accept or Reject.`,
                 'Accept',
+                'Always apply this session',
                 'Reject',
             );
-            const accepted = action === 'Accept';
+            const approved = action === 'Accept' || action === 'Always apply this session';
+            const rememberSession = action === 'Always apply this session';
             // Fase E: the accept/reject is free implicit feedback for the agent.
-            this.conversationLink.notifyReviewWrite(accepted, base);
-            return accepted;
+            this.conversationLink.notifyReviewWrite(approved, base);
+            return { approved, rememberSession };
         } catch {
             // If the diff can't be shown, fail safe: do not auto-write.
             const action = await this.messages.warn(
@@ -99,7 +117,7 @@ export class SorikuDiffReviewService {
                 'Accept',
                 'Reject',
             );
-            return action === 'Accept';
+            return { approved: action === 'Accept', rememberSession: false };
         } finally {
             this.dispose(proposedUri);
             if (originalMem) {

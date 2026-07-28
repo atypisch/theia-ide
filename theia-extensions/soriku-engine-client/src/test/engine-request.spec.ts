@@ -85,4 +85,13 @@ describe('toChatRequestBody', () => {
         assert.equal(toChatRequestBody(params({ mode: 'plan', planModels: ['m1'] })).plan_models, undefined);
         assert.equal(toChatRequestBody(params({ mode: 'auto', planModels: ['m1', 'm2'] })).plan_models, undefined);
     });
+
+    it('sends allow_mcp only in plan mode', () => {
+        assert.equal(toChatRequestBody(params({ mode: 'plan', allowMcp: true })).allow_mcp, true);
+        assert.equal(toChatRequestBody(params({ mode: 'auto', allowMcp: true })).allow_mcp, undefined);
+    });
+
+    it('defaults allow_mcp to undefined (opt-in only) when not set', () => {
+        assert.equal(toChatRequestBody(params({ mode: 'plan' })).allow_mcp, undefined);
+    });
 });

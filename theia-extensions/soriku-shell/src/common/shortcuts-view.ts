@@ -64,7 +64,7 @@ export const SHORTCUT_GROUPS: ReadonlyArray<ShortcutGroup> = [
     {
         title: 'Editor',
         items: [
-            { label: 'Inline edit', commandId: 'soriku.inlineEdit.placeholder' },
+            { label: 'Inline edit', commandId: 'soriku.inlineEdit.open' },
             { label: 'Accept ghost-text', commandId: '', staticHint: 'Tab' },
             { label: 'Revert inline edit', commandId: 'soriku.inlineEdit.discard' },
             { label: 'Find', commandId: 'core.find' },

@@ -51,7 +51,10 @@ export interface GeneratedFileView {
     removed?: number;
 }
 
-const FILE_MENTION_RE = /@([\w./-]+\.(?:html|js|ts|tsx|py|css|json|md))/g;
+// Generic "any file extension" pattern (Phase 2) rather than a hardcoded
+// language list — a full-project agent needs @mentions for .php/.vue/.go/
+// .rs/.blade.php/etc, not just the original web-stack subset.
+const FILE_MENTION_RE = /@([\w./-]+\.[A-Za-z0-9]{1,10})/g;
 
 /** Extracts deduped `@file.ext`-style mentions from a chat prompt, in order of first appearance. */
 export function parseFileMentions(text: string): string[] {
@@ -85,6 +88,12 @@ export interface AgentActivity {
     corrections: number;
     /** Review verdict when this worker is a reviewer (code-reviewer / editor). */
     verdict?: { status: 'approved' | 'changes_requested'; notes?: string };
+    /**
+     * Set on a REVIEWER's row when its changes_requested verdict triggered a
+     * bounded re-dispatch of the task it reviewed (Phase 3.1, `task_rework`
+     * SSE event) — rendered as a small badge next to the verdict pill.
+     */
+    rework?: { targetTaskId?: string; reason?: string; attempt?: number };
 }
 
 export interface AssistantTurn {
@@ -448,6 +457,27 @@ export function reduceSseEvent(turn: AssistantTurn, event: SorikuSseEvent): Assi
             }
             break;
         }
+        case 'task_rework': {
+            // Payload carries task ids, not worker ids — find the reviewer's Fleet
+            // row (already keyed by workerId via worker_start/review_verdict) by
+            // its taskId matching this event's reviewer_task_id.
+            const reviewerTaskId = asString(event.reviewer_task_id);
+            const targetTaskId = asString(event.task_id);
+            const attempt = typeof event.attempt === 'number' ? event.attempt : undefined;
+            if (reviewerTaskId) {
+                const idx = next.agents.findIndex(a => a.taskId === reviewerTaskId);
+                if (idx >= 0) {
+                    next.agents[idx] = {
+                        ...next.agents[idx],
+                        rework: { targetTaskId, reason: asString(event.reason), attempt },
+                    };
+                }
+            }
+            if (targetTaskId) {
+                next.phase = `Reworking ${targetTaskId}${attempt ? ` (attempt ${attempt})` : ''}`;
+            }
+            break;
+        }
         case 'worker_tool_call': {
             const failed = !!event.error;
             upsertToolCall(next.toolCalls, event, 'done');
@@ -793,4 +823,45 @@ export const SUBAGENT_ROLES: readonly string[] = [
 /** "backend-developer" -> "Backend Developer". */
 export function roleLabel(role: string): string {
     return role.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+// ── Conversation cap (Phase 6.4) — bound a very long-lived chat's memory ──
+
+/** Hard cap on how many messages one conversation keeps client-side. */
+export const MAX_CLIENT_MESSAGES = 200;
+
+/** Default number of most-recent messages rendered before "Show earlier". */
+export const DEFAULT_RENDER_WINDOW = 100;
+
+/**
+ * Caps `conversation` at `max` messages, dropping the OLDEST ones once
+ * exceeded — except the very first message (the conversation's opening
+ * prompt), which always survives for context even as everything after it
+ * ages out. Pure: returns the same array reference when already within
+ * budget, otherwise a new array — never mutates the input.
+ */
+export function capConversation(conversation: ChatMessage[], max: number = MAX_CLIENT_MESSAGES): ChatMessage[] {
+    const budget = Math.max(1, max);
+    if (conversation.length <= budget) {
+        return conversation;
+    }
+    const first = conversation[0];
+    const tail = conversation.slice(conversation.length - (budget - 1));
+    return [first, ...tail];
+}
+
+/**
+ * The slice of `conversation` to actually render: the most recent
+ * `windowSize` messages, or everything when `showAll` is set (the "Show
+ * earlier" affordance) or the conversation is already short enough that
+ * windowing wouldn't hide anything. Pure — a render-time concern, distinct
+ * from capConversation's persistent data cap.
+ */
+export function visibleMessages(
+    conversation: ChatMessage[], showAll: boolean, windowSize: number = DEFAULT_RENDER_WINDOW,
+): ChatMessage[] {
+    if (showAll || conversation.length <= windowSize) {
+        return conversation;
+    }
+    return conversation.slice(conversation.length - windowSize);
 }

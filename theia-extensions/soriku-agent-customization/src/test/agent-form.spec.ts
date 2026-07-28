@@ -38,6 +38,8 @@ describe('toAgentForm', () => {
             visibility: 'private',
             systemPrompt: 'You are Koda.',
             decisionPatternsText: '',
+            preferredRoutingStrategy: '',
+            toolWhitelist: [],
         });
     });
 
@@ -46,6 +48,18 @@ describe('toAgentForm', () => {
         assert.equal(form.description, '');
         assert.equal(form.systemPrompt, '');
         assert.equal(form.visibility, '');
+        assert.equal(form.preferredRoutingStrategy, '');
+        assert.deepEqual(form.toolWhitelist, []);
+    });
+
+    it('reads preferred_routing_strategy and tool_whitelist when set', () => {
+        const form = toAgentForm(persona({
+            id: 'a3',
+            preferred_routing_strategy: 'prefer_local',
+            tool_whitelist: ['file_read', 'file_write'],
+        }));
+        assert.equal(form.preferredRoutingStrategy, 'prefer_local');
+        assert.deepEqual(form.toolWhitelist, ['file_read', 'file_write']);
     });
 });
 
@@ -55,6 +69,7 @@ describe('buildUpdateRequest', () => {
             name: ' Koda ', role: ' reviewer ', description: 'd',
             preferredModel: ' auto ', visibility: 'team', systemPrompt: 'sp',
             decisionPatternsText: 'kubernetes: 0.8\nreact: 1.5\nbad line\n: 0.2',
+            preferredRoutingStrategy: ' prefer_local ', toolWhitelist: ['file_read', 'file_write'],
         });
         assert.equal(body.name, 'Koda');
         assert.equal(body.role, 'reviewer');
@@ -63,16 +78,21 @@ describe('buildUpdateRequest', () => {
         assert.equal(body.visibility, 'team');
         // parsed + clamped; junk/empty-key lines dropped
         assert.deepEqual(body.decision_patterns, { kubernetes: 0.8, react: 1 });
+        assert.equal(body.preferred_routing_strategy, 'prefer_local');
+        assert.deepEqual(body.tool_whitelist, ['file_read', 'file_write']);
     });
 
-    it('omits visibility when blank', () => {
+    it('omits visibility and preferred_routing_strategy when blank', () => {
         const body = buildUpdateRequest({
             name: 'x', role: '', description: '', preferredModel: '', visibility: '   ',
             systemPrompt: '', decisionPatternsText: '',
+            preferredRoutingStrategy: '   ', toolWhitelist: [],
         });
         assert.ok(!('visibility' in body));
+        assert.ok(!('preferred_routing_strategy' in body));
         assert.equal(body.preferred_model, '');
         assert.deepEqual(body.decision_patterns, {});
+        assert.deepEqual(body.tool_whitelist, []);
     });
 });
 

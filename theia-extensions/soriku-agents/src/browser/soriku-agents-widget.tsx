@@ -103,8 +103,24 @@ export class SorikuAgentsWidget extends ReactWidget {
         try {
             // P3-c2: served from the startup-prefetched catalog — instant on a warm
             // memo; force=true (the Refresh button) bypasses it.
-            const agents = await this.catalog.getAgents(force);
-            this.state = { status: 'ready', items: toAgentItems(agents) };
+            let agents = await this.catalog.getAgents(force);
+            if (agents.length === 0) {
+                // A fresh install has zero agents — never dead-end here; the same
+                // resolver the chat panel uses will auto-create "Koda" (dedupes by
+                // name on the engine side, so this is safe to call unconditionally).
+                await this.defaultAgentResolver.ensureActiveAgent();
+                this.catalog.invalidate();
+                agents = await this.catalog.getAgents(true);
+            }
+            const items = toAgentItems(agents);
+            this.state = { status: 'ready', items };
+            if (!this.detailAgentId || !items.some(i => i.id === this.detailAgentId)) {
+                const preselect = items.find(i => i.id === this.selection.getActiveId()) ?? items[0];
+                if (preselect) {
+                    await this.selectForDetail(preselect);
+                    return;
+                }
+            }
         } catch (e) {
             this.state = { status: 'error', items: [], error: (e as Error).message };
         }
@@ -157,10 +173,13 @@ export class SorikuAgentsWidget extends ReactWidget {
                 </div>
                 <div className='soriku-agents-header-actions'>
                     {this.renderFilters()}
-                    {/* No "New agent" flow exists yet in the engine/IDE — the mockup's create
-                        button is intentionally omitted rather than wired to nothing. Refresh
-                        (not present in the static mockup, which has no live data to refresh)
-                        is kept as a small icon-only affordance instead of inventing a full button. */}
+                    {/* Phase 6.1: the mockup's create button, now wired to the
+                        name -> category -> model QuickInput wizard (soriku.agents.new). */}
+                    {this.commands.getCommand('soriku.agents.new') && <Btn
+                        variant='secondary'
+                        title='Create a new agent'
+                        onClick={() => this.commands.executeCommand('soriku.agents.new')}
+                    ><span className='codicon codicon-add' /> New agent</Btn>}
                     <button className='soriku-agents-refresh-icon' title='Refresh' onClick={() => this.refresh(true)}>
                         <span className='codicon codicon-refresh' />
                     </button>
@@ -244,15 +263,16 @@ export class SorikuAgentsWidget extends ReactWidget {
 
     /**
      * Master-detail panel, 1:1 the mockup (392px, right of the grid). "Allowed
-     * tools" (mockup: per-tool toggle switches) is deliberately omitted — per-
-     * agent tool whitelisting has no real engine persistence yet (same gap
-     * documented in Fase R2 / soriku-agent-edit-widget.tsx). "runs this week"/
-     * "verified clean" stat tiles are replaced with real equivalents this
-     * agent's own learning data actually has: lifetime interaction count and
-     * positive-feedback ratio (reusing summarizeLearning(), the same parsing
-     * already used by the agent editor's "What this agent has learned"
-     * section) — not a time-windowed run count or a "clean" verdict, since
-     * neither exists as real data.
+     * tools" is now real (persisted per-agent tool_whitelist, editable in
+     * soriku-agent-edit-widget.tsx) — shown read-only in the Persona tab
+     * instead of the mockup's per-tool toggle switches, since editing lives
+     * in the dedicated edit form. "runs this week"/"verified clean" stat
+     * tiles are replaced with real equivalents this agent's own learning
+     * data actually has: lifetime interaction count and positive-feedback
+     * ratio (reusing summarizeLearning(), the same parsing already used by
+     * the agent editor's "What this agent has learned" section) — not a
+     * time-windowed run count or a "clean" verdict, since neither exists as
+     * real data.
      */
     protected renderDetailPanel(item: AgentItem): React.ReactNode {
         const category = toKnownCategory(item.category);
@@ -294,28 +314,95 @@ export class SorikuAgentsWidget extends ReactWidget {
                 >{tab}</button>)}
             </div>
             <div className='soriku-agent-detail-body'>
-                {item.systemPrompt && <div className='soriku-agent-detail-section'>
-                    <div className='soriku-agent-detail-section-title'>System prompt</div>
-                    <div className='soriku-agent-detail-prompt'>{item.systemPrompt}</div>
-                </div>}
-                {item.skills.length > 0 && <div className='soriku-agent-detail-section'>
-                    <div className='soriku-agent-detail-section-title'>Specialisms</div>
-                    <div className='soriku-agent-detail-skills'>
-                        {item.skills.map(skill => <span key={skill} className='soriku-agent-detail-skill'>{skill}</span>)}
-                    </div>
-                </div>}
-                {d?.status === 'loading' && <div className='soriku-agents-message'>Loading activity…</div>}
-                {l && (l.interactions > 0 || positivePct !== undefined) && <div className='soriku-agent-detail-stats'>
-                    <div className='soriku-agent-detail-stat'>
-                        <div className='soriku-agent-detail-stat-value'>{l.interactions}</div>
-                        <div className='soriku-agent-detail-stat-label'>interactions</div>
-                    </div>
-                    {positivePct !== undefined && <div className='soriku-agent-detail-stat'>
-                        <div className='soriku-agent-detail-stat-value soriku-agent-detail-stat-ok'>{positivePct}%</div>
-                        <div className='soriku-agent-detail-stat-label'>positive feedback</div>
-                    </div>}
-                </div>}
+                {this.detailTab === 'Persona' && this.renderPersonaTab(item)}
+                {this.detailTab === 'Specialisms' && this.renderSpecialismsTab(item)}
+                {this.detailTab === 'Memory' && this.renderMemoryTab(d, l)}
+                {this.detailTab === 'Activity' && this.renderActivityTab(d, l, positivePct)}
             </div>
+        </div>;
+    }
+
+    protected renderPersonaTab(item: AgentItem): React.ReactNode {
+        if (!item.description && !item.systemPrompt && item.toolWhitelist.length === 0) {
+            return <div className='soriku-agent-detail-note'>No persona details set for this agent.</div>;
+        }
+        return <>
+            {item.description && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>Description</div>
+                <div className='soriku-agent-detail-note'>{item.description}</div>
+            </div>}
+            {item.systemPrompt && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>System prompt</div>
+                <div className='soriku-agent-detail-prompt'>{item.systemPrompt}</div>
+            </div>}
+            {item.toolWhitelist.length > 0 && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>Allowed tools</div>
+                <div className='soriku-agent-detail-skills'>
+                    {item.toolWhitelist.map(tool => <span key={tool} className='soriku-agent-detail-skill'>{tool}</span>)}
+                </div>
+            </div>}
+        </>;
+    }
+
+    protected renderSpecialismsTab(item: AgentItem): React.ReactNode {
+        if (item.skills.length === 0) {
+            return <div className='soriku-agent-detail-note'>No specialisms configured for this agent.</div>;
+        }
+        return <div className='soriku-agent-detail-section'>
+            <div className='soriku-agent-detail-section-title'>Specialisms</div>
+            <div className='soriku-agent-detail-skills'>
+                {item.skills.map(skill => <span key={skill} className='soriku-agent-detail-skill'>{skill}</span>)}
+            </div>
+        </div>;
+    }
+
+    protected renderMemoryTab(d: DetailState | undefined, l: LearningSummary | undefined): React.ReactNode {
+        if (d?.status === 'loading') {
+            return <div className='soriku-agent-detail-note'>Loading memory…</div>;
+        }
+        if (d?.status === 'error') {
+            return <div className='soriku-agent-detail-note'>Could not load memory: {d.error}</div>;
+        }
+        const empty = !l || (l.feedbackRules.length === 0 && l.qualityScores.length === 0 && l.stack.length === 0);
+        if (empty) {
+            return <div className='soriku-agent-detail-note'>No learning yet — give the agent feedback (👍/👎) in chat.</div>;
+        }
+        return <>
+            {l.feedbackRules.length > 0 && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>Rules learned from feedback</div>
+                <ul className='soriku-agent-detail-list'>{l.feedbackRules.map((r, i) => <li key={i}>{r}</li>)}</ul>
+            </div>}
+            {l.qualityScores.length > 0 && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>Quality by category</div>
+                <ul className='soriku-agent-detail-list'>{l.qualityScores.map((q, i) =>
+                    <li key={i}>{q.category}: {Math.round(q.ratio * 100)}% positive ({q.count})</li>)}</ul>
+            </div>}
+            {l.stack.length > 0 && <div className='soriku-agent-detail-section'>
+                <div className='soriku-agent-detail-section-title'>Detected stack</div>
+                <div className='soriku-agent-detail-note'>{l.stack.join(', ')}</div>
+            </div>}
+        </>;
+    }
+
+    protected renderActivityTab(d: DetailState | undefined, l: LearningSummary | undefined, positivePct: number | undefined): React.ReactNode {
+        if (d?.status === 'loading') {
+            return <div className='soriku-agent-detail-note'>Loading activity…</div>;
+        }
+        if (d?.status === 'error') {
+            return <div className='soriku-agent-detail-note'>Could not load activity: {d.error}</div>;
+        }
+        if (!l || (l.interactions === 0 && positivePct === undefined)) {
+            return <div className='soriku-agent-detail-note'>No activity yet.</div>;
+        }
+        return <div className='soriku-agent-detail-stats'>
+            <div className='soriku-agent-detail-stat'>
+                <div className='soriku-agent-detail-stat-value'>{l.interactions}</div>
+                <div className='soriku-agent-detail-stat-label'>interactions</div>
+            </div>
+            {positivePct !== undefined && <div className='soriku-agent-detail-stat'>
+                <div className='soriku-agent-detail-stat-value soriku-agent-detail-stat-ok'>{positivePct}%</div>
+                <div className='soriku-agent-detail-stat-label'>positive feedback</div>
+            </div>}
         </div>;
     }
 }

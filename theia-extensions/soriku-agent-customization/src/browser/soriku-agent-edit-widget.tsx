@@ -10,7 +10,10 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { Btn, Card, PageHeader, SettingsGroup, SettingsRow } from 'soriku-theme-ext/lib/browser/ui';
-import { AgentForm, LearningSummary, buildUpdateRequest, summarizeLearning, toAgentForm } from '../common/agent-form';
+import {
+    AgentForm, LearningSummary, ROUTING_STRATEGY_OPTIONS, TOOL_WHITELIST_OPTIONS,
+    buildUpdateRequest, summarizeLearning, toAgentForm,
+} from '../common/agent-form';
 
 interface EditState {
     status: 'empty' | 'loading' | 'error' | 'ready' | 'saving';
@@ -41,6 +44,10 @@ export class SorikuAgentEditWidget extends ReactWidget {
     protected visibilityRef = React.createRef<HTMLInputElement>();
     protected promptRef = React.createRef<HTMLTextAreaElement>();
     protected decisionPatternsRef = React.createRef<HTMLTextAreaElement>();
+    protected routingStrategyRef = React.createRef<HTMLSelectElement>();
+    protected readonly toolWhitelistRefs: ReadonlyMap<string, React.RefObject<HTMLInputElement>> = new Map(
+        TOOL_WHITELIST_OPTIONS.map(name => [name, React.createRef<HTMLInputElement>()]),
+    );
 
     @postConstruct()
     protected init(): void {
@@ -80,6 +87,8 @@ export class SorikuAgentEditWidget extends ReactWidget {
             visibility: this.visibilityRef.current?.value ?? '',
             systemPrompt: this.promptRef.current?.value ?? '',
             decisionPatternsText: this.decisionPatternsRef.current?.value ?? '',
+            preferredRoutingStrategy: this.routingStrategyRef.current?.value ?? '',
+            toolWhitelist: TOOL_WHITELIST_OPTIONS.filter(name => this.toolWhitelistRefs.get(name)?.current?.checked),
         };
     }
 
@@ -149,10 +158,37 @@ export class SorikuAgentEditWidget extends ReactWidget {
                         defaultValue={form.decisionPatternsText}
                     />
                 </Card>
-                <div className='soriku-agent-edit-note'>
-                    Per-agent tool whitelist and routing mode are not yet persisted by the engine.
-                    Set those per chat for now.
-                </div>
+                <Card className='soriku-agent-edit-section'>
+                    <div className='soriku-agent-edit-section-title'>Default routing</div>
+                    <div className='soriku-agent-edit-section-desc'>
+                        Seeds a new chat's routing choice — still overridable per chat.
+                    </div>
+                    <select
+                        ref={this.routingStrategyRef}
+                        className='theia-select soriku-agent-edit-input'
+                        defaultValue={form.preferredRoutingStrategy}
+                    >
+                        <option value=''>Engine default (Local-first)</option>
+                        {ROUTING_STRATEGY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                </Card>
+                <Card className='soriku-agent-edit-section'>
+                    <div className='soriku-agent-edit-section-title'>Tool whitelist</div>
+                    <div className='soriku-agent-edit-section-desc'>
+                        Restricts which tools this agent may use. Leave everything unchecked for no restriction
+                        (a role's own tools stay available either way — this can only narrow that further).
+                    </div>
+                    <div className='soriku-agent-edit-tool-whitelist'>
+                        {TOOL_WHITELIST_OPTIONS.map(name => <label key={name} className='soriku-agent-edit-tool-option'>
+                            <input
+                                type='checkbox'
+                                ref={this.toolWhitelistRefs.get(name)}
+                                defaultChecked={form.toolWhitelist.includes(name)}
+                            />
+                            {name}
+                        </label>)}
+                    </div>
+                </Card>
                 <div className='soriku-agent-edit-actions'>
                     <Btn variant='primary' disabled={saving} onClick={() => this.save()}>
                         {saving ? 'Saving…' : 'Save'}

@@ -61,7 +61,18 @@ describe('toAgentItem', () => {
             skills: [],
             preferredModel: undefined,
             systemPrompt: undefined,
+            toolWhitelist: [],
         });
+    });
+
+    it('maps a real tool_whitelist for the master-detail panel', () => {
+        const item = toAgentItem(persona({ id: 'a6', tool_whitelist: ['file_read', 'file_write'] }));
+        assert.deepEqual(item.toolWhitelist, ['file_read', 'file_write']);
+    });
+
+    it('defaults toolWhitelist to empty (unrestricted) when unset', () => {
+        const item = toAgentItem(persona({ id: 'a7' }));
+        assert.deepEqual(item.toolWhitelist, []);
     });
 
     it('maps a real system prompt for the master-detail panel', () => {

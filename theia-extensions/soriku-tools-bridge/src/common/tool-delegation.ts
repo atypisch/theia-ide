@@ -10,6 +10,7 @@
  ********************************************************************************/
 
 import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/common/engine-types';
+import { splitShellCommand } from './shell-service';
 
 export interface ToolRequest {
     requestId: string;
@@ -20,11 +21,16 @@ export interface ToolRequest {
 
 /**
  * Tools the IDE executes itself against the open workspace. Sent to the engine
- * as `client_tools`; everything else stays server-side. Filesystem-scoped tools
- * only — shell/search/document generation remain on the engine for now.
+ * as `client_tools`; everything else stays server-side. `shell_exec` and
+ * `project_search` run on the Theia BACKEND (a real Node process, see
+ * ../node/soriku-shell-service-impl.ts) via SorikuShellService, not in this
+ * renderer — `child_process` here would hit the browser-bundle polyfill and
+ * throw on every call. `shell_job_status`/`shell_job_stop` poll/stop a
+ * background job started by `shell_exec({background:true})` (e.g. a dev server).
  */
 export const DELEGATED_TOOLS: readonly string[] = [
     'file_read', 'file_write', 'list_directory', 'apply_patch', 'project_search', 'shell_exec',
+    'shell_job_status', 'shell_job_stop',
 ];
 
 /** Extract a delegated tool request from a `tool_request` SSE event, or undefined if malformed. */
@@ -49,6 +55,11 @@ export function getStringArg(args: Record<string, unknown>, key: string): string
 export function getNumberArg(args: Record<string, unknown>, key: string): number | undefined {
     const value = args[key];
     return typeof value === 'number' ? value : undefined;
+}
+
+export function getBooleanArg(args: Record<string, unknown>, key: string): boolean | undefined {
+    const value = args[key];
+    return typeof value === 'boolean' ? value : undefined;
 }
 
 /** Mirror the engine `list_directory` output: "d name" / "f name", alpha-sorted, capped at 100. */
@@ -131,6 +142,48 @@ export function sessionAllowKey(tool: string, args: unknown): string {
 
 export function okResult(result: string): ToolExecResult {
     return { result };
+}
+
+/**
+ * Commands that keep asking even under `autoApprove: 'safe'` (Phase 2) — the
+ * user still has to type "all" (full YOLO) to skip these. Most classic
+ * dangerous binaries (`rm`, `sudo`, `chmod`, `dd`, `mkfs`, `curl`) aren't even
+ * in ALLOWED_SHELL_COMMANDS (see shell-service.ts) so they're already hard-
+ * blocked outright; this list exists for (a) the allowlisted commands whose
+ * OWN semantics are destructive (`git push`, `git reset --hard`, `git clean`)
+ * and (b) `bash`/`sh -c` — the one escape hatch that defeats the argv-only
+ * exec model, since bash *itself* becomes a shell interpreter once it runs.
+ */
+export function isDangerousShellCommand(command: string): boolean {
+    const argv = splitShellCommand(command);
+    if (argv.length === 0) {
+        return false;
+    }
+    const [bin, ...rest] = argv;
+    if ((bin === 'bash' || bin === 'sh' || bin === 'zsh') && rest.includes('-c')) {
+        return true;
+    }
+    if (bin === 'git') {
+        const sub = rest[0];
+        if (sub === 'push') {
+            return true;
+        }
+        if (sub === 'reset' && rest.includes('--hard')) {
+            return true;
+        }
+        if (sub === 'clean') {
+            return true;
+        }
+    }
+    // Defense in depth for a future allowlist change, not reachable today —
+    // none of these binaries are in ALLOWED_SHELL_COMMANDS yet.
+    if (['rm', 'rmdir', 'sudo', 'mkfs', 'dd'].includes(bin)) {
+        return true;
+    }
+    if ((bin === 'chmod' || bin === 'chown') && rest.some(a => /^-\w*[rR]\w*$/.test(a) || a === '--recursive')) {
+        return true;
+    }
+    return false;
 }
 
 /**

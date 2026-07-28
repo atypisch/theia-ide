@@ -14,6 +14,7 @@
     "@theia/core": "1.73.0-next.2",
     "@theia/filesystem": "1.73.0-next.2",
     "@theia/workspace": "1.73.0-next.2",
+    "@vscode/ripgrep": "1.18.0",
     "inversify": "^6.2.2",
     "soriku-engine-client-ext": "0.1.0"
   },
@@ -34,7 +35,8 @@
   },
   "theiaExtensions": [
     {
-      "frontend": "lib/browser/soriku-tools-bridge-frontend-module"
+      "frontend": "lib/browser/soriku-tools-bridge-frontend-module",
+      "backend": "lib/node/soriku-tools-bridge-backend-module"
     }
   ]
 }

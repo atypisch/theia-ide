@@ -10,6 +10,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { Emitter, Event } from '@theia/core/lib/common/event';
 import { PreferenceService } from '@theia/core/lib/common/preferences';
 import { SorikuSseEvent } from '../common/engine-types';
+import { DEFAULT_ENGINE_BASE_URL, SORIKU_ENGINE_BASE_URL } from './soriku-engine-preferences';
 
 @injectable()
 export class SorikuPlanLiveBridge {
@@ -21,7 +22,7 @@ export class SorikuPlanLiveBridge {
     readonly onDidReceivePlanEvent: Event<SorikuSseEvent> = this.onDidReceivePlanEventEmitter.event;
 
     protected source?: EventSource;
-    protected engineBase = 'http://127.0.0.1:8765';
+    protected engineBase = DEFAULT_ENGINE_BASE_URL;
     // #19: reconnect with capped exponential backoff instead of a fixed 5s loop
     // hammering a down engine forever; a fired timer must be a no-op after dispose.
     protected reconnectTimer: number | undefined;
@@ -33,8 +34,8 @@ export class SorikuPlanLiveBridge {
 
     @postConstruct()
     protected init(): void {
-        const pref = this.preferences.get<string>('soriku.engineUrl', 'http://127.0.0.1:8765');
-        this.engineBase = (pref || 'http://127.0.0.1:8765').replace(/\/$/, '');
+        const pref = this.preferences.get<string>(SORIKU_ENGINE_BASE_URL, DEFAULT_ENGINE_BASE_URL);
+        this.engineBase = (pref || DEFAULT_ENGINE_BASE_URL).replace(/\/$/, '');
         this.connect();
     }
 

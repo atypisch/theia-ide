@@ -6,6 +6,15 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
+/**
+ * Last-reviewed date for the content below (bump alongside any real edit to
+ * DOC_PAGES). This is hand-maintained static text, not generated from the
+ * running engine — shown in the overlay's nav footer next to the offline
+ * note so it reads as "may lag the engine you're actually running", not as
+ * a live/always-current source.
+ */
+export const DOCS_LAST_REVIEWED = '2026-07-19';
+
 export type DocBlock =
     | { kind: 'h'; text: string }
     | { kind: 'h2'; text: string }

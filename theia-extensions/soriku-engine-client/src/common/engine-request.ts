@@ -28,5 +28,6 @@ export function toChatRequestBody(params: ChatStreamParams): ChatRequest {
         images: params.images && params.images.length > 0 ? params.images : undefined,
         plan_model_id: params.mode === 'plan' ? params.planModelId : undefined,
         plan_models: params.mode === 'plan' && params.planModels && params.planModels.length >= 2 ? params.planModels : undefined,
+        allow_mcp: params.mode === 'plan' ? params.allowMcp : undefined,
     };
 }

@@ -31,9 +31,10 @@ describe('parseToolRequestEvent', () => {
 });
 
 describe('DELEGATED_TOOLS', () => {
-    it('covers the filesystem tools only', () => {
+    it('covers filesystem, shell and background-job tools', () => {
         assert.deepEqual([...DELEGATED_TOOLS], [
             'file_read', 'file_write', 'list_directory', 'apply_patch', 'project_search', 'shell_exec',
+            'shell_job_status', 'shell_job_stop',
         ]);
     });
 });

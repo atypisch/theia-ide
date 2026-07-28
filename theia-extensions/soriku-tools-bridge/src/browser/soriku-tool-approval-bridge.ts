@@ -10,9 +10,11 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { injectable } from '@theia/core/shared/inversify';
+import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
+import { PreferenceService } from '@theia/core/lib/common';
 import { ToolConfirmationView } from '../common/tool-confirmation';
 import { ApprovalQueue } from '../common/approval-queue';
+import { DEFAULT_APPROVAL_TIMEOUT_SECONDS, SORIKU_APPROVAL_TIMEOUT_SECONDS } from './soriku-tools-preferences';
 
 export interface PendingToolApproval {
     confirmationId: string;
@@ -27,6 +29,9 @@ const DENIED: ApprovalDecision = { approved: false, rememberSession: false };
 @injectable()
 export class SorikuToolApprovalBridge {
 
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
+
     protected listeners = new Set<() => void>();
 
     /** Optional hook (set by the widget) to surface an auto-deny notice to the user. */
@@ -37,6 +42,21 @@ export class SorikuToolApprovalBridge {
         onChange: () => this.notify(),
         onAutoDeny: payload => this.onAutoDeny?.(payload as PendingToolApproval),
     });
+
+    @postConstruct()
+    protected init(): void {
+        this.applyTimeoutPreference();
+        this.preferences.onPreferenceChanged(e => {
+            if (e.preferenceName === SORIKU_APPROVAL_TIMEOUT_SECONDS) {
+                this.applyTimeoutPreference();
+            }
+        });
+    }
+
+    protected applyTimeoutPreference(): void {
+        const seconds = this.preferences.get<number>(SORIKU_APPROVAL_TIMEOUT_SECONDS, DEFAULT_APPROVAL_TIMEOUT_SECONDS);
+        this.queue.setTimeoutMs(Math.max(0, seconds) * 1000);
+    }
 
     /** The approval currently shown in the banner (queue head), or undefined. */
     get pending(): PendingToolApproval | undefined {

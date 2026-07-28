@@ -10,6 +10,7 @@
 
 import URI from '@theia/core/lib/common/uri';
 import { inject, injectable } from '@theia/core/shared/inversify';
+import { PreferenceService } from '@theia/core/lib/common';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
@@ -17,9 +18,13 @@ import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/com
 import { describeToolConfirmation, parseConfirmToolEvent } from '../common/tool-confirmation';
 import {
     DELEGATED_TOOLS, ToolRequest, applyUnifiedPatch, computeLineDiffStats, errorResult, formatDirectoryListing,
-    formatSearchResults, formatWriteResult, getNumberArg, getStringArg, isPathWithinRoot, okResult,
-    parseToolRequestEvent, pathKind, sessionAllowKey, truncateToMaxLines,
+    formatSearchResults, formatWriteResult, getBooleanArg, getNumberArg, getStringArg, isDangerousShellCommand,
+    isPathWithinRoot, okResult, parseToolRequestEvent, pathKind, sessionAllowKey, truncateToMaxLines,
 } from '../common/tool-delegation';
+import { DEFAULT_SHELL_TIMEOUT_MS, RipgrepHit, SorikuShellService, formatShellResult } from '../common/shell-service';
+import {
+    AutoApproveLevel, DEFAULT_AUTO_APPLY_EDITS, DEFAULT_AUTO_APPROVE, SORIKU_AUTO_APPLY_EDITS, SORIKU_AUTO_APPROVE,
+} from './soriku-tools-preferences';
 import { SorikuEditorRevealService } from './soriku-editor-reveal-service';
 import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
 import { SorikuDiffReviewService } from './soriku-diff-review-service';
@@ -51,6 +56,12 @@ export class SorikuToolConfirmationService {
 
     @inject(SorikuGeneratedFilesTracker)
     protected readonly generatedFiles: SorikuGeneratedFilesTracker;
+
+    @inject(SorikuShellService)
+    protected readonly shellService: SorikuShellService;
+
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
 
     /** Tools the IDE can execute locally — sent to the engine as `client_tools`. */
     delegatedTools(): string[] {
@@ -130,6 +141,13 @@ export class SorikuToolConfirmationService {
         if (request.tool === 'file_write' || request.tool === 'apply_patch') {
             return this.reviewWrite(request);
         }
+        const autoApprove = this.preferences.get<AutoApproveLevel>(SORIKU_AUTO_APPROVE, DEFAULT_AUTO_APPROVE);
+        if (autoApprove === 'all') {
+            return true;
+        }
+        if (autoApprove === 'safe' && !this.isDangerousShellRequest(request)) {
+            return true;
+        }
         const view = describeToolConfirmation({
             confirmationId: request.requestId,
             tool: request.tool,
@@ -141,6 +159,15 @@ export class SorikuToolConfirmationService {
             SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
         }
         return approved;
+    }
+
+    /** Whether `safe` auto-approve should still stop and ask for this request (only shell_exec carries a raw command to inspect). */
+    protected isDangerousShellRequest(request: ToolRequest): boolean {
+        if (request.tool !== 'shell_exec') {
+            return false;
+        }
+        const cmd = getStringArg(request.args, 'command') ?? getStringArg(request.args, 'cmd') ?? '';
+        return isDangerousShellCommand(cmd);
     }
 
     protected async promptUser(
@@ -170,7 +197,14 @@ export class SorikuToolConfirmationService {
         } else {
             proposed = getStringArg(request.args, 'content') ?? '';
         }
-        return this.diffReview.reviewProposedWrite(uri, proposed, request.tool);
+        const autoApply = this.preferences.get<boolean>(SORIKU_AUTO_APPLY_EDITS, DEFAULT_AUTO_APPLY_EDITS);
+        const { approved, rememberSession } = await this.diffReview.reviewProposedWrite(
+            uri, proposed, request.tool, { blocking: !autoApply },
+        );
+        if (approved && rememberSession) {
+            SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
+        }
+        return approved;
     }
 
     protected async runTool(request: ToolRequest): Promise<ToolExecResult> {
@@ -222,13 +256,27 @@ export class SorikuToolConfirmationService {
         }
         if (request.tool === 'shell_exec') {
             const cmd = getStringArg(request.args, 'command') ?? getStringArg(request.args, 'cmd') ?? '';
-            const { exec } = await import('child_process');
-            const { promisify } = await import('util');
-            const run = promisify(exec);
-            const roots = await this.workspaceService.roots;
-            const cwd = roots[0]?.resource.path.toString() ?? process.cwd();
-            const out = await run(cmd, { cwd, timeout: 30000, maxBuffer: 512 * 1024 });
-            return okResult((out.stdout || '') + (out.stderr || ''));
+            const cwdArg = getStringArg(request.args, 'cwd');
+            const cwdUri = await this.resolveUri(cwdArg ?? '');
+            const cwd = cwdUri.path.toString();
+            const timeoutSeconds = getNumberArg(request.args, 'timeout');
+            const timeoutMs = timeoutSeconds ? Math.min(Math.max(timeoutSeconds, 1), 600) * 1000 : undefined;
+            if (getBooleanArg(request.args, 'background')) {
+                const { jobId } = await this.shellService.startJob({ command: cmd, cwd, timeoutMs });
+                return okResult(JSON.stringify({ job_id: jobId, started: cmd }));
+            }
+            const result = await this.shellService.exec({ command: cmd, cwd, timeoutMs });
+            return okResult(formatShellResult(result, (timeoutMs ?? DEFAULT_SHELL_TIMEOUT_MS) / 1000));
+        }
+        if (request.tool === 'shell_job_status') {
+            const jobId = getStringArg(request.args, 'job_id') ?? '';
+            const status = await this.shellService.pollJob(jobId);
+            return okResult(JSON.stringify(status));
+        }
+        if (request.tool === 'shell_job_stop') {
+            const jobId = getStringArg(request.args, 'job_id') ?? '';
+            const stopped = await this.shellService.stopJob(jobId);
+            return okResult(JSON.stringify({ stopped }));
         }
         return errorResult(`Unsupported tool: ${request.tool}`);
     }
@@ -264,8 +312,8 @@ export class SorikuToolConfirmationService {
         return candidate;
     }
 
-    /** Fast workspace search via ripgrep; falls back to a shallow walk when rg is unavailable. */
-    protected async searchWorkspace(query: string, subpath?: string): Promise<{ path: string; line: number; text: string }[]> {
+    /** Fast workspace search via the backend's bundled ripgrep; falls back to a shallow walk if the backend RPC itself is unreachable. */
+    protected async searchWorkspace(query: string, subpath?: string): Promise<RipgrepHit[]> {
         if (!query.trim()) {
             return [];
         }
@@ -277,27 +325,8 @@ export class SorikuToolConfirmationService {
         const requested = subpath ? root.resolve(subpath) : root;
         // Contain the search to the workspace: a subpath that climbs out (#11) falls back to root.
         const base = isPathWithinRoot(root.path.toString(), requested.path.toString()) ? requested : root;
-        const basePath = base.path.toString();
         try {
-            const { execFile } = await import('child_process');
-            const { promisify } = await import('util');
-            const run = promisify(execFile);
-            const { stdout } = await run(
-                'rg',
-                [
-                    '--line-number', '--no-heading', '--max-count', '50',
-                    '--glob', '!node_modules', '--glob', '!.git', '--glob', '!yarn.lock',
-                    query, basePath,
-                ],
-                { timeout: 15000, maxBuffer: 512 * 1024 },
-            );
-            return stdout.split('\n').filter(Boolean).map(line => {
-                const m = line.match(/^(.+?):(\d+):(.*)$/);
-                if (!m) {
-                    return undefined;
-                }
-                return { path: m[1], line: parseInt(m[2], 10), text: m[3].trim().slice(0, 200) };
-            }).filter((hit): hit is { path: string; line: number; text: string } => !!hit);
+            return await this.shellService.search(query, base.path.toString());
         } catch {
             return this.searchWorkspaceWalk(query, subpath);
         }

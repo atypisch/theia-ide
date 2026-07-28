@@ -8,6 +8,7 @@ import { electronOptions } from './gen-esbuild.electron.mjs';
 import esbuild from 'esbuild';
 import { createRequire } from 'module';
 import path from 'path';
+import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const resolvePackagePath = require('resolve-package-path');
@@ -78,6 +79,13 @@ const parcelWatcherPlugin = {
 // plugin so they take precedence (esbuild uses the first onResolve match).
 nodeOptions.plugins.unshift(asarRipgrepPlugin, parcelWatcherPlugin);
 
+// Phase 5.0 (RAM/weight measurement): emit esbuild's own bundle-composition
+// metafile for the browser (renderer) bundle — the one that actually ships
+// to users and matters for cold-load/download size. Skipped in watch mode
+// (dev iteration doesn't need it, and re-writing on every incremental
+// rebuild would just be noise).
+browserOptions.metafile = true;
+
 const browserContext = await esbuild.context(browserOptions);
 const nodeContext = await esbuild.context(nodeOptions);
 const electronContext = await esbuild.context(electronOptions);
@@ -90,8 +98,14 @@ if (watch) {
     ]);
 } else {
     try {
-        await browserContext.rebuild();
+        const browserResult = await browserContext.rebuild();
         await browserContext.dispose();
+        if (browserResult.metafile) {
+            fs.writeFileSync(
+                path.join(browserOptions.outdir, 'meta-browser.json'),
+                JSON.stringify(browserResult.metafile),
+            );
+        }
         await nodeContext.rebuild();
         await nodeContext.dispose();
         await electronContext.rebuild();

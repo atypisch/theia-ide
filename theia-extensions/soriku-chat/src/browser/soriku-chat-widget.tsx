@@ -31,6 +31,8 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
+import { SorikuShellService, formatTree } from 'soriku-tools-bridge-ext/lib/common/shell-service';
+import { SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP } from 'soriku-tools-bridge-ext/lib/browser/soriku-tools-preferences';
 import { AgentAvatar, Badge, Btn, DiffBar, Overlay, Pill, SegmentedPicker, StatusDot, VerifyPill, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { ChatMarkdown } from './chat-markdown-view';
@@ -45,15 +47,18 @@ import {
     AssistantTurn,
     ChatMessage,
     ChatToolCall,
+    DEFAULT_RENDER_WINDOW,
     PendingPlan,
     PlanTaskView,
     roleLabel,
     SUBAGENT_ROLES,
     busyPhase,
+    capConversation,
     createAssistantTurn,
     formatToolCallSummary,
     parseFileMentions,
     summarizeAgentInsights,
+    visibleMessages,
     withWorkspacePrefix,
 } from '../common/chat-model';
 
@@ -176,6 +181,9 @@ export class SorikuChatWidget extends ReactWidget {
     @inject(SorikuToolConfirmationService)
     protected readonly toolConfirmation: SorikuToolConfirmationService;
 
+    @inject(SorikuShellService)
+    protected readonly shellService: SorikuShellService;
+
     @inject(ChatStreamController)
     protected readonly streamController: ChatStreamController;
 
@@ -252,6 +260,11 @@ export class SorikuChatWidget extends ReactWidget {
     /** Images attached to the NEXT message (paste/drop/attach), cleared once sent. */
     protected pendingImages: ChatImageAttachment[] = [];
     protected dragOver = false;
+
+    /** Phase 6.4: only the last DEFAULT_RENDER_WINDOW messages render by
+     * default on a long conversation — "Show earlier" flips this to render
+     * everything still in memory (capConversation already bounds that). */
+    protected showEarlierMessages = false;
 
     /** Mic dictation state, backed by the real POST /api/v1/transcribe endpoint (core/voice) — no mock. */
     protected recording: 'idle' | 'recording' | 'transcribing' = 'idle';
@@ -403,6 +416,7 @@ export class SorikuChatWidget extends ReactWidget {
         // Select the agent FIRST (guarded by `restoring` so it doesn't wipe the chat),
         // then let the session load state — same order as before the P4-b extraction.
         const personaId = await this.session.loadConversation(id);
+        this.showEarlierMessages = false;
         const agentId = personaId ?? agentIdHint;
         this.restoring = true;
         try {
@@ -422,6 +436,7 @@ export class SorikuChatWidget extends ReactWidget {
         this.streamController.abort();
         this.session.reset();
         this.pendingImages = [];
+        this.showEarlierMessages = false;
         void this.defaultAgentResolver.ensureActiveAgent();
         this.update();
         if (hadMessages) {
@@ -718,6 +733,11 @@ export class SorikuChatWidget extends ReactWidget {
             },
         });
         this.conversation[turnIndex] = finalTurn;
+        // Phase 6.4: cap AFTER the turn is fully settled, never mid-stream —
+        // capConversation can drop old messages and shift indices, which
+        // would break the `this.conversation[turnIndex] = …` updates above
+        // if applied while this turn is still streaming.
+        this.conversation = capConversation(this.conversation);
         this.conversationLink.notifyChanged();
         this.scheduleUpdate(true);
     }
@@ -758,7 +778,7 @@ export class SorikuChatWidget extends ReactWidget {
 
         const [projectId, editorContext] = await Promise.all([
             this.workspaceProjectId(),
-            this.buildEditorContext(text),
+            this.buildEditorContext(text, editsEnabled),
         ]);
 
         // C-B: the engine's guard/learnings extractors read the USER prompt, not the
@@ -788,6 +808,9 @@ export class SorikuChatWidget extends ReactWidget {
                 ? this.planModelId : undefined,
             planModels: this.behavior === 'plan' && this.planModelMode === 'multi' && this.planModels.length >= 2
                 ? this.planModels : undefined,
+            allowMcp: this.behavior === 'plan'
+                ? this.preferences.get<boolean>(SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP)
+                : undefined,
         };
     }
 
@@ -802,7 +825,7 @@ export class SorikuChatWidget extends ReactWidget {
     }
 
     /** @file mentions + the workspace root as engine context items (no editor tabs yet — that is Fix A). */
-    protected async buildEditorContext(prompt: string): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[]> {
+    protected async buildEditorContext(prompt: string, editsEnabled: boolean): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[]> {
         const items: import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem[] = [];
         const roots = await this.workspaceService.roots;
         const root = roots[0]?.resource;
@@ -815,10 +838,32 @@ export class SorikuChatWidget extends ReactWidget {
         if (this.preferences.get<boolean>('soriku.context.editorEnabled', true) !== false) {
             items.push(...buildEditorContextItems(this.editorContext.collect()));
         }
+        // Phase 2.8: when the agent can act (edits enabled), give it the
+        // workspace layout up front instead of making it spend early
+        // iterations on list_directory just to find out what's there.
+        if (root && editsEnabled) {
+            const tree = await this.buildWorkspaceTreeContext(root.path.toString());
+            if (tree) {
+                items.push(tree);
+            }
+        }
         for (const rel of parseFileMentions(prompt)) {
             items.push({ type: 'file', value: rel });
         }
         return items;
+    }
+
+    /** Best-effort — a backend hiccup here must never block sending the chat message. */
+    protected async buildWorkspaceTreeContext(rootPath: string): Promise<import('soriku-engine-client-ext/lib/common/engine-types').ChatContextItem | undefined> {
+        try {
+            const entries = await this.shellService.listTree(rootPath, 200);
+            if (entries.length === 0) {
+                return undefined;
+            }
+            return { type: 'text', value: `Workspace file tree:\n${formatTree(entries)}` };
+        } catch {
+            return undefined;
+        }
     }
 
     /** Approve a parked Plan so the engine runs it (Plan mode). */
@@ -1025,7 +1070,15 @@ export class SorikuChatWidget extends ReactWidget {
             <div className='soriku-chat-messages'>
                 {this.conversation.length === 0
                     ? <div className='soriku-chat-empty'>Ask the agent a question to start.</div>
-                    : this.conversation.map(message => this.renderMessage(message))}
+                    : <>
+                        {!this.showEarlierMessages && this.conversation.length > DEFAULT_RENDER_WINDOW && <button
+                            className='soriku-chat-show-earlier'
+                            onClick={() => { this.showEarlierMessages = true; this.update(); }}
+                        >
+                            Show {this.conversation.length - DEFAULT_RENDER_WINDOW} earlier message{this.conversation.length - DEFAULT_RENDER_WINDOW === 1 ? '' : 's'}
+                        </button>}
+                        {visibleMessages(this.conversation, this.showEarlierMessages).map(message => this.renderMessage(message))}
+                    </>}
             </div>
             {this.renderInlineToolApproval()}
             <div className='soriku-chat-input'>
@@ -1818,6 +1871,9 @@ export class SorikuChatWidget extends ReactWidget {
             </span>}
             {a.verdict && <span title={a.verdict.notes ?? ''}>
                 <VerifyPill state={a.verdict.status === 'approved' ? 'verified' : 'fixing'} />
+            </span>}
+            {a.rework && <span title={a.rework.reason ?? ''}>
+                <Badge tone='warn'>↻ rework{a.rework.targetTaskId ? ` ${a.rework.targetTaskId}` : ''}</Badge>
             </span>}
         </div>;
     }

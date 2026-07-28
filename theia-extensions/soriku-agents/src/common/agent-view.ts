@@ -22,6 +22,8 @@ export interface AgentItem {
     preferredModel?: string;
     /** Real system prompt (AgentIntelligence.system_prompt) — shown in the master-detail panel. */
     systemPrompt?: string;
+    /** Tools this agent is restricted to (narrows its role's own allowlist) — empty/absent = unrestricted. */
+    toolWhitelist: string[];
 }
 
 /** Derive a short avatar label (initials) from a display name. */
@@ -50,6 +52,7 @@ export function toAgentItem(persona: AgentPersona): AgentItem {
         skills: (persona.specializations ?? []).map(s => s.name).filter(Boolean),
         preferredModel: persona.preferred_model ?? undefined,
         systemPrompt: persona.intelligence?.system_prompt?.trim() || undefined,
+        toolWhitelist: persona.tool_whitelist ?? [],
     };
 }
 

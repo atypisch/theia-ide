@@ -158,49 +158,53 @@ describe('Theia App', function () {
     expect(windowTitle).to.include('workspace');
   });
 
-  it('Builtin extensions', async function () {
-    // Wait a bit to make sure key handlers are registered.
+  // Soriku's shell hard-removes Theia's legacy left panel at startup
+  // (soriku-sidebar-contribution.ts) and replaces Explorer/Search/SCM/
+  // Extensions with its own embedded sidebar — so the stock Extensions
+  // marketplace view and #search-input-field never exist in this product.
+  // @theia/vsx-registry itself was removed as a dependency (unreachable,
+  // ~182KB of dead weight). These two specs cover the same underlying
+  // claims (plugins load under asar packaging; ripgrep-backed search works)
+  // through Soriku's real, reachable UI instead.
+
+  it('Builtin plugins activate under asar packaging', async function () {
+    // Wait a bit to make sure the plugin host finished activating.
     await new Promise(r => setTimeout(r, 5000));
 
-    // Open extensions view
-    await this.browser.keys(macSafeKeyCombo(['Control', 'Shift', 'x']));
-    const builtinContainer = await this.browser.$(
-      '#vsx-extensions-view-container--vsx-extensions\\:builtin'
-    );
+    // The Command Palette is untouched by the custom sidebar and surfaces
+    // commands contributed by real bundled VS Code extensions — "Reload
+    // Project" comes from the bundled TypeScript/JavaScript language
+    // features plugin, so finding it proves the plugin host loaded it
+    // correctly under asar packaging.
+    await this.browser.keys(macSafeKeyCombo(['Control', 'Shift', 'p']));
 
-    // Expand builtin extensions
-    const builtinHeader = await builtinContainer.$('.theia-header.header');
-    await builtinHeader.moveTo({ xOffset: 1, yOffset: 1 });
-    await builtinHeader.waitForDisplayed();
-    await builtinHeader.waitForClickable();
-    await builtinHeader.click();
+    const paletteInput = await this.browser.$('.quick-input-box input');
+    await paletteInput.waitForExist({ timeout: 5000 });
+    await paletteInput.setValue('Reload Project');
 
-    // Wait for expansion to finish (plugins may take time to scan, especially with asar packaging)
-    const builtin = await this.browser.$(
-      '#vsx-extensions\\:builtin .theia-TreeContainer'
-    );
-    await builtin.waitForExist({ timeout: 10000 });
+    const result = await this.browser.$('.quick-input-list-row');
+    await result.waitForExist({
+      timeout: 10000,
+      timeoutMsg: 'TypeScript language-features plugin command did not appear. Plugins may not be loading correctly under asar packaging.',
+    });
 
-    // Get names of all builtin extensions
-    const extensions = await builtin.$$('.theia-vsx-extension .name');
-    const extensionNames = await Promise.all(
-      extensions.map(e => e.getText())
-    );
-
-    // Exemplary check a few extensions
-    expect(extensionNames).to.include('Debugger for Java');
-    expect(extensionNames).to.include('TypeScript and JavaScript Language Features (built-in)');
+    const label = await this.browser.$('.quick-input-list-label');
+    const labelText = await label.getText();
+    expect(labelText).to.include('Reload Project');
   });
 
-  it('Search in workspace', async function () {
+  it('Search in workspace (Soriku sidebar)', async function () {
     // Wait a bit to make sure key handlers are registered
     await new Promise(r => setTimeout(r, 5000));
 
-    // Open search view (Ctrl+Shift+F)
-    await this.browser.keys(macSafeKeyCombo(['Control', 'Shift', 'f']));
+    // Open Soriku's own "Find in Files" sidebar panel (soriku-sidebar-
+    // search-panel.tsx) — the real, reachable equivalent of the stock
+    // search-in-workspace view in this product.
+    const findInFiles = await this.browser.$('li*=Find in Files');
+    await findInFiles.waitForExist({ timeout: 5000 });
+    await findInFiles.click();
 
-    // Wait for search input to appear
-    const searchInput = await this.browser.$('#search-input-field');
+    const searchInput = await this.browser.$('.soriku-sidebar-search-input');
     await searchInput.waitForExist({ timeout: 5000 });
     await searchInput.waitForDisplayed();
 
@@ -208,11 +212,11 @@ describe('Theia App', function () {
     await searchInput.setValue('Test Workspace');
 
     // Wait for search results to appear
-    const searchResults = await this.browser.$('.t-siw-search-container .resultLine');
-    await searchResults.waitForExist({ timeout: 10000, timeoutMsg: 'Search results did not appear. Ripgrep may not be working correctly with asar packaging.' });
+    const searchMatch = await this.browser.$('.soriku-sidebar-search-match');
+    await searchMatch.waitForExist({ timeout: 10000, timeoutMsg: 'Search results did not appear. Ripgrep may not be working correctly with asar packaging.' });
 
     // Verify we got results
-    const resultsText = await searchResults.getText();
+    const resultsText = await searchMatch.getText();
     expect(resultsText).to.include('Test Workspace');
   });
 

@@ -77,6 +77,30 @@ describe('ApprovalQueue — auto-deny timeout (#1)', () => {
     });
 });
 
+describe('ApprovalQueue — configurable timeout (Phase 2: long unattended runs)', () => {
+    it('setTimeoutMs(0) disables auto-deny for approvals enqueued afterward', () => {
+        const { q, timers } = makeQueue();
+        q.setTimeoutMs(0);
+        let decided = false;
+        q.enqueue({ id: 'a' }, () => { decided = true; });
+        assert.equal(timers.size, 0);   // no timer was ever set
+        assert.equal(decided, false);   // never auto-denied — stays pending indefinitely
+    });
+    it('a positive timeout still arms a timer as before', () => {
+        const { q, timers } = makeQueue();
+        q.setTimeoutMs(60_000);
+        q.enqueue({ id: 'a' }, () => { /* keep */ });
+        assert.equal(timers.size, 1);
+    });
+    it('setTimeoutMs only affects approvals enqueued after the call', () => {
+        const { q, timers } = makeQueue();
+        q.enqueue({ id: 'a' }, () => { /* already-queued, keeps its timer */ });
+        assert.equal(timers.size, 1);
+        q.setTimeoutMs(0);
+        assert.equal(timers.size, 1);   // existing timer untouched
+    });
+});
+
 describe('ApprovalQueue — flush (#1/#16)', () => {
     it('cancelAll denies every queued approval and clears timers', () => {
         const { q, timers } = makeQueue();

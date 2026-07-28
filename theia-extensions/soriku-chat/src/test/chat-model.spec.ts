@@ -8,8 +8,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 import {
-    AssistantTurn, busyPhase, createAssistantTurn, fromEngineMessages, parseFileMentions, reduceSseEvent,
-    roleLabel, SUBAGENT_ROLES, summarizeAgentInsights, withWorkspacePrefix,
+    AssistantTurn, busyPhase, capConversation, ChatMessage, createAssistantTurn, DEFAULT_RENDER_WINDOW,
+    fromEngineMessages, MAX_CLIENT_MESSAGES, parseFileMentions, reduceSseEvent,
+    roleLabel, SUBAGENT_ROLES, summarizeAgentInsights, visibleMessages, withWorkspacePrefix,
 } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
@@ -124,6 +125,28 @@ describe('reduceSseEvent', () => {
         const a = turn.agents.find(x => x.workerId === 'w2');
         assert.equal(a?.verdict?.status, 'changes_requested');
         assert.equal(a?.verdict?.notes, 'fixed a bug');
+    });
+
+    it('attaches a task_rework badge to the reviewer row, keyed by reviewer_task_id not worker_id', () => {
+        const turn = fold([
+            { type: 'worker_start', worker_id: 'w1', task_id: 't1', role: 'backend-developer' },
+            { type: 'worker_start', worker_id: 'w2', task_id: 't2', role: 'code-reviewer' },
+            { type: 'review_verdict', worker_id: 'w2', task_id: 't2', target_task_id: 't1', status: 'changes_requested', notes: 'fixed a bug' },
+            { type: 'task_rework', task_id: 't1', reviewer_task_id: 't2', reason: 'fixed a bug', attempt: 1 },
+        ]);
+        const reviewer = turn.agents.find(x => x.workerId === 'w2');
+        const target = turn.agents.find(x => x.workerId === 'w1');
+        assert.equal(reviewer?.rework?.targetTaskId, 't1');
+        assert.equal(reviewer?.rework?.reason, 'fixed a bug');
+        assert.equal(reviewer?.rework?.attempt, 1);
+        assert.equal(target?.rework, undefined);  // badge lives on the reviewer's row, not the target's
+    });
+
+    it('ignores a task_rework event when no Fleet row matches its reviewer_task_id yet', () => {
+        const turn = fold([
+            { type: 'task_rework', task_id: 't1', reviewer_task_id: 't2', reason: 'x', attempt: 1 },
+        ]);
+        assert.equal(turn.agents.length, 0);  // no crash, no phantom row created
     });
 
     it('tracks two workers in parallel as distinct Fleet rows', () => {
@@ -547,5 +570,98 @@ describe('parseFileMentions', () => {
 
     it('returns an empty array for text with no mentions', () => {
         assert.deepEqual(parseFileMentions('no file references here'), []);
+    });
+
+    it('recognizes non-web-stack extensions (Phase 2: any project, not just JS/Python)', () => {
+        assert.deepEqual(
+            parseFileMentions('check @api/UserController.php and @cmd/main.go and @src/lib.rs'),
+            ['api/UserController.php', 'cmd/main.go', 'src/lib.rs'],
+        );
+    });
+
+    it('recognizes a multi-dot filename by its final extension (.blade.php)', () => {
+        assert.deepEqual(
+            parseFileMentions('render @resources/views/welcome.blade.php'),
+            ['resources/views/welcome.blade.php'],
+        );
+    });
+
+    it('recognizes a Vue single-file component', () => {
+        assert.deepEqual(parseFileMentions('update @src/App.vue'), ['src/App.vue']);
+    });
+});
+
+describe('capConversation (Phase 6.4)', () => {
+    function userMsg(id: string): ChatMessage {
+        return { role: 'user', id, text: `msg-${id}` };
+    }
+
+    it('leaves a conversation under the cap untouched (same reference)', () => {
+        const conversation = [userMsg('1'), userMsg('2'), userMsg('3')];
+        assert.equal(capConversation(conversation, 200), conversation);
+    });
+
+    it('drops the oldest messages once over the cap', () => {
+        const conversation = Array.from({ length: 10 }, (_, i) => userMsg(String(i)));
+        const capped = capConversation(conversation, 5);
+        assert.equal(capped.length, 5);
+    });
+
+    it('always preserves the first message even as everything else ages out', () => {
+        const conversation = Array.from({ length: 250 }, (_, i) => userMsg(String(i)));
+        const capped = capConversation(conversation, MAX_CLIENT_MESSAGES);
+        assert.equal(capped[0].id, '0');
+        assert.equal(capped.length, MAX_CLIENT_MESSAGES);
+    });
+
+    it('keeps the MOST RECENT messages after the preserved first one', () => {
+        const conversation = Array.from({ length: 10 }, (_, i) => userMsg(String(i)));
+        const capped = capConversation(conversation, 5);
+        // first (0) + newest 4 of the remaining 9 = [0, 6, 7, 8, 9]
+        assert.deepEqual(capped.map(m => m.id), ['0', '6', '7', '8', '9']);
+    });
+
+    it('never duplicates the first message when the conversation barely exceeds the cap', () => {
+        const conversation = Array.from({ length: 6 }, (_, i) => userMsg(String(i)));
+        const capped = capConversation(conversation, 5);
+        const ids = capped.map(m => m.id);
+        assert.equal(new Set(ids).size, ids.length, 'duplicate id found');
+        assert.equal(ids[0], '0');
+    });
+
+    it('defaults to MAX_CLIENT_MESSAGES when no max is given', () => {
+        const conversation = Array.from({ length: 250 }, (_, i) => userMsg(String(i)));
+        assert.equal(capConversation(conversation).length, MAX_CLIENT_MESSAGES);
+    });
+
+    it('never mutates the input array', () => {
+        const conversation = Array.from({ length: 10 }, (_, i) => userMsg(String(i)));
+        const snapshot = [...conversation];
+        capConversation(conversation, 5);
+        assert.deepEqual(conversation, snapshot);
+    });
+});
+
+describe('visibleMessages (Phase 6.4)', () => {
+    function userMsg(id: string): ChatMessage {
+        return { role: 'user', id, text: `msg-${id}` };
+    }
+
+    it('returns everything when the conversation is already within the window', () => {
+        const conversation = [userMsg('1'), userMsg('2')];
+        assert.equal(visibleMessages(conversation, false, 100), conversation);
+    });
+
+    it('windows to the most recent N messages when over the window and not showAll', () => {
+        const conversation = Array.from({ length: 150 }, (_, i) => userMsg(String(i)));
+        const visible = visibleMessages(conversation, false, DEFAULT_RENDER_WINDOW);
+        assert.equal(visible.length, DEFAULT_RENDER_WINDOW);
+        assert.equal(visible[0].id, String(150 - DEFAULT_RENDER_WINDOW));
+        assert.equal(visible[visible.length - 1].id, '149');
+    });
+
+    it('returns everything when showAll is true, regardless of length', () => {
+        const conversation = Array.from({ length: 150 }, (_, i) => userMsg(String(i)));
+        assert.equal(visibleMessages(conversation, true, DEFAULT_RENDER_WINDOW).length, 150);
     });
 });

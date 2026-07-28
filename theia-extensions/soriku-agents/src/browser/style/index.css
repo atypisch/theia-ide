@@ -407,3 +407,16 @@
     color: var(--ink3);
     margin-top: 2px;
 }
+
+.soriku-agent-detail-note {
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+
+.soriku-agent-detail-list {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    font-size: 11.5px;
+    color: var(--ink2);
+    line-height: 1.6;
+}

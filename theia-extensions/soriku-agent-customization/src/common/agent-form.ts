@@ -1,10 +1,20 @@
 /********************************************************************************
  * Soriku IDE — agent edit form model (pure, Theia-free, unit-testable)
  *
- * Maps an engine AgentPersona to/from the fields that PATCH /api/v1/agents
+ * Maps an engine AgentPersona to/from the fields that PATCH /api/agents/{id}
  * actually persists: name, role, description, system_prompt, preferred_model,
- * visibility. (Per-agent tool whitelist and routing mode are NOT persisted by
- * the engine — see the form's note — so they are intentionally absent here.)
+ * visibility, decision_patterns, preferred_routing_strategy, tool_whitelist.
+ *
+ * Phase 6.2 fix: `visibility` and `decision_patterns` were ALREADY being sent
+ * in every save below, but core.agents.manager.AgentManager.update() silently
+ * dropped both (no handling for either kwarg) — this comment used to claim
+ * visibility persisted when it didn't. Fixed engine-side; both are real now.
+ *
+ * preferred_routing_strategy seeds a new chat's routing choice when the chat
+ * doesn't already have one (core/worker.py + server.py chat()). tool_whitelist
+ * narrows — never expands — whatever tools the agent's role/task would
+ * otherwise allow (Worker.execute() in core/worker.py). Both were added the
+ * same session this comment block was corrected.
  *
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
@@ -20,7 +30,31 @@ export interface AgentForm {
     systemPrompt: string;
     /** Editable "keyword: weight" lines, one per decision pattern. */
     decisionPatternsText: string;
+    /** '' = engine default (prefer_local). */
+    preferredRoutingStrategy: string;
+    /** Empty = unrestricted — the engine treats [] the same as unset (falsy check). */
+    toolWhitelist: string[];
 }
+
+/** The common tool set surfaced as checkboxes — see core/builtin_tools.py. Checking
+ * a tool the agent's own role/task never grants is harmless: the engine's whitelist
+ * can only NARROW an allowlist, never add to it (Worker.execute() in core/worker.py). */
+export const TOOL_WHITELIST_OPTIONS: readonly string[] = [
+    'file_read', 'file_write', 'list_directory', 'project_search',
+    'shell_exec', 'shell_job_status', 'shell_job_stop',
+    'web_fetch', 'http_request', 'generate_document',
+    'check_security_headers', 'port_scan',
+];
+
+/** Same 4 values/labels as soriku-chat's ROUTING_OPTIONS (kept separate — that
+ * one also carries per-option hint text for the chat header control). Keep the
+ * value/label pairs in sync if the engine's RoutingStrategy set ever changes. */
+export const ROUTING_STRATEGY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'prefer_local', label: 'Local-first' },
+    { value: 'local_with_remote_conductor', label: 'Hybrid' },
+    { value: 'balanced', label: 'Balanced' },
+    { value: 'prefer_quality', label: 'Best' },
+];
 
 /** Read `memory.decision_patterns.patterns` defensively into "keyword: weight" lines. */
 export function decisionPatternsToText(persona: AgentPersona): string {
@@ -65,6 +99,8 @@ export function toAgentForm(persona: AgentPersona): AgentForm {
         visibility: persona.simezu?.visibility ?? '',
         systemPrompt: persona.intelligence?.system_prompt ?? '',
         decisionPatternsText: decisionPatternsToText(persona),
+        preferredRoutingStrategy: persona.preferred_routing_strategy ?? '',
+        toolWhitelist: persona.tool_whitelist ?? [],
     };
 }
 
@@ -145,5 +181,10 @@ export function buildUpdateRequest(form: AgentForm): AgentUpdateRequest {
         body.visibility = visibility;
     }
     body.decision_patterns = parseDecisionPatterns(form.decisionPatternsText);
+    const routingStrategy = form.preferredRoutingStrategy.trim();
+    if (routingStrategy) {
+        body.preferred_routing_strategy = routingStrategy;
+    }
+    body.tool_whitelist = form.toolWhitelist;
     return body;
 }

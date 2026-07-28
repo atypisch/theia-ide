@@ -12,6 +12,10 @@ export interface AgentPersona {
     category: string;
     version: number;
     preferred_model?: string | null;
+    /** Default per-request routing strategy, seeded into a new chat when unset there. */
+    preferred_routing_strategy?: string | null;
+    /** Tools this agent may use — narrows (never expands) its role/task allowlist. null/absent = unrestricted. */
+    tool_whitelist?: string[] | null;
     /** "" = user-created; "minion" = spawned by a head agent during a plan run. */
     origin?: string;
     /** A repeatedly-good minion the engine promoted to a persistent sub-agent. */
@@ -91,6 +95,8 @@ export interface AgentUpdateRequest {
     visibility?: string;
     /** Editable keyword→weight decision patterns (memory.decision_patterns). */
     decision_patterns?: Record<string, number>;
+    preferred_routing_strategy?: string;
+    tool_whitelist?: string[];
 }
 
 export interface ChatContextItem {
@@ -137,6 +143,13 @@ export interface ChatRequest {
     plan_model_id?: string | null;
     /** Plan-authoring model choice (mode="plan" only) — 2+ models draft, a judge picks the best. */
     plan_models?: string[] | null;
+    /**
+     * Opt-in (mode="plan" only): let plan workers use connected MCP tools.
+     * Off by default — MCP servers can reach outside this machine, so
+     * autonomous plan workers don't get them unless the user explicitly
+     * enables `soriku.tools.planMcp`.
+     */
+    allow_mcp?: boolean | null;
 }
 
 /**
@@ -607,6 +620,8 @@ export interface ChatStreamParams {
     planModelId?: string;
     /** Plan mode only: 2+ models draft competing plans; a judge picks the best. */
     planModels?: string[];
+    /** Plan mode only: let plan workers use connected MCP tools (soriku.tools.planMcp). */
+    allowMcp?: boolean;
 }
 
 export interface EngineClientConfig {
