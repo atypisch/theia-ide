@@ -46,14 +46,19 @@ describe('toChatRequestBody', () => {
         assert.equal(body.plan_auto_execute, true);
     });
 
-    it('enables pilot_tools for plan/single/auto modes', () => {
+    it('enables pilot_tools for every mode the IDE can send', () => {
+        // 'ensemble' used to be excluded here; it is no longer a request mode
+        // (Do:Plan → Plan by:Compare sends mode 'plan' + worker_models), and
+        // a compare run gets tools like any other plan.
         for (const mode of ['plan', 'single', 'auto'] as const) {
             assert.equal(toChatRequestBody(params({ mode })).pilot_tools, true);
         }
     });
 
-    it('leaves pilot_tools undefined for ensemble mode', () => {
-        assert.equal(toChatRequestBody(params({ mode: 'ensemble' })).pilot_tools, undefined);
+    it('carries worker_models on a plan request (the compare shape)', () => {
+        const body = toChatRequestBody(params({ mode: 'plan', workerModels: ['a:1', 'b:2'] }));
+        assert.equal(body.mode, 'plan');
+        assert.deepEqual(body.worker_models, ['a:1', 'b:2']);
     });
 
     it('omits empty worker_models / client_tools / context arrays', () => {

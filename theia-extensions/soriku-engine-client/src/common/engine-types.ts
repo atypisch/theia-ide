@@ -104,7 +104,14 @@ export interface ChatContextItem {
     value: string;
 }
 
-export type ChatMode = 'auto' | 'single' | 'plan' | 'verify' | 'ensemble';
+/**
+ * What kind of run the engine should do. `verify` and `ensemble` used to be
+ * separate modes here; the engine has translated both into plan mode for
+ * months, and the IDE now asks for that shape directly (mode 'plan' plus
+ * `worker_models`), so they are gone from the request side. They can still
+ * appear in a RoutingDecision the engine sends back.
+ */
+export type ChatMode = 'auto' | 'single' | 'plan';
 
 export interface ChatRequest {
     prompt: string;
@@ -124,7 +131,11 @@ export interface ChatRequest {
     tools_enabled?: boolean | null;
     /** Tools the IDE will execute itself (against its workspace) instead of the engine. */
     client_tools?: string[] | null;
-    /** Explicit models to collaborate on one ensemble answer (one worker each). */
+    /**
+     * Explicit models to run the SAME prompt on, one worker each, answers
+     * merged. With `mode: 'plan'` this makes the engine skip the planning
+     * step entirely (a replication plan) — there is nothing to decompose.
+     */
     worker_models?: string[] | null;
     /** Override settings.plan.auto_execute for this request (IDE Plan mode sends false). */
     plan_auto_execute?: boolean | null;
@@ -495,6 +506,11 @@ export interface RoutingDecision {
     confidence: number;
     reasoning: string;
     alternatives: string[];
+    /**
+     * The engine's own routing verdict. Still reports 'verify'/'ensemble' for
+     * prompts its auto-router judged worth several answers — it translates
+     * those into a plan itself. Read-only here; not a ChatMode we can send.
+     */
     mode: 'single' | 'verify' | 'ensemble';
     provider: string;
     forced: boolean;
@@ -594,9 +610,9 @@ export interface ChatStreamParams {
     clientTools?: string[];
     /** Force a specific model (only meaningful in `single` mode). */
     modelId?: string;
-    /** Number of workers for ensemble mode ('auto' or 2..5). */
+    /** Number of workers when the engine picks the models ('auto' or 2..5). */
     workerCount?: string;
-    /** Explicit models to combine in ensemble mode (overrides workerCount). */
+    /** Explicit models to compare — one worker each (overrides workerCount). */
     workerModels?: string[];
     /** Set false for chat-only (no tools / no file edits). */
     toolsEnabled?: boolean;

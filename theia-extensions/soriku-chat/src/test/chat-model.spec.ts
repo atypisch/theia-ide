@@ -230,7 +230,7 @@ describe('reduceSseEvent', () => {
         assert.equal(turn.phase, 'Routing to a model');
     });
 
-    it('renders a plan/ensemble answer from synthesis events and tracks worker models', () => {
+    it('renders a plan answer from synthesis events and tracks worker models', () => {
         const turn = fold([
             { type: 'plan_generated' },
             { type: 'worker_start', worker_id: 'w1', model: 'qwen2.5-coder:7b' },

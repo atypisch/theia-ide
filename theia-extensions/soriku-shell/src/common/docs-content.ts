@@ -36,8 +36,9 @@ export const DOC_PAGES: ReadonlyArray<DocPage> = [
             { kind: 'p', text: 'Soriku is a local-first AI IDE. Every prompt runs on your machine unless you explicitly opt in to a capped cloud call.' },
             { kind: 'h2', text: 'The three pickers' },
             {
-                kind: 'p', text: 'Every message is shaped by Do (behaviour), Model (single / ensemble) and Route ' +
-                    '(local-first / hybrid / best). The router classifies your prompt and picks the strongest model from the capability map.'
+                kind: 'p', text: 'Every message is shaped by Do (behaviour), Model (auto / single) and Route ' +
+                    '(local-first / hybrid / best). The router classifies your prompt and picks the strongest model from the capability map. ' +
+                    'A model is the engine, a worker is one execution of one task, an agent is the persona that carries it out.'
             },
             { kind: 'code', text: 'soriku engine start   # http://127.0.0.1:8765' },
             { kind: 'h2', text: 'Working with a fleet' },

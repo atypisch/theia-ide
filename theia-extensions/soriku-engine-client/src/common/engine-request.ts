@@ -20,7 +20,10 @@ export function toChatRequestBody(params: ChatStreamParams): ChatRequest {
         tools_enabled: params.toolsEnabled,
         stream: true,
         client_tools: params.clientTools && params.clientTools.length > 0 ? params.clientTools : undefined,
-        pilot_tools: params.mode === 'plan' || params.mode === 'single' || params.mode === 'auto' ? true : undefined,
+        // Every mode the IDE can send now wants tools available. (This used to
+        // exclude 'ensemble', which no longer exists as a request mode — its
+        // successor, plan + worker_models, gets tools like any other plan.)
+        pilot_tools: true,
         context: params.context && params.context.length > 0 ? params.context : undefined,
         plan_auto_execute: params.mode === 'plan' ? false : params.planAutoExecute,
         routing_strategy: params.routingStrategy,

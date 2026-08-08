@@ -93,7 +93,7 @@ export interface EngineClient {
     complete(body: CompleteRequest): Promise<CompleteResponse>;
     /** ⌘K inline edit: proposes review-able hunks for a selection/cursor + instruction. */
     proposeInlineEdit(body: InlineEditRequest): Promise<InlineEditResponse>;
-    /** Resume a plan parked after `plan_awaiting_execution` (multi-worker / ensemble). */
+    /** Resume a plan parked after `plan_awaiting_execution`. */
     executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */
     cancelPlan(planId: string): Promise<PlanSignalResponse>;

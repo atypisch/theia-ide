@@ -108,7 +108,7 @@ export interface AssistantTurn {
     toolCalls: ChatToolCall[];
     /** Files written during this turn (from engine history). */
     generatedFiles: GeneratedFileView[];
-    /** Models that collaborated on this answer (multi-worker / ensemble), for transparency. */
+    /** Models whose workers contributed to this answer, for transparency. */
     workers: string[];
     /** Structured per-worker activity for the Fleet view (multi-agent runs). */
     agents: AgentActivity[];

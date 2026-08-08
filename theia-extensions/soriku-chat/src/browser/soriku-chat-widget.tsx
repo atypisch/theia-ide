@@ -107,8 +107,8 @@ const BEHAVIOR_OPTIONS: BehaviorOption[] = [
     { value: 'chat', label: 'Chat', hint: 'Chat only — answer and discuss only, no file edits.' },
 ];
 
-/** Which model(s) answer, independent of behaviour. */
-type Orchestration = 'auto' | 'single' | 'ensemble';
+/** Which model answers, independent of behaviour. */
+type Orchestration = 'auto' | 'single';
 
 interface OrchestrationOption {
     value: Orchestration;
@@ -116,10 +116,13 @@ interface OrchestrationOption {
     hint: string;
 }
 
+// "Ensemble" used to live here as a third option. It was never a different
+// kind of run — the engine translated it into a plan whose workers all
+// answer the same prompt. It now lives where it belongs: Do:Plan → Plan by:
+// Compare (see PLAN_MODEL_MODE_OPTIONS).
 const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
     { value: 'auto', label: 'Auto', hint: 'Auto model — Soriku routes to the best model via the capability map.' },
     { value: 'single', label: 'Single', hint: 'Single model — use one specific model.' },
-    { value: 'ensemble', label: 'Ensemble', hint: 'Several models you pick collaborate into one answer.' },
 ];
 
 /**
@@ -139,8 +142,20 @@ const ROUTING_OPTIONS: RoutingOption[] = [
     { value: 'prefer_quality', label: 'Best', hint: 'Best quality — pick the best model regardless of locality or cost (cloud allowed).' },
 ];
 
-/** Which model(s) author the PLAN itself, when behaviour is 'plan'. Independent of the answer-model pickers above. */
-type PlanModelMode = 'auto' | 'single' | 'multi';
+/**
+ * How several models get involved when behaviour is 'plan'. The three shapes
+ * are mutually exclusive by nature, which is why they share one picker:
+ *
+ *   auto/single/multi  — a model AUTHORS a plan, then workers execute its tasks.
+ *   compare            — there is no plan to author: the same prompt runs on
+ *                        every model you tick and the answers are merged.
+ *
+ * `compare` is what the separate "Ensemble" orchestration option used to be.
+ * The engine always ran it through plan mode anyway (as a replication plan),
+ * so keeping a second name for it only made "models", "workers" and "agents"
+ * harder to tell apart.
+ */
+type PlanModelMode = 'auto' | 'single' | 'multi' | 'compare';
 
 interface PlanModelModeOption {
     value: PlanModelMode;
@@ -152,6 +167,7 @@ const PLAN_MODEL_MODE_OPTIONS: PlanModelModeOption[] = [
     { value: 'auto', label: 'Auto', hint: 'Auto model — the router picks a reasoning model to write the plan.' },
     { value: 'single', label: 'Single', hint: 'One model you pick writes the plan.' },
     { value: 'multi', label: 'Multi', hint: '2-3 models each draft a competing plan; the best one wins. Slower.' },
+    { value: 'compare', label: 'Compare', hint: 'No planning step — run this prompt on every model you tick and merge the answers.' },
 ];
 
 @injectable()
@@ -760,14 +776,17 @@ export class SorikuChatWidget extends ReactWidget {
     /** Translate the two pickers (behaviour + models) into engine stream params. */
     protected async buildStreamParams(text: string, agentId: string, images: ChatImageAttachment[] = []): Promise<ChatStreamParams> {
         const editsEnabled = this.behavior !== 'chat';
-        const ensemble = this.orchestration === 'ensemble' && this.workerModels.length >= 2;
+        // Compare = one worker per ticked model, all on the same prompt. The
+        // engine builds that as a plan with no planning step, so it rides the
+        // ordinary plan mode rather than a mode of its own.
+        const compare = this.behavior === 'plan'
+            && this.planModelMode === 'compare'
+            && this.workerModels.length >= 2;
         const single = this.orchestration === 'single' && !!this.modelId;
 
         let mode: ChatMode;
         if (this.behavior === 'plan') {
             mode = 'plan';
-        } else if (ensemble) {
-            mode = 'ensemble';
         } else if (single) {
             mode = 'single';
         } else if (this.behavior === 'edit') {
@@ -798,8 +817,11 @@ export class SorikuChatWidget extends ReactWidget {
             clientTools: editsEnabled ? this.toolConfirmation.delegatedTools() : undefined,
             toolsEnabled: editsEnabled ? undefined : false,
             modelId: single ? this.modelId : undefined,
-            workerModels: ensemble ? this.workerModels : undefined,
-            planAutoExecute: this.behavior === 'plan' ? false : undefined,
+            workerModels: compare ? this.workerModels : undefined,
+            // Compare has nothing to approve — the user already chose the
+            // models. The engine forces auto-execute for that shape; sending
+            // `false` anyway would only be misleading.
+            planAutoExecute: this.behavior === 'plan' && !compare ? false : undefined,
             routingStrategy: this.routingStrategy,
             cloudCostCapEur: this.getCloudCostCap(),
             images: images.length > 0 ? images.map(a => a.base64) : undefined,
@@ -808,6 +830,8 @@ export class SorikuChatWidget extends ReactWidget {
                 ? this.planModelId : undefined,
             planModels: this.behavior === 'plan' && this.planModelMode === 'multi' && this.planModels.length >= 2
                 ? this.planModels : undefined,
+            // planModelId/planModels above are about who WRITES the plan; in
+            // compare there is no plan to write, so both stay undefined.
             allowMcp: this.behavior === 'plan'
                 ? this.preferences.get<boolean>(SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP)
                 : undefined,
@@ -1702,29 +1726,6 @@ export class SorikuChatWidget extends ReactWidget {
                     </option>;
                 })}
             </select>}
-            {this.orchestration === 'ensemble' && <div className='soriku-worker-models'>
-                <div className='soriku-worker-models-hint'>
-                    {this.workerModels.length >= 2
-                        ? `${this.workerModels.length} models will collaborate`
-                        : 'Tick 2+ models to combine (none = Soriku chooses)'}
-                </div>
-                <div className='soriku-model-checklist'>
-                    {this.models.length === 0
-                        ? <div className='soriku-worker-models-hint'>No models available</div>
-                        : this.models.map(m => {
-                            const avail = this.modelAvailability(m.id);
-                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
-                                <input
-                                    type='checkbox'
-                                    checked={this.workerModels.includes(m.id)}
-                                    disabled={this.streaming || !avail.ok}
-                                    onChange={() => this.toggleWorkerModel(m.id)}
-                                />
-                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
-                            </label>;
-                        })}
-                </div>
-            </div>}
             {this.behavior === 'plan' && this.renderPlanModelControls()}
         </div>;
     }
@@ -1779,6 +1780,29 @@ export class SorikuChatWidget extends ReactWidget {
                         })}
                 </div>
             </div>}
+            {this.planModelMode === 'compare' && <div className='soriku-worker-models'>
+                <div className='soriku-worker-models-hint'>
+                    {this.workerModels.length >= 2
+                        ? `${this.workerModels.length} workers — one per model, same prompt, answers merged`
+                        : 'Tick 2+ models to compare (fewer = Soriku plans normally)'}
+                </div>
+                <div className='soriku-model-checklist'>
+                    {this.models.length === 0
+                        ? <div className='soriku-worker-models-hint'>No models available</div>
+                        : this.models.map(m => {
+                            const avail = this.modelAvailability(m.id);
+                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
+                                <input
+                                    type='checkbox'
+                                    checked={this.workerModels.includes(m.id)}
+                                    disabled={this.streaming || !avail.ok}
+                                    onChange={() => this.toggleWorkerModel(m.id)}
+                                />
+                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
+                            </label>;
+                        })}
+                </div>
+            </div>}
         </div>;
     }
 
@@ -1790,7 +1814,7 @@ export class SorikuChatWidget extends ReactWidget {
         this.update();
     }
 
-    /** Toggle a model in the ensemble collaboration set. */
+    /** Toggle a model in the compare set — one worker per ticked model. */
     protected toggleWorkerModel(modelId: string): void {
         this.workerModels = this.workerModels.includes(modelId)
             ? this.workerModels.filter(id => id !== modelId)
