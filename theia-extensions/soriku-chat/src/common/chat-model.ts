@@ -128,6 +128,8 @@ export interface AssistantTurn {
     phase?: string;
     /** Set when the engine escalated to another model (e.g. timed-out local → cloud). */
     escalation?: { from?: string; to?: string; reason?: string };
+    /** The request let the router choose the model (Auto) — drives the "Auto → model" line. */
+    auto?: boolean;
     /** Time to first token (ms) — from SSE `timing` event. */
     ttftMs?: number;
     /** Total stream duration (ms) — from SSE `done` event. */
@@ -146,6 +148,10 @@ export interface UserMessage {
     role: 'user';
     id: string;
     text: string;
+    /** Epoch ms when it was sent — shown as the clock time under the bubble. */
+    at?: number;
+    /** The user rewrote this message after sending (shows "edited"). */
+    edited?: boolean;
     fileMentions?: string[];
     images?: ChatMessageImage[];
 }
@@ -207,6 +213,29 @@ export function withWorkspacePrefix(prompt: string, workspaceRoot: string | unde
         return prompt;   // already carries one (e.g. retry of an engine-stored prompt)
     }
     return `Workspace: ${root}\n\n${prompt}`;
+}
+
+/**
+ * Inverse of {@link withWorkspacePrefix} for DISPLAY: the engine stores the wire prompt, so a
+ * reloaded message (or a title the engine derived from it) starts with the `Workspace: /path`
+ * line the user never typed. Only a leading first line is removed.
+ */
+export function stripWorkspacePrefix(text: string): string {
+    return text.replace(/^[ \t]*Workspace:[^\n]*\n+/i, '');
+}
+
+/** Header title: the engine's title unless it is just the workspace line, then the first message, then "New chat". */
+export function chatTitle(rawTitle: string | undefined, conversation: ChatMessage[]): string {
+    const title = (rawTitle ?? '').trim();
+    if (title && !/^workspace:/i.test(title)) {
+        return title;
+    }
+    const first = conversation.find((m): m is UserMessage => m.role === 'user');
+    const text = first ? stripWorkspacePrefix(first.text).trim().replace(/\s+/g, ' ') : '';
+    if (!text) {
+        return 'New chat';
+    }
+    return text.length > 60 ? `${text.slice(0, 59)}…` : text;
 }
 
 function callIdOf(event: SorikuSseEvent): string | undefined {
@@ -690,7 +719,7 @@ export function fromEngineMessages(messages: ConversationMessage[]): ChatMessage
     messages.forEach((m, i) => {
         const text = typeof m.content === 'string' ? m.content : '';
         if (m.role === 'user') {
-            out.push({ role: 'user', id: `h${i}`, text, images: parseHistoryImages(m.images) });
+            out.push({ role: 'user', id: `h${i}`, text: stripWorkspacePrefix(text), images: parseHistoryImages(m.images) });
         } else if (m.role === 'assistant' && (text || Array.isArray(m.steps) || Array.isArray(m.workers))) {
             out.push({
                 role: 'assistant',

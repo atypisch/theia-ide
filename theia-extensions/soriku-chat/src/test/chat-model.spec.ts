@@ -8,9 +8,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SorikuSseEvent } from 'soriku-engine-client-ext/lib/common/engine-types';
 import {
-    AssistantTurn, busyPhase, capConversation, ChatMessage, createAssistantTurn, DEFAULT_RENDER_WINDOW,
+    AssistantTurn, busyPhase, capConversation, chatTitle, ChatMessage, createAssistantTurn, DEFAULT_RENDER_WINDOW,
     fromEngineMessages, MAX_CLIENT_MESSAGES, parseFileMentions, reduceSseEvent,
-    roleLabel, SUBAGENT_ROLES, summarizeAgentInsights, visibleMessages, withWorkspacePrefix,
+    roleLabel, stripWorkspacePrefix, SUBAGENT_ROLES, summarizeAgentInsights, visibleMessages, withWorkspacePrefix,
 } from '../common/chat-model';
 
 function fold(events: SorikuSseEvent[]): AssistantTurn {
@@ -663,5 +663,27 @@ describe('visibleMessages (Phase 6.4)', () => {
     it('returns everything when showAll is true, regardless of length', () => {
         const conversation = Array.from({ length: 150 }, (_, i) => userMsg(String(i)));
         assert.equal(visibleMessages(conversation, true, DEFAULT_RENDER_WINDOW).length, 150);
+    });
+});
+
+describe('stripWorkspacePrefix / chatTitle', () => {
+    it('removes only the leading Workspace line that withWorkspacePrefix adds', () => {
+        const wire = withWorkspacePrefix('Fix the router', '/Users/m/Sites/my app');
+        assert.equal(stripWorkspacePrefix(wire), 'Fix the router');
+        assert.equal(stripWorkspacePrefix('Fix the router'), 'Fix the router');
+        assert.equal(stripWorkspacePrefix('Explain\nWorkspace: x\nthis'), 'Explain\nWorkspace: x\nthis');
+    });
+    it('history user messages are shown without the wire prefix', () => {
+        const msgs = fromEngineMessages([{ role: 'user', content: 'Workspace: /w\n\nhello' } as never]);
+        assert.equal(msgs[0].role === 'user' && msgs[0].text, 'hello');
+    });
+    it('title falls back from a workspace-line title to the first message, then to New chat', () => {
+        const user = { role: 'user', id: 'u1', text: 'Workspace: /w\n\nAdd a local-first fallback to the router' } as never;
+        assert.equal(chatTitle('Routing fix', [user]), 'Routing fix');
+        assert.equal(chatTitle('Workspace: /private/tmp/cl…', [user]), 'Add a local-first fallback to the router');
+        assert.equal(chatTitle(undefined, []), 'New chat');
+        assert.equal(chatTitle('  ', []), 'New chat');
+        const long = { role: 'user', id: 'u2', text: 'x'.repeat(100) } as never;
+        assert.equal(chatTitle(undefined, [long]).length, 60);
     });
 });

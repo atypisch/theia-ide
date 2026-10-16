@@ -12,11 +12,10 @@
 export type EditChoice = 'revert' | 'continue';
 
 export type EditAction =
-    | { kind: 'pause_run' }
+    /** Stop the running work (pause/stop the plan or abort the stream). */
+    | { kind: 'stop_run' }
     | { kind: 'undo_checkpoint' }
-    | { kind: 'cancel_plan' }
-    | { kind: 'resume_run' }
-    | { kind: 'update_plan'; text: string }
+    /** `restart` replaces the old turn; `amend` keeps it and adds a follow-up turn. */
     | { kind: 'send'; text: string; mode: 'restart' | 'amend' };
 
 export interface EditContext {
@@ -24,8 +23,6 @@ export interface EditContext {
     running: boolean;
     /** Agents already changed files. */
     hasChanges: boolean;
-    /** The plan id when the engine plan is still parked or running. */
-    planId?: string;
 }
 
 /** Whether saving needs the revert/continue decision card (v2: only when agents already worked). */
@@ -33,21 +30,24 @@ export function needsDecision(ctx: EditContext): boolean {
     return ctx.hasChanges || ctx.running;
 }
 
+const AMEND_PREFIX = 'The user edited their instruction. Keep the work already done and adapt the remaining steps.';
+
+/**
+ * Revert & restart: stop, put the files back, run the edited message from scratch.
+ * Continue from here: stop, keep every file as written, and send a follow-up turn
+ * that tells the agents to adapt. (The engine cannot rewrite a running plan, so
+ * "continue" is a new turn on top of the finished work — not a silent plan patch.)
+ */
 export function editActions(choice: EditChoice, newText: string, ctx: EditContext): EditAction[] {
     const text = newText.trim();
     if (!text) { return []; }
     const actions: EditAction[] = [];
+    if (ctx.running) { actions.push({ kind: 'stop_run' }); }
     if (choice === 'revert') {
-        if (ctx.running) { actions.push({ kind: 'pause_run' }); }
         if (ctx.hasChanges) { actions.push({ kind: 'undo_checkpoint' }); }
-        if (ctx.planId) { actions.push({ kind: 'cancel_plan' }); }
         actions.push({ kind: 'send', text, mode: 'restart' });
-    } else if (ctx.planId && ctx.running) {
-        // continue: keep what is written; agents adapt the remaining to-dos
-        actions.push({ kind: 'update_plan', text }, { kind: 'resume_run' });
     } else {
-        const amend = `The user edited their instruction. Keep the work already done and adapt the remaining steps.\n\nUpdated instruction:\n${text}`;
-        actions.push({ kind: 'send', text: amend, mode: 'amend' });
+        actions.push({ kind: 'send', text: `${AMEND_PREFIX}\n\nUpdated instruction:\n${text}`, mode: 'amend' });
     }
     return actions;
 }

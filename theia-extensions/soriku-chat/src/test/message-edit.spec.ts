@@ -14,26 +14,33 @@ describe('message edit decisions', () => {
         assert.equal(needsDecision({ running: true, hasChanges: false }), true);
         assert.equal(needsDecision({ running: false, hasChanges: true }), true);
     });
-    it('revert & restart: pause, undo, cancel, resend', () => {
-        assert.deepEqual(editActions('revert', ' new ', { running: true, hasChanges: true, planId: 'p1' }), [
-            { kind: 'pause_run' }, { kind: 'undo_checkpoint' }, { kind: 'cancel_plan' }, { kind: 'send', text: 'new', mode: 'restart' },
+    it('revert & restart: stop, undo, resend', () => {
+        assert.deepEqual(editActions('revert', ' new ', { running: true, hasChanges: true }), [
+            { kind: 'stop_run' }, { kind: 'undo_checkpoint' }, { kind: 'send', text: 'new', mode: 'restart' },
         ]);
     });
-    it('revert on a finished run with no plan just undoes and resends', () => {
+    it('revert on a finished run only undoes and resends', () => {
         assert.deepEqual(editActions('revert', 'x', { running: false, hasChanges: true }), [
             { kind: 'undo_checkpoint' }, { kind: 'send', text: 'x', mode: 'restart' },
         ]);
     });
-    it('continue on a live plan updates it and resumes', () => {
-        assert.deepEqual(editActions('continue', 'x', { running: true, hasChanges: true, planId: 'p1' }), [
-            { kind: 'update_plan', text: 'x' }, { kind: 'resume_run' },
+    it('revert with nothing changed skips the undo', () => {
+        assert.deepEqual(editActions('revert', 'x', { running: true, hasChanges: false }), [
+            { kind: 'stop_run' }, { kind: 'send', text: 'x', mode: 'restart' },
         ]);
     });
-    it('continue on a finished run sends an amend turn that keeps the work', () => {
-        const [a] = editActions('continue', 'x', { running: false, hasChanges: true });
-        assert.equal(a.kind, 'send');
-        assert.match((a as { text: string }).text, /Keep the work already done/);
-        assert.match((a as { text: string }).text, /x$/);
+    it('continue stops live work and sends an amend turn that keeps the files', () => {
+        const live = editActions('continue', 'x', { running: true, hasChanges: true });
+        assert.deepEqual(live.map(a => a.kind), ['stop_run', 'send']);
+        const done = editActions('continue', 'x', { running: false, hasChanges: true });
+        assert.deepEqual(done.map(a => a.kind), ['send']);
+        const send = done[0] as { text: string; mode: string };
+        assert.equal(send.mode, 'amend');
+        assert.match(send.text, /Keep the work already done/);
+        assert.match(send.text, /x$/);
+    });
+    it('never undoes files on continue', () => {
+        assert.ok(!editActions('continue', 'x', { running: true, hasChanges: true }).some(a => a.kind === 'undo_checkpoint'));
     });
     it('an empty edit does nothing', () => {
         assert.deepEqual(editActions('revert', '   ', { running: true, hasChanges: true }), []);

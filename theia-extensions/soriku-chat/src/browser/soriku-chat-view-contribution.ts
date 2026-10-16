@@ -12,6 +12,9 @@ import { FrontendApplication } from '@theia/core/lib/browser/frontend-applicatio
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuChatWidget } from './soriku-chat-widget';
 
+/** v2 design: the chat dock is 420px wide by default (resizable 360–720). */
+const DEFAULT_CHAT_WIDTH = 420;
+
 export namespace SorikuChatCommands {
     /** Toggle visibility of the chat panel (Cmd/Ctrl+L keybinding is bound in Phase 3). */
     export const TOGGLE = 'soriku.chat.toggle';
@@ -37,8 +40,9 @@ export class SorikuChatViewContribution
     }
 
     /** Open the chat panel on first start (next to Agents). Phase 3 owns the final default layout. */
-    async initializeLayout(_app: FrontendApplication): Promise<void> {
+    async initializeLayout(app: FrontendApplication): Promise<void> {
         await this.openView({ activate: false, reveal: true });
+        app.shell.resize(DEFAULT_CHAT_WIDTH, 'right');
     }
 
     override registerCommands(commands: CommandRegistry): void {

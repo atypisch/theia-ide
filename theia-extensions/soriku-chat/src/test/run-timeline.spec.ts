@@ -7,26 +7,26 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAssistantTurn, AssistantTurn, ChatToolCall } from '../common/chat-model';
-import { deriveRunState, deriveSteps, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
+import { deriveRunState, deriveSteps, resultFailed, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
 
 function turnWith(calls: ChatToolCall[], patch: Partial<AssistantTurn> = {}): AssistantTurn {
     return { ...createAssistantTurn('t1'), toolCalls: calls, ...patch };
 }
 
 describe('shortPath / stepTarget', () => {
-    it('keeps the last two segments', () => {
-        assert.equal(shortPath('/Users/m/Sites/app/agents/router.py'), 'agents/router.py');
+    it('keeps just the file name, as the design does', () => {
+        assert.equal(shortPath('/Users/m/Sites/app/agents/router.py'), 'router.py');
         assert.equal(shortPath('router.py'), 'router.py');
     });
     it('reads path, command and query from args (object or JSON string)', () => {
-        assert.equal(stepTarget({ tool: 'file_read', status: 'done', args: { path: '/a/b/c.py' } }), 'b/c.py');
+        assert.equal(stepTarget({ tool: 'file_read', status: 'done', args: { path: '/a/b/c.py' } }), 'c.py');
         assert.equal(stepTarget({ tool: 'shell_exec', status: 'done', args: JSON.stringify({ command: 'pytest -q' }) }), 'pytest -q');
         assert.equal(stepTarget({ tool: 'project_search', status: 'done', args: { query: 'route(' } }), 'route(');
         assert.equal(stepTarget({ tool: 'file_read', status: 'done', args: 'not json' }), undefined);
     });
     it('finds the file in an apply_patch diff header', () => {
         const patch = '--- a/src/x.php\n+++ b/src/x.php\n@@ -1 +1 @@\n-a\n+b\n';
-        assert.equal(stepTarget({ tool: 'apply_patch', status: 'done', args: { patch } }), 'src/x.php');
+        assert.equal(stepTarget({ tool: 'apply_patch', status: 'done', args: { patch } }), 'x.php');
     });
 });
 
@@ -38,7 +38,52 @@ describe('summarizeResult', () => {
     });
 });
 
+describe('resultFailed', () => {
+    it('recognises failures reported in the result text', () => {
+        for (const text of ['Refused: "/etc/x" resolves outside the workspace folder.', 'ERROR: write blocked', 'TIMEOUT: command exceeded 120s',
+            'Tool call denied by user', '  failed to parse']) {
+            assert.equal(resultFailed(text), true, text);
+        }
+        for (const text of ['{"written":"/x/a.py","bytes":14}', '12 passed', 'Errors fixed: 3', '', undefined]) {
+            assert.equal(resultFailed(text), false, String(text));
+        }
+    });
+    it('a completed call whose result is a failure is drawn as an error', () => {
+        const step = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', args: { path: '/outside/app.py' },
+            result: 'Refused: "/outside/app.py" resolves outside the workspace folder.' }]))[0];
+        assert.equal(step.status, 'error');
+        assert.equal(step.tone, 'danger');
+        assert.match(step.result ?? '', /^Refused/);
+    });
+});
+
 describe('deriveSteps', () => {
+    it('a call that never got a result on a finished turn is an error, not a spinner', () => {
+        const done = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'requested', args: { path: '/outside/app.py' } }], { status: 'done' }));
+        assert.equal(done[0].status, 'error');
+        assert.equal(done[0].tone, 'danger');
+        assert.equal(done[0].result, 'no result');
+        const live = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'running', args: { path: 'a.py' } }]));
+        assert.equal(live[0].status, 'active');
+        const errored = deriveSteps(turnWith([{ callId: '1', tool: 'file_read', status: 'running', args: { path: 'a' } }], { status: 'error' }));
+        assert.equal(errored[0].status, 'error');
+    });
+
+    it('read and edit rows carry no result text (the design shows stats instead)', () => {
+        const steps = deriveSteps(turnWith([
+            { callId: '1', tool: 'file_read', status: 'done', args: { path: 'a.py' }, result: 'def route(): pass' },
+            { callId: '2', tool: 'file_write', status: 'done', args: { path: 'a.py' }, result: '{"written":"/x/a.py","bytes":14}' },
+        ]));
+        assert.equal(steps[0].result, undefined);
+        assert.equal(steps[1].result, undefined);
+    });
+
+    it('reads the real wire shape: args arrive as a JSON string', () => {
+        const wire = JSON.stringify({ path: '/Users/m/ws/hello.txt', content: 'hi' });
+        const steps = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', args: wire }]));
+        assert.equal(steps[0].target, 'hello.txt');
+    });
+
     it('maps tools to step kinds with verbs and status', () => {
         const steps = deriveSteps(turnWith([
             { callId: '1', tool: 'file_read', status: 'done', args: { path: 'a/router.py' }, result: 'def route()' },

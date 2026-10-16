@@ -52,7 +52,27 @@ export class SorikuLegacyCleanupContribution implements FrontendApplicationContr
         }
     }
 
+    /**
+     * The v2 design has no side-panel chrome on the right: the chat header IS the
+     * panel's header. Hide the stock title toolbar and the (empty) tab bar/menus via
+     * Lumino's own hidden state — a CSS-only `display:none` leaves Lumino reserving
+     * their 48px / 38px slots, which showed up as a dead strip next to the chat.
+     */
+    protected cleanupRightChrome(): void {
+        const handler = this.shell.rightPanelHandler;
+        // tabBar.parent is the `theia-app-sidebar-container` that holds the tab bar + menus.
+        for (const chrome of [handler.tabBar.parent, handler.tabBar, handler.topMenu, handler.bottomMenu, handler.toolBar]) {
+            if (!chrome) {
+                continue;
+            }
+            if (!chrome.isDisposed && !chrome.isHidden) {
+                chrome.setHidden(true);
+            }
+        }
+    }
+
     protected cleanupRightDockPanel(): void {
+        this.cleanupRightChrome();
         const dockPanel = this.shell.rightPanelHandler.dockPanel;
         const widgets = [...dockPanel.widgets()];
         for (const widget of widgets) {

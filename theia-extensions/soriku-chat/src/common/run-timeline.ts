@@ -61,10 +61,10 @@ function str(v: unknown): string | undefined {
     return typeof v === 'string' && v.length > 0 ? v : undefined;
 }
 
-/** `a/b/c.py` → `b/c.py`; commands and queries are returned unchanged. */
+/** `/a/b/c.py` → `c.py` — the design shows bare file names. */
 export function shortPath(p: string): string {
     const parts = p.split(/[\\/]/).filter(Boolean);
-    return parts.length <= 2 ? parts.join('/') : parts.slice(-2).join('/');
+    return parts.length === 0 ? p : parts[parts.length - 1];
 }
 
 /** The thing a step acts on: a file for read/edit, the command for shell, the query for search. */
@@ -99,13 +99,30 @@ export function summarizeResult(result: unknown, max = 80): string | undefined {
     return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
-function statusOf(call: ChatToolCall): StepStatus {
+/**
+ * The engine and the IDE report a failed tool in the result TEXT (`Refused: …`, `ERROR: …`,
+ * `TIMEOUT: …`), not always as an `outcome` — so a step that "completed" with such a result
+ * must not be drawn as a success.
+ */
+const FAILURE_TEXT = /^\s*(error|refused|failed|timeout|blocked|denied|tool call denied)\b/i;
+
+export function resultFailed(result: unknown): boolean {
+    return typeof result === 'string' && FAILURE_TEXT.test(result);
+}
+
+function statusOf(call: ChatToolCall, finished: boolean): StepStatus {
+    // A call that never got a result on a finished turn will not get one — the IDE refused it
+    // (e.g. a path outside the workspace) or the stream ended. Never leave it spinning.
+    if (call.status !== 'done' && finished) { return 'error'; }
     if (call.status === 'requested') { return 'waiting'; }
     if (call.status === 'running') { return 'active'; }
+    if (resultFailed(call.result)) { return 'error'; }
     return call.outcome === 'error' || call.outcome === 'denied' || call.outcome === 'blocked' ? 'error' : 'done';
 }
 
-function toneOf(call: ChatToolCall): StepTone {
+function toneOf(call: ChatToolCall, finished: boolean): StepTone {
+    if (call.status !== 'done' && finished) { return 'danger'; }
+    if (resultFailed(call.result)) { return 'danger'; }
     switch (call.outcome) {
         case 'error': case 'denied': case 'blocked': return 'danger';
         case 'verify_failed': case 'salvaged': return 'warn';
@@ -131,6 +148,7 @@ function agentLabel(turn: AssistantTurn, call: ChatToolCall): string | undefined
  * on a write becomes its own `check` row right after it, review verdicts follow.
  */
 export function deriveSteps(turn: AssistantTurn): RunStep[] {
+    const finished = turn.status !== 'streaming';
     const steps: RunStep[] = [];
     if (turn.pendingPlan) {
         const n = turn.pendingPlan.tasks.length;
@@ -141,7 +159,7 @@ export function deriveSteps(turn: AssistantTurn): RunStep[] {
     }
     turn.toolCalls.forEach((call, i) => {
         const kind = toolKind(call.tool);
-        const status = statusOf(call);
+        const status = statusOf(call, finished);
         const generated = kind === 'edit'
             ? turn.generatedFiles.find(f => stepTarget(call) !== undefined && (f.path.endsWith(stepTarget(call)!) || shortPath(f.path) === stepTarget(call)))
             : undefined;
@@ -155,7 +173,7 @@ export function deriveSteps(turn: AssistantTurn): RunStep[] {
             target: stepTarget(call),
             add: generated?.added,
             del: generated?.removed,
-            tone: exit !== undefined && exit !== 0 ? 'danger' : toneOf(call),
+            tone: exit !== undefined && exit !== 0 ? 'danger' : toneOf(call, finished),
             status: exit !== undefined && exit !== 0 ? 'error' : status,
         };
         if (kind === 'shell') {
@@ -164,9 +182,10 @@ export function deriveSteps(turn: AssistantTurn): RunStep[] {
                 step.output = typeof call.result === 'string' ? call.result : undefined;
                 step.result = exit !== undefined && exit !== 0 ? `exit ${exit}` : 'exit 0';
             }
-        } else if (call.status === 'done') {
-            step.result = summarizeResult(call.result);
         }
+        // The design shows no result text on read/edit rows (edits show +/− instead).
+        if (call.status !== 'done' && finished) { step.result = 'no result'; }
+        if (call.status === 'done' && resultFailed(call.result)) { step.result = summarizeResult(call.result, 60); }
         if (call.outcomeReason && step.tone !== 'default') { step.result = call.outcomeReason; }
         steps.push(step);
         if (call.outcome === 'verified' || call.outcome === 'verify_failed') {

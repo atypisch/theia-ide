@@ -8,7 +8,8 @@ import * as React from '@theia/core/shared/react';
 import { createRoot, Root } from '@theia/core/shared/react-dom/client';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
+import { Message } from '@theia/core/shared/@lumino/messaging';
+import { CommandRegistry, CommandService, MessageService, PreferenceService } from '@theia/core/lib/common';
 import { OpenerService } from '@theia/core/lib/browser/opener-service';
 import { ApplicationShell } from '@theia/core/lib/browser/shell/application-shell';
 import URI from '@theia/core/lib/common/uri';
@@ -18,22 +19,22 @@ import { SorikuModelCatalog } from 'soriku-engine-client-ext/lib/browser/soriku-
 import { SorikuConversationLink } from 'soriku-engine-client-ext/lib/browser/soriku-conversation-link';
 import { SorikuPlanLiveBridge } from 'soriku-engine-client-ext/lib/browser/soriku-plan-live-bridge';
 import {
-    ChatMode, ChatStreamParams, MinionSpawnOutcome, ProviderInfo, RoutingStrategy,
+    ChatStreamParams, MinionSpawnOutcome, ProviderInfo,
     SubagentInsight, SubagentPotential, V1ModelDescriptor,
 } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { SorikuEditorContextCollector } from 'soriku-engine-client-ext/lib/browser/soriku-editor-context-collector';
 import { buildEditorContextItems } from 'soriku-engine-client-ext/lib/common/editor-context';
 import { SorikuAgentSelectionService } from 'soriku-agents-ext/lib/browser/soriku-agent-selection';
 import { SorikuDefaultAgentResolver } from 'soriku-agents-ext/lib/browser/soriku-default-agent-resolver';
-import { initials } from 'soriku-agents-ext/lib/common/agent-view';
 import { SorikuToolConfirmationService } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-confirmation-service';
 import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/soriku-tool-approval-bridge';
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
+import { SorikuCheckpointService } from 'soriku-tools-bridge-ext/lib/browser/soriku-checkpoint-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { SorikuShellService, formatTree } from 'soriku-tools-bridge-ext/lib/common/shell-service';
 import { SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP } from 'soriku-tools-bridge-ext/lib/browser/soriku-tools-preferences';
-import { AgentAvatar, Badge, Btn, DiffBar, Overlay, Pill, SegmentedPicker, StatusDot, VerifyPill, toKnownCategory } from 'soriku-theme-ext/lib/browser/ui';
+import { Badge, Btn, Overlay, StatusDot, VerifyPill } from 'soriku-theme-ext/lib/browser/ui';
 import { SorikuToastService } from 'soriku-theme-ext/lib/browser/soriku-toast-service';
 import { ChatMarkdown } from './chat-markdown-view';
 import { ChatStreamController } from './chat-stream-controller';
@@ -50,10 +51,12 @@ import {
     DEFAULT_RENDER_WINDOW,
     PendingPlan,
     PlanTaskView,
+    UserMessage,
     roleLabel,
     SUBAGENT_ROLES,
     busyPhase,
     capConversation,
+    chatTitle,
     createAssistantTurn,
     formatToolCallSummary,
     parseFileMentions,
@@ -61,6 +64,19 @@ import {
     visibleMessages,
     withWorkspacePrefix,
 } from '../common/chat-model';
+import { clockTime, formatDuration, historyTitle, modelLine, plural, relativeTime } from '../common/chat-format';
+import { EditAction, EditChoice, editActions, needsDecision } from '../common/message-edit';
+import {
+    ChatModeChoice, DEFAULT_MODE, DEFAULT_MODEL, ModelSelection, RoutingChoice, placeholderFor, resolveRun, toggleMultiple,
+} from '../common/mode-model';
+import { RunState, deriveRunState, deriveSteps, runStats, shortPath, toolKind } from '../common/run-timeline';
+import { ChatHeader, HistoryEntry } from './components/ChatHeader';
+import { UserBubble } from './components/UserBubble';
+import { PlanCard, PlanTodoView } from './components/PlanCard';
+import { ApprovalView, RunTimeline, StepDetail } from './components/RunTimeline';
+import { PastBanner, PausedBanner, RunBar, RunSummary } from './components/RunSummary';
+import { Composer, ModelRow } from './components/Composer';
+import { ThumbDownIcon, ThumbUpIcon } from './components/chat-icons';
 
 /** User-configurable term for a head agent's spawned sub-agents (Fase F). */
 const SUBAGENT_LABEL_PREF = 'soriku.ui.subagentLabel';
@@ -80,95 +96,6 @@ interface SubagentOverlayState {
     /** Display name, for the overlay title. */
     name?: string;
 }
-
-/** How the agent works (Cursor-style behaviour), independent of model choice. */
-type AgentBehavior = 'auto' | 'edit' | 'plan' | 'chat';
-
-interface BehaviorOption {
-    value: AgentBehavior;
-    label: string;
-    hint: string;
-}
-
-/** Short badge labels for non-clean tool outcomes (engine reliability signals). */
-const OUTCOME_LABELS: Record<string, string> = {
-    blocked: 'blocked',
-    salvaged: 'recovered',
-    denied: 'denied',
-    error: 'error',
-    verify_failed: 'fixing',
-    verified: 'verified ✓',
-};
-
-const BEHAVIOR_OPTIONS: BehaviorOption[] = [
-    { value: 'auto', label: 'Auto', hint: 'Soriku decides per task whether to plan or act directly.' },
-    { value: 'edit', label: 'Edit', hint: 'Edit automatically — the agent acts and edits files directly.' },
-    { value: 'plan', label: 'Plan', hint: 'Soriku drafts a plan you approve before anything runs.' },
-    { value: 'chat', label: 'Chat', hint: 'Chat only — answer and discuss only, no file edits.' },
-];
-
-/** Which model answers, independent of behaviour. */
-type Orchestration = 'auto' | 'single';
-
-interface OrchestrationOption {
-    value: Orchestration;
-    label: string;
-    hint: string;
-}
-
-// "Ensemble" used to live here as a third option. It was never a different
-// kind of run — the engine translated it into a plan whose workers all
-// answer the same prompt. It now lives where it belongs: Do:Plan → Plan by:
-// Compare (see PLAN_MODEL_MODE_OPTIONS).
-const ORCHESTRATION_OPTIONS: OrchestrationOption[] = [
-    { value: 'auto', label: 'Auto', hint: 'Auto model — Soriku routes to the best model via the capability map.' },
-    { value: 'single', label: 'Single', hint: 'Single model — use one specific model.' },
-];
-
-/**
- * Where compute runs, per request — local-first by default. Sent as
- * `routingStrategy`; never changes the soriku web app's saved setting.
- */
-interface RoutingOption {
-    value: RoutingStrategy;
-    label: string;
-    hint: string;
-}
-
-const ROUTING_OPTIONS: RoutingOption[] = [
-    { value: 'prefer_local', label: 'Local-first', hint: 'Local models only — nothing leaves this machine. Default.' },
-    { value: 'local_with_remote_conductor', label: 'Hybrid', hint: 'Local workers do the work; a stronger remote model may plan.' },
-    { value: 'balanced', label: 'Balanced', hint: 'Cost-aware mix of local and cloud models.' },
-    { value: 'prefer_quality', label: 'Best', hint: 'Best quality — pick the best model regardless of locality or cost (cloud allowed).' },
-];
-
-/**
- * How several models get involved when behaviour is 'plan'. The three shapes
- * are mutually exclusive by nature, which is why they share one picker:
- *
- *   auto/single/multi  — a model AUTHORS a plan, then workers execute its tasks.
- *   compare            — there is no plan to author: the same prompt runs on
- *                        every model you tick and the answers are merged.
- *
- * `compare` is what the separate "Ensemble" orchestration option used to be.
- * The engine always ran it through plan mode anyway (as a replication plan),
- * so keeping a second name for it only made "models", "workers" and "agents"
- * harder to tell apart.
- */
-type PlanModelMode = 'auto' | 'single' | 'multi' | 'compare';
-
-interface PlanModelModeOption {
-    value: PlanModelMode;
-    label: string;
-    hint: string;
-}
-
-const PLAN_MODEL_MODE_OPTIONS: PlanModelModeOption[] = [
-    { value: 'auto', label: 'Auto', hint: 'Auto model — the router picks a reasoning model to write the plan.' },
-    { value: 'single', label: 'Single', hint: 'One model you pick writes the plan.' },
-    { value: 'multi', label: 'Multi', hint: '2-3 models each draft a competing plan; the best one wins. Slower.' },
-    { value: 'compare', label: 'Compare', hint: 'No planning step — run this prompt on every model you tick and merge the answers.' },
-];
 
 @injectable()
 export class SorikuChatWidget extends ReactWidget {
@@ -214,6 +141,12 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(SorikuGeneratedFilesTracker)
     protected readonly generatedFilesTracker: SorikuGeneratedFilesTracker;
+
+    @inject(SorikuCheckpointService)
+    protected readonly checkpoints: SorikuCheckpointService;
+
+    @inject(CommandRegistry)
+    protected readonly commandRegistry: CommandRegistry;
 
     @inject(SorikuToastService)
     protected readonly toast: SorikuToastService;
@@ -282,32 +215,41 @@ export class SorikuChatWidget extends ReactWidget {
      * everything still in memory (capConversation already bounds that). */
     protected showEarlierMessages = false;
 
-    /** Mic dictation state, backed by the real POST /api/v1/transcribe endpoint (core/voice) — no mock. */
-    protected recording: 'idle' | 'recording' | 'transcribing' = 'idle';
-    protected mediaRecorder: MediaRecorder | undefined;
-    protected recordedChunks: Blob[] = [];
-
     /** One stream at a time — backed by the controller (P4-a), so there is a single source of truth. */
     protected get streaming(): boolean {
         return this.streamController.active;
     }
 
-    /** Controls: agent behaviour (Mode) + model orchestration (Models). */
-    protected behavior: AgentBehavior = 'auto';
-    protected orchestration: Orchestration = 'auto';
-    /**
-     * Per-request routing strategy — local-first by default (the soriku principle).
-     * Sent to the engine per request; never writes the global setting.
-     */
-    protected routingStrategy: RoutingStrategy = 'prefer_local';
-    protected modelId = '';
-    protected workerModels: string[] = [];
-    /** Which model(s) author the plan itself (behavior === 'plan' only) — independent of the answer-model pickers above. */
-    protected planModelMode: PlanModelMode = 'auto';
-    protected planModelId = '';
-    protected planModels: string[] = [];
+    /** Composer pickers (v2): Mode pill + Model pill. Defaults: Plan, Auto / local-first. */
+    protected mode: ChatModeChoice = DEFAULT_MODE;
+    protected modelSel: ModelSelection = DEFAULT_MODEL;
+    protected lastSingleModel: string | undefined;
+    protected popMenu: 'mode' | 'model' | undefined;
+    protected draftHasText = false;
     protected models: V1ModelDescriptor[] = [];
     protected providers: ProviderInfo[] = [];
+
+    // ── v2 chat view state ──
+    protected histOpen = false;
+    protected history: HistoryEntry[] | undefined;
+    protected planOpen = true;
+    protected expandedStep: string | undefined;
+    /** Plans the user paused (run bar "Stop" / editing) — shown with the Paused banner + Resume. */
+    protected pausedPlans = new Set<string>();
+    protected editingId: string | undefined;
+    protected editDraft = '';
+    /** The run was live when editing started, so cancelling the edit resumes it. */
+    protected editWasRunning = false;
+    /** The edit awaiting the revert-or-continue choice. */
+    protected pendingEdit: { id: string; text: string } | undefined;
+    /** The live conversation, parked while a past session is shown (v2 "Back to current run"). */
+    protected liveStash: { conversation: ChatMessage[]; conversationId?: string; title?: string } | undefined;
+    protected pastWhen = '';
+    protected tabMaximized = false;
+    /** Distinguishes this IDE session's runs: the `m4`-style turn ids restart at every launch, so a bare turn id would reuse a checkpoint file. */
+    protected readonly sessionStamp = Date.now().toString(36);
+    /** Promise of the running send(), so edit/restart flows can wait for the old run to settle. */
+    protected currentRun: Promise<void> | undefined;
     /** Plan id currently being approved/cancelled (to disable the buttons). */
     protected resolvingPlans = new Set<string>();
     /** User-edited task goals keyed by plan id, then task id. */
@@ -385,12 +327,12 @@ export class SorikuChatWidget extends ReactWidget {
         this.toDispose.push(this.session.onDidChange(() => this.scheduleUpdate()));
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
         this.toDispose.push(this.generatedFilesTracker.onDidChange(() => this.scheduleUpdate()));
+        this.toDispose.push(this.checkpoints.onDidChange(() => this.scheduleUpdate()));
         // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
         // no longer mutates state / executes delegated tools / writes files) and flush
         // any pending approvals so the engine stream isn't left blocked (#2/#1).
         this.toDispose.push({
             dispose: () => {
-                this.mediaRecorder?.stop();
                 this.streamController.abort();
                 this.toolApproval.cancelAll();
             },
@@ -453,31 +395,19 @@ export class SorikuChatWidget extends ReactWidget {
         this.session.reset();
         this.pendingImages = [];
         this.showEarlierMessages = false;
+        this.liveStash = undefined;
+        this.pastWhen = '';
+        this.editingId = undefined;
+        this.pendingEdit = undefined;
+        this.pausedPlans.clear();
+        this.expandedStep = undefined;
+        this.histOpen = false;
         void this.defaultAgentResolver.ensureActiveAgent();
         this.update();
         if (hadMessages) {
             this.toast.show('New chat');
         }
         requestAnimationFrame(() => this.inputRef.current?.focus());
-    }
-
-    /**
-     * Maximize/restore the chat's right-side panel. Theia's `toggleMaximized` only
-     * handles main/bottom-area widgets (silently no-ops for a right-area widget like
-     * this one), so this resizes the panel directly via ApplicationShell's public
-     * `expandPanel`/`resize` API instead of moving the widget between shell areas.
-     */
-    protected togglePanelMaximize(): void {
-        this.shell.expandPanel('right');
-        if (this.panelMaximized) {
-            this.shell.resize(this.panelWidthBeforeMaximize ?? MIN_MAXIMIZED_WIDTH, 'right');
-            this.panelMaximized = false;
-        } else {
-            this.panelWidthBeforeMaximize = this.node.clientWidth || undefined;
-            this.shell.resize(maximizedPanelWidth(window.innerWidth), 'right');
-            this.panelMaximized = true;
-        }
-        this.update();
     }
 
     /** Workspace root path sent to the engine as project_id. */
@@ -502,21 +432,6 @@ export class SorikuChatWidget extends ReactWidget {
         } catch {
             /* picker stays empty; modes other than Single are unaffected */
         }
-    }
-
-    /** Opportunistically preload the picked local model to cut first-token latency. */
-    protected warmSelectedModel(): void {
-        if (this.orchestration !== 'single' || !this.modelId) {
-            return;
-        }
-        const avail = this.modelAvailability(this.modelId);
-        if (!avail.ok) {
-            return;
-        }
-        const bare = this.modelId.includes(':')
-            ? this.modelId.slice(this.modelId.indexOf(':') + 1)
-            : this.modelId;
-        this.engineClient.warmModel(bare).catch(() => { /* best-effort */ });
     }
 
     /** Load provider health so unavailable models (bad/expired key, no credits) are marked. */
@@ -565,56 +480,6 @@ export class SorikuChatWidget extends ReactWidget {
 
     protected nextId(): string {
         return this.session.nextId();
-    }
-
-    protected async toggleRecording(): Promise<void> {
-        if (this.recording === 'recording') {
-            this.mediaRecorder?.stop();
-            return;
-        }
-        if (this.recording !== 'idle') {
-            return;
-        }
-        let stream: MediaStream;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-            this.messages.error(`Could not access the microphone: ${(e as Error).message}`);
-            return;
-        }
-        this.recordedChunks = [];
-        const recorder = new MediaRecorder(stream);
-        this.mediaRecorder = recorder;
-        recorder.ondataavailable = e => { if (e.data.size > 0) { this.recordedChunks.push(e.data); } };
-        recorder.onstop = () => {
-            stream.getTracks().forEach(track => track.stop());
-            this.mediaRecorder = undefined;
-            this.transcribeRecording();
-        };
-        recorder.start();
-        this.recording = 'recording';
-        this.update();
-    }
-
-    protected async transcribeRecording(): Promise<void> {
-        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-        this.recordedChunks = [];
-        this.recording = 'transcribing';
-        this.update();
-        try {
-            const result = await this.engineClient.transcribeAudio(blob);
-            const textarea = this.inputRef.current;
-            if (textarea) {
-                const sep = textarea.value && !textarea.value.endsWith(' ') ? ' ' : '';
-                textarea.value = `${textarea.value}${sep}${result.text}`;
-                textarea.focus();
-            }
-        } catch (e) {
-            this.messages.error(`Transcription failed: ${(e as Error).message}`);
-        } finally {
-            this.recording = 'idle';
-            this.update();
-        }
     }
 
     /** Adds one dropped/pasted/attached image, downscaling it and enforcing the caps. */
@@ -701,13 +566,20 @@ export class SorikuChatWidget extends ReactWidget {
         const text = textarea.value;
         if (text.trim() || this.pendingImages.length > 0) {
             textarea.value = '';
+            textarea.style.height = 'auto';
+            this.draftHasText = false;
+            this.popMenu = undefined;
             const images = this.pendingImages;
             this.pendingImages = [];
             this.send(text.trim(), images).catch(() => { /* errors are captured into the assistant turn */ });
         }
     }
 
-    async send(text: string, images: ChatImageAttachment[] = []): Promise<void> {
+    async send(
+        text: string,
+        images: ChatImageAttachment[] = [],
+        opts: { wirePrompt?: string; silentUser?: boolean; edited?: boolean } = {},
+    ): Promise<void> {
         const agentId = this.selection.getActiveId() ?? await this.defaultAgentResolver.ensureActiveAgent();
         if (!agentId) {
             this.messages.error('No agent available — is the Soriku engine running?');
@@ -717,45 +589,74 @@ export class SorikuChatWidget extends ReactWidget {
             return;
         }
         this.resolvingPlans.clear();
-        const fileMentions = parseFileMentions(text);
-        this.conversation.push({
-            role: 'user',
-            id: this.nextId(),
-            text,
-            fileMentions: fileMentions.length > 0 ? fileMentions : undefined,
-            images: images.length > 0 ? images.map(({ base64, mimeType }) => ({ base64, mimeType })) : undefined,
-        });
-        const initialTurn = createAssistantTurn(this.nextId());
+        this.expandedStep = undefined;
+        if (!opts.silentUser) {
+            const fileMentions = parseFileMentions(text);
+            this.conversation.push({
+                role: 'user',
+                id: this.nextId(),
+                text,
+                at: Date.now(),
+                edited: opts.edited ? true : undefined,
+                fileMentions: fileMentions.length > 0 ? fileMentions : undefined,
+                images: images.length > 0 ? images.map(({ base64, mimeType }) => ({ base64, mimeType })) : undefined,
+            });
+        }
+        const initialTurn: AssistantTurn = { ...createAssistantTurn(this.nextId()), auto: this.modelSel.kind === 'auto' };
         const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
+        // Agent writes during this run are checkpointed so "Undo all" can restore them.
+        this.checkpoints.beginRun(this.runKey(initialTurn.id));
         this.scheduleUpdate(true);
-        const params = await this.buildStreamParams(text, agentId, images);
-        // The controller owns the lifecycle (P4-a): abort, reduce, typed errors,
-        // tool/plan fan-out. This widget only renders the turns it hands back.
-        const finalTurn = await this.streamController.run({
-            params,
-            initialTurn,
-            needsApproval: params.mode === 'plan',
-            tools: this.toolConfirmation,
-            isDisposed: () => this.isDisposed,
-            onTurn: (turn, event) => {
+        // After an edit/restart the conversation array can be replaced while this run is
+        // still unwinding; only write into the slot if it still holds OUR turn.
+        const write = (turn: AssistantTurn): void => {
+            if (this.conversation[turnIndex]?.id === initialTurn.id) {
                 this.conversation[turnIndex] = turn;
-                if (turn.conversationId && turn.conversationId !== this.conversationId) {
-                    this.conversationId = turn.conversationId;
-                    this.persistActiveChat();
-                }
-                void this.handleLiveActivity(event);
-                this.scheduleUpdate();
-            },
-        });
-        this.conversation[turnIndex] = finalTurn;
-        // Phase 6.4: cap AFTER the turn is fully settled, never mid-stream —
-        // capConversation can drop old messages and shift indices, which
-        // would break the `this.conversation[turnIndex] = …` updates above
-        // if applied while this turn is still streaming.
-        this.conversation = capConversation(this.conversation);
-        this.conversationLink.notifyChanged();
-        this.scheduleUpdate(true);
+            }
+        };
+        const run = (async (): Promise<void> => {
+            try {
+                const params = await this.buildStreamParams(opts.wirePrompt ?? text, agentId, images);
+                // The controller owns the lifecycle (P4-a): abort, reduce, typed errors,
+                // tool/plan fan-out. This widget only renders the turns it hands back.
+                const finalTurn = await this.streamController.run({
+                    params,
+                    initialTurn,
+                    needsApproval: params.mode === 'plan',
+                    tools: this.toolConfirmation,
+                    isDisposed: () => this.isDisposed,
+                    onTurn: (turn, event) => {
+                        write(turn);
+                        if (turn.conversationId && turn.conversationId !== this.conversationId) {
+                            this.conversationId = turn.conversationId;
+                            this.persistActiveChat();
+                        }
+                        void this.handleLiveActivity(event);
+                        this.scheduleUpdate();
+                    },
+                });
+                write(finalTurn);
+            } finally {
+                this.checkpoints.endRun();
+            }
+            // Phase 6.4: cap AFTER the turn is fully settled, never mid-stream —
+            // capConversation can drop old messages and shift indices, which would
+            // break the slot writes above if applied while this turn is still streaming.
+            if (this.conversation[turnIndex]?.id === initialTurn.id) {
+                this.conversation = capConversation(this.conversation);
+            }
+            this.conversationLink.notifyChanged();
+            this.scheduleUpdate(true);
+        })();
+        this.currentRun = run;
+        try {
+            await run;
+        } finally {
+            if (this.currentRun === run) {
+                this.currentRun = undefined;
+            }
+        }
     }
 
     /** Re-send the user message that produced an interrupted turn (#5, manual retry). */
@@ -773,68 +674,35 @@ export class SorikuChatWidget extends ReactWidget {
         }
     }
 
-    /** Translate the two pickers (behaviour + models) into engine stream params. */
+    /** Translate the v2 pickers (Mode + Model) into engine stream params. */
     protected async buildStreamParams(text: string, agentId: string, images: ChatImageAttachment[] = []): Promise<ChatStreamParams> {
-        const editsEnabled = this.behavior !== 'chat';
-        // Compare = one worker per ticked model, all on the same prompt. The
-        // engine builds that as a plan with no planning step, so it rides the
-        // ordinary plan mode rather than a mode of its own.
-        const compare = this.behavior === 'plan'
-            && this.planModelMode === 'compare'
-            && this.workerModels.length >= 2;
-        const single = this.orchestration === 'single' && !!this.modelId;
-
-        let mode: ChatMode;
-        if (this.behavior === 'plan') {
-            mode = 'plan';
-        } else if (single) {
-            mode = 'single';
-        } else if (this.behavior === 'edit') {
-            mode = 'single'; // act directly; router picks the model
-        } else {
-            mode = 'auto';
-        }
-
+        const run = resolveRun(this.mode, this.modelSel);
         const [projectId, editorContext] = await Promise.all([
             this.workspaceProjectId(),
-            this.buildEditorContext(text, editsEnabled),
+            this.buildEditorContext(text, run.editsEnabled),
         ]);
-
         // C-B: the engine's guard/learnings extractors read the USER prompt, not the
         // context items — carry the workspace line there so per-project learnings,
         // soriku.md guidelines and the write-guard actually engage for IDE chats.
         const roots = await this.workspaceService.roots;
         const wirePrompt = withWorkspacePrefix(text, roots[0]?.resource.path.toString());
-
         return {
             prompt: wirePrompt,
             personaId: agentId,
             conversationId: this.conversationId,
             projectId,
             useWorker: true,
-            mode,
+            mode: run.mode,
             context: editorContext,
-            clientTools: editsEnabled ? this.toolConfirmation.delegatedTools() : undefined,
-            toolsEnabled: editsEnabled ? undefined : false,
-            modelId: single ? this.modelId : undefined,
-            workerModels: compare ? this.workerModels : undefined,
-            // Compare has nothing to approve — the user already chose the
-            // models. The engine forces auto-execute for that shape; sending
-            // `false` anyway would only be misleading.
-            planAutoExecute: this.behavior === 'plan' && !compare ? false : undefined,
-            routingStrategy: this.routingStrategy,
+            clientTools: run.editsEnabled ? this.toolConfirmation.delegatedTools() : undefined,
+            toolsEnabled: run.editsEnabled ? undefined : false,
+            modelId: run.modelId,
+            workerModels: run.workerModels,
+            planAutoExecute: run.planAutoExecute,
+            routingStrategy: run.routingStrategy,
             cloudCostCapEur: this.getCloudCostCap(),
             images: images.length > 0 ? images.map(a => a.base64) : undefined,
-            planModelId: this.behavior === 'plan' && this.planModelMode === 'single'
-                && this.planModelId && this.modelAvailability(this.planModelId).ok
-                ? this.planModelId : undefined,
-            planModels: this.behavior === 'plan' && this.planModelMode === 'multi' && this.planModels.length >= 2
-                ? this.planModels : undefined,
-            // planModelId/planModels above are about who WRITES the plan; in
-            // compare there is no plan to write, so both stay undefined.
-            allowMcp: this.behavior === 'plan'
-                ? this.preferences.get<boolean>(SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP)
-                : undefined,
+            allowMcp: run.mode === 'plan' ? this.preferences.get<boolean>(SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP) : undefined,
         };
     }
 
@@ -936,8 +804,41 @@ export class SorikuChatWidget extends ReactWidget {
         return edits;
     }
 
-    protected stop(): void {
+    /** Stop for good: stops the engine plan (if any) and aborts the stream, then waits for the run to settle. */
+    protected async stopRun(): Promise<void> {
+        const planId = this.lastAssistant()?.planId;
+        if (planId) {
+            await this.engineClient.stopPlan(planId).catch(() => { /* the abort below ends the stream either way */ });
+        }
         this.streamController.abort();
+        this.toolApproval.cancelAll();
+        await this.currentRun?.catch(() => { /* errors are captured into the turn */ });
+    }
+
+    /** Run bar "Stop" (v2): pauses a plan run so it can be resumed; a plain agent run is aborted. */
+    protected pauseRun(): void {
+        const planId = this.lastAssistant()?.planId;
+        if (!planId) {
+            this.streamController.abort();
+            return;
+        }
+        this.pausedPlans.add(planId);
+        this.engineClient.pausePlan(planId).catch(e => {
+            this.pausedPlans.delete(planId);
+            this.messages.warn(`Could not pause the run: ${(e as Error).message}`);
+            this.update();
+        });
+        this.update();
+    }
+
+    protected resumeRun(): void {
+        const planId = this.lastAssistant()?.planId;
+        if (!planId) {
+            return;
+        }
+        this.pausedPlans.delete(planId);
+        this.engineClient.resumePlan(planId).catch(e => this.messages.warn(`Could not resume the run: ${(e as Error).message}`));
+        this.update();
     }
 
     /** Send thumbs feedback for an assistant turn to the engine (positive/negative). */
@@ -1042,219 +943,696 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
+    // ═══ v2 chat: helpers ══════════════════════════════════════════════════════
+
+    /** Keep the view pinned to the newest content unless the user scrolled up. */
+    protected scrollEl: HTMLDivElement | undefined;
+
+    protected override onUpdateRequest(msg: Message): void {
+        const el = this.scrollEl;
+        const stick = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        super.onUpdateRequest(msg);
+        if (stick) {
+            requestAnimationFrame(() => {
+                if (this.scrollEl) {
+                    this.scrollEl.scrollTop = this.scrollEl.scrollHeight;
+                }
+            });
+        }
+    }
+
+    /** Fire-and-forget for UI handlers: failures are shown instead of becoming unhandled rejections. */
+    protected fire(promise: PromiseLike<unknown>): void {
+        Promise.resolve(promise).catch(e => this.messages.error((e as Error).message));
+    }
+
+    protected runKey(turnId: string): string {
+        return `${this.sessionStamp}-${turnId}`;
+    }
+
+    protected lastAssistant(): AssistantTurn | undefined {
+        for (let i = this.conversation.length - 1; i >= 0; i--) {
+            const m = this.conversation[i];
+            if (m.role === 'assistant') {
+                return m;
+            }
+        }
+        return undefined;
+    }
+
+    protected isPaused(turn: AssistantTurn): boolean {
+        return !!turn.planId && this.pausedPlans.has(turn.planId) && turn.status === 'streaming';
+    }
+
+    /** The assistant turn that answers the user message with this id. */
+    protected followingTurn(userId: string): AssistantTurn | undefined {
+        const i = this.conversation.findIndex(m => m.id === userId);
+        const next = i >= 0 ? this.conversation[i + 1] : undefined;
+        return next && next.role === 'assistant' ? next : undefined;
+    }
+
+    protected isLastUser(userId: string): boolean {
+        const i = this.conversation.findIndex(m => m.id === userId);
+        return i >= 0 && !this.conversation.slice(i + 1).some(m => m.role === 'user');
+    }
+
+    protected isLocalModel(id: string): boolean {
+        const known = this.models.find(m => m.id === id);
+        if (known && typeof known.is_local === 'boolean') {
+            return known.is_local;
+        }
+        const prefix = id.includes(':') ? id.slice(0, id.indexOf(':')) : '';
+        return !this.providers.some(p => !p.is_local && p.name === prefix);
+    }
+
+    protected modelRows(): ModelRow[] {
+        return this.models.map(m => {
+            const avail = this.modelAvailability(m.id);
+            const local = this.isLocalModel(m.id);
+            return { id: m.id, local, ok: avail.ok, tag: avail.ok ? (local ? 'local' : 'cloud') : (avail.reason ?? 'unavailable') };
+        });
+    }
+
+    /** Opens a file the agent touched; relative paths resolve against the workspace root. */
+    protected async openFilePath(path: string): Promise<void> {
+        const root = this.workspaceService.tryGetRoots()[0]?.resource;
+        const absolute = path.startsWith('/') || !root ? path : root.resolve(path).path.toString();
+        await this.openGeneratedFile(absolute);
+    }
+
+    protected get placement(): 'dock' | 'tab' {
+        return this.shell.getAreaFor(this) === 'main' ? 'tab' : 'dock';
+    }
+
+    protected get maximized(): boolean {
+        return this.placement === 'tab' ? this.tabMaximized : this.panelMaximized;
+    }
+
+    // ═══ v2 chat: handlers ═════════════════════════════════════════════════════
+
+    /** Dock ⇄ editor tab: moves THIS widget between areas, so its state is kept. */
+    protected async togglePlacement(): Promise<void> {
+        if (this.placement === 'tab') {
+            await this.shell.addWidget(this, { area: 'right', rank: 200 });
+            this.shell.expandPanel('right');
+            this.tabMaximized = false;
+        } else {
+            this.panelMaximized = false;
+            await this.shell.addWidget(this, { area: 'main', mode: 'tab-after' });
+        }
+        await this.shell.activateWidget(this.id);
+        this.update();
+    }
+
+    protected toggleMaximize(): void {
+        if (this.placement === 'tab') {
+            this.shell.toggleMaximized(this);
+            this.tabMaximized = !this.tabMaximized;
+            this.update();
+            return;
+        }
+        this.shell.expandPanel('right');
+        if (this.panelMaximized) {
+            this.shell.resize(this.panelWidthBeforeMaximize ?? MIN_MAXIMIZED_WIDTH, 'right');
+            this.panelMaximized = false;
+        } else {
+            this.panelWidthBeforeMaximize = this.node.clientWidth || undefined;
+            this.shell.resize(maximizedPanelWidth(window.innerWidth), 'right');
+            this.panelMaximized = true;
+        }
+        this.update();
+    }
+
+    protected async toggleHistory(): Promise<void> {
+        this.histOpen = !this.histOpen;
+        this.update();
+        if (!this.histOpen) {
+            return;
+        }
+        try {
+            const all = await this.engineClient.listConversations();
+            const project = await this.workspaceProjectId();
+            const scoped = all.filter(c => !c.project_id || !project || c.project_id === project);
+            const list = (scoped.length > 0 ? scoped : all).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
+            this.history = list.map(c => ({
+                id: c.id,
+                title: historyTitle(c.title),
+                sub: plural(c.message_count, 'message'),
+                time: relativeTime(c.created_at),
+                on: c.id === this.conversationId,
+            }));
+        } catch {
+            this.history = [];
+        }
+        this.update();
+    }
+
+    protected openHistory(id: string): void {
+        this.histOpen = false;
+        if (id === this.conversationId) {
+            this.update();
+            return;
+        }
+        if (this.streaming) {
+            // The running turn writes into the live conversation; swapping it now would corrupt the past view.
+            this.toast.show('Stop the current run before opening another chat');
+            this.update();
+            return;
+        }
+        if (!this.liveStash && this.conversation.length > 0) {
+            this.liveStash = { conversation: this.conversation, conversationId: this.conversationId, title: this.conversationTitle };
+        }
+        this.pastWhen = this.history?.find(h => h.id === id)?.time ?? '';
+        this.loadConversation(id).catch(e => this.messages.error(`Could not open conversation: ${(e as Error).message}`));
+    }
+
+    protected backToLive(): void {
+        const stash = this.liveStash;
+        if (!stash) {
+            return;
+        }
+        this.conversation = stash.conversation;
+        this.conversationId = stash.conversationId;
+        this.conversationTitle = stash.title;
+        this.liveStash = undefined;
+        this.pastWhen = '';
+        this.persistActiveChat();
+        this.update();
+    }
+
+    protected setMode(mode: ChatModeChoice): void {
+        this.mode = mode;
+        this.update();
+    }
+
+    protected setModelTab(kind: ModelSelection['kind']): void {
+        const routing: RoutingChoice = this.modelSel.kind === 'auto' ? this.modelSel.routing : 'local_first';
+        if (this.modelSel.kind === 'single') {
+            this.lastSingleModel = this.modelSel.modelId;
+        }
+        this.modelSel = kind === 'auto' ? { kind: 'auto', routing }
+            : kind === 'single' ? { kind: 'single', modelId: this.lastSingleModel }
+                : { kind: 'multiple', modelIds: [] };
+        this.update();
+    }
+
+    protected setRouting(routing: RoutingChoice): void {
+        this.modelSel = { kind: 'auto', routing };
+        this.update();
+    }
+
+    protected pickModel(id: string): void {
+        if (this.modelSel.kind === 'multiple') {
+            this.modelSel = { kind: 'multiple', modelIds: toggleMultiple(this.modelSel.modelIds, id) };
+        } else {
+            this.modelSel = { kind: 'single', modelId: id };
+            this.lastSingleModel = id;
+            this.popMenu = undefined;
+            this.warmSelectedModel();
+        }
+        this.update();
+    }
+
+    /** Opportunistically preload the picked local model to cut first-token latency. */
+    protected warmSelectedModel(): void {
+        if (this.modelSel.kind !== 'single' || !this.modelSel.modelId) {
+            return;
+        }
+        const id = this.modelSel.modelId;
+        if (!this.modelAvailability(id).ok || !this.isLocalModel(id)) {
+            return;
+        }
+        const bare = id.includes(':') ? id.slice(id.indexOf(':') + 1) : id;
+        this.engineClient.warmModel(bare).catch(() => { /* best-effort */ });
+    }
+
+    protected onComposerInput(): void {
+        const ta = this.inputRef.current;
+        if (!ta) {
+            return;
+        }
+        ta.style.height = 'auto';
+        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden';
+        const has = ta.value.trim().length > 0;
+        if (has !== this.draftHasText) {
+            this.draftHasText = has;
+            this.update();
+        }
+    }
+
+    // ── message editing (v2: edit, then revert-or-continue) ──
+
+    protected startEdit(id: string): void {
+        const m = this.conversation.find(x => x.id === id);
+        if (!m || m.role !== 'user' || this.editingId || this.pendingEdit) {
+            return;
+        }
+        this.editingId = id;
+        this.editDraft = m.text;
+        this.editWasRunning = this.streaming && this.isLastUser(id);
+        if (this.editWasRunning) {
+            this.pauseRun();   // v2: "Run paused while you edit"
+        }
+        this.update();
+    }
+
+    protected cancelEdit(): void {
+        const resume = this.editWasRunning;
+        this.editingId = undefined;
+        this.pendingEdit = undefined;
+        this.editWasRunning = false;
+        if (resume) {
+            this.resumeRun();
+        }
+        this.update();
+    }
+
+    protected editContext(userId: string): { running: boolean; hasChanges: boolean } {
+        const turn = this.followingTurn(userId);
+        return { running: !!turn && turn.status === 'streaming', hasChanges: !!turn && this.checkpoints.hasChanges(this.runKey(turn.id)) };
+    }
+
+    protected saveEdit(): void {
+        const id = this.editingId;
+        const text = this.editDraft.trim();
+        if (!id || !text) {
+            return;
+        }
+        const idx = this.conversation.findIndex(m => m.id === id);
+        this.editingId = undefined;
+        if (this.isLastUser(id) && needsDecision(this.editContext(id))) {
+            this.pendingEdit = { id, text };   // the revert-or-continue card takes over
+            this.update();
+            return;
+        }
+        this.editWasRunning = false;
+        this.restartFrom(idx, text).catch(() => { /* captured into the turn */ });
+        this.update();
+    }
+
+    protected resolveEdit(choice: EditChoice): void {
+        const pending = this.pendingEdit;
+        if (!pending) {
+            return;
+        }
+        const idx = this.conversation.findIndex(m => m.id === pending.id);
+        const actions = editActions(choice, pending.text, this.editContext(pending.id));
+        this.pendingEdit = undefined;
+        this.editWasRunning = false;
+        this.update();
+        this.runEditActions(actions, idx, pending.id).catch(e => this.messages.error(`Edit failed: ${(e as Error).message}`));
+    }
+
+    protected async runEditActions(actions: EditAction[], idx: number, userId: string): Promise<void> {
+        const turn = this.followingTurn(userId);
+        for (const action of actions) {
+            if (action.kind === 'stop_run') {
+                await this.stopRun();
+            } else if (action.kind === 'undo_checkpoint' && turn) {
+                const outcome = await this.checkpoints.undo(this.runKey(turn.id));
+                this.toast.show(`Restored ${plural(outcome.restored, 'file')}`);
+                if (outcome.refused.length > 0 || outcome.failed.length > 0) {
+                    this.messages.warn(`${outcome.refused.length + outcome.failed.length} file(s) could not be restored.`);
+                }
+            } else if (action.kind === 'send' && action.mode === 'restart') {
+                await this.restartFrom(idx, action.text);
+            } else if (action.kind === 'send') {
+                // amend: the user's bubble becomes the edited text; agents get a follow-up turn on top of the finished work
+                const original = this.conversation[idx];
+                if (original?.role === 'user') {
+                    const shown = this.pendingEditText(action.text, original.text);
+                    this.conversation[idx] = { ...original, text: shown, edited: true };
+                }
+                await this.send(this.conversation[idx]?.role === 'user' ? (this.conversation[idx] as UserMessage).text : action.text,
+                    [], { wirePrompt: action.text, silentUser: true });
+            }
+        }
+    }
+
+    /** For an amend turn the visible bubble should show the user's own edit, not the instruction wrapper. */
+    protected pendingEditText(wire: string, fallback: string): string {
+        const marker = 'Updated instruction:\n';
+        const i = wire.indexOf(marker);
+        return i >= 0 ? wire.slice(i + marker.length) : fallback;
+    }
+
+    /** Replace the user message at `idx` (and everything after it) with an edited one and run it again. */
+    protected async restartFrom(idx: number, text: string): Promise<void> {
+        if (this.streaming) {
+            await this.stopRun();
+        }
+        const original = this.conversation[idx];
+        const images: ChatImageAttachment[] = original?.role === 'user'
+            ? (original.images ?? []).map((img, i) => ({ id: `edit-${i}`, base64: img.base64, mimeType: 'image/jpeg' as const, width: 0, height: 0 }))
+            : [];
+        this.conversation = this.conversation.slice(0, idx);
+        this.pausedPlans.clear();
+        this.update();
+        await this.send(text, images, { edited: true });
+    }
+
+    // ── approvals, checkpoints ──
+
+    protected respondToolApproval(approved: boolean, remember = false): void {
+        this.toolApproval.respond(approved, approved && remember);
+        if (approved && remember) {
+            this.toast.show('Allowed for this session');
+        }
+        this.scheduleUpdate(true);
+    }
+
+    protected async undoRun(turnId: string): Promise<void> {
+        const outcome = await this.checkpoints.undo(this.runKey(turnId));
+        this.toast.show(`Restored ${plural(outcome.restored, 'file')}`);
+        if (outcome.refused.length > 0 || outcome.failed.length > 0) {
+            this.messages.warn(`${outcome.refused.length + outcome.failed.length} file(s) could not be restored.`);
+        }
+    }
+
+    // ═══ v2 chat: render ═══════════════════════════════════════════════════════
+
     protected render(): React.ReactNode {
         this.renderPlanDetailPortal();
         const active = this.selection.getActive();
         const agentId = active.id;
-        const agentName = active.name;
-        const category = active.category ? toKnownCategory(active.category) : undefined;
+        const viewingPast = !!this.liveStash;
+        const lastTurn = this.lastAssistant();
+        const messages = visibleMessages(this.conversation, this.showEarlierMessages);
+        const chip = viewingPast ? { label: 'Past', cls: 'sk-chip-past' } : this.chipFor(lastTurn);
+        const streamingTurn = lastTurn && lastTurn.status === 'streaming' ? lastTurn : undefined;
+        // As an editor tab the chat is labelled with its conversation (v2), not a generic name.
+        const label = chatTitle(this.conversationTitle, this.conversation);
+        const tabLabel = this.conversation.length > 0 ? label : SorikuChatWidget.LABEL;
+        if (this.title.label !== tabLabel) {
+            this.title.label = tabLabel;
+        }
+        const paused = !!streamingTurn && this.isPaused(streamingTurn);
         return <div
-            className={`soriku-chat${this.dragOver ? ' soriku-chat-dragover' : ''}`}
+            className={`sk-chat${this.dragOver ? ' sk-chat-dragover' : ''}`}
             onDragOver={e => this.onChatDragOver(e)}
             onDragLeave={() => this.onChatDragLeave()}
             onDrop={e => this.onChatDrop(e)}
         >
-            <div className='soriku-chat-header'>
-                <div className='soriku-chat-header-main'>
-                    {agentId
-                        ? <span className='soriku-chat-agent-identity'>
-                            <AgentAvatar initials={initials(agentName ?? agentId)} category={category ?? 'general'} size='sm' />
-                            <span className='soriku-chat-agent'>{agentName ?? agentId}</span>
-                            {category && <Badge tone='acc'>{category}</Badge>}
-                        </span>
-                        : <span className='soriku-chat-noagent'>No agent selected — pick one in the Agents panel.</span>}
-                    {this.conversationTitle && <span className='soriku-chat-conv-title' title={this.conversationTitle}>{this.conversationTitle}</span>}
-                </div>
-                <div className='soriku-chat-header-actions'>
-                    <button className='soriku-chat-header-icon-btn' title='History'
-                        onClick={() => this.commands.executeCommand('soriku.conversations.open')}>
-                        <span className='codicon codicon-history' />
-                    </button>
-                    <button className='soriku-chat-header-icon-btn' title='New chat'
-                        disabled={this.streaming} onClick={() => this.startNewConversation()}>
-                        <span className='codicon codicon-add' />
-                    </button>
-                    <button className='soriku-chat-header-icon-btn' title={this.panelMaximized ? 'Restore chat size' : 'Maximize chat'}
-                        onClick={() => this.togglePanelMaximize()}>
-                        <span className={`codicon ${this.panelMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'}`} />
-                    </button>
-                    {/* Not part of the mockup's 3-icon header row (History/New chat/Maximize) —
-                        a real, working feature (per-agent learned-pattern summary) kept as a
-                        4th icon in the same minimal style rather than dropped, matching the
-                        "Quick Actions" precedent of preserving real functionality without
-                        reintroducing mockup-foreign chrome (labelled buttons, extra text). */}
-                    {agentId && <button className='soriku-chat-header-icon-btn' title='What this agent has learned'
-                        onClick={() => this.toggleInsights()}>
-                        <span className='codicon codicon-lightbulb' />
-                    </button>}
-                </div>
-            </div>
+            <ChatHeader
+                title={label}
+                chipLabel={chip.label}
+                chipClass={chip.cls}
+                history={this.history}
+                histOpen={this.histOpen}
+                onToggleHist={() => this.fire(this.toggleHistory())}
+                onOpenHistory={id => this.openHistory(id)}
+                onAllConversations={() => { this.histOpen = false; this.update(); this.fire(this.commands.executeCommand('soriku.conversations.open')); }}
+                onNew={() => this.startNewConversation()}
+                newDisabled={this.streaming}
+                placement={this.placement}
+                onPlacement={() => this.fire(this.togglePlacement())}
+                maxed={this.maximized}
+                onMax={() => this.toggleMaximize()}
+                onInsights={agentId ? () => this.fire(this.toggleInsights()) : undefined}
+            />
             {agentId && this.insightsOpen && this.renderInsights()}
-            {agentId && this.renderControls()}
-            <div className='soriku-chat-messages'>
-                {this.conversation.length === 0
-                    ? <div className='soriku-chat-empty'>Ask the agent a question to start.</div>
-                    : <>
-                        {!this.showEarlierMessages && this.conversation.length > DEFAULT_RENDER_WINDOW && <button
-                            className='soriku-chat-show-earlier'
-                            onClick={() => { this.showEarlierMessages = true; this.update(); }}
-                        >
-                            Show {this.conversation.length - DEFAULT_RENDER_WINDOW} earlier message{this.conversation.length - DEFAULT_RENDER_WINDOW === 1 ? '' : 's'}
-                        </button>}
-                        {visibleMessages(this.conversation, this.showEarlierMessages).map(message => this.renderMessage(message))}
-                    </>}
-            </div>
-            {this.renderInlineToolApproval()}
-            <div className='soriku-chat-input'>
-                {this.pendingImages.length > 0 && <div className='soriku-chat-attachments'>
-                    {this.pendingImages.map(a => <div key={a.id} className='soriku-chat-attachment'>
-                        <img src={`data:${a.mimeType};base64,${a.base64}`} alt={a.name ?? 'attached image'} />
-                        <button
-                            className='soriku-chat-attachment-remove'
-                            title='Remove image'
-                            disabled={this.streaming}
-                            onClick={() => this.removeImage(a.id)}
-                        >
-                            <span className='codicon codicon-close' />
-                        </button>
-                    </div>)}
-                </div>}
-                <textarea
-                    ref={this.inputRef}
-                    className='theia-input'
-                    rows={3}
-                    placeholder={agentId ? 'Message the agent…  (Enter to send, Shift+Enter for newline)' : 'Message Soriku…  (Enter to send, Shift+Enter for newline)'}
-                    onPaste={e => this.onInputPaste(e)}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            this.submitFromInput();
-                        }
-                    }}
-                />
-                <div className='soriku-chat-actions'>
-                    <input
-                        ref={this.fileInputRef}
-                        type='file'
-                        accept='image/png,image/jpeg,image/webp,image/gif'
-                        multiple
-                        style={{ display: 'none' }}
-                        onChange={e => this.onFileInputChange(e)}
-                    />
-                    <Btn
-                        variant='secondary'
-                        title='Attach an image'
-                        onClick={() => this.fileInputRef.current?.click()}
+            <div className='sk-chat-scroll sk-scroll' ref={el => { this.scrollEl = el ?? undefined; }}>
+                <div className='sk-chat-stack'>
+                    {viewingPast && <PastBanner when={this.pastWhen} onBack={() => this.backToLive()} />}
+                    {this.conversation.length === 0 && <div className='sk-empty'>
+                        {agentId ? 'Ask the agent a question to start.' : 'No agent selected — pick one in the Agents panel.'}
+                    </div>}
+                    {!this.showEarlierMessages && this.conversation.length > DEFAULT_RENDER_WINDOW && <button
+                        className='sk-show-earlier'
+                        onClick={() => { this.showEarlierMessages = true; this.update(); }}
                     >
-                        <span className='codicon codicon-attach' />
-                    </Btn>
-                    <Btn
-                        variant={this.recording === 'recording' ? 'danger' : 'secondary'}
-                        disabled={this.recording === 'transcribing'}
-                        title={this.recording === 'recording' ? 'Stop recording' : 'Dictate a message'}
-                        onClick={() => this.toggleRecording()}
-                    >
-                        <span className={`codicon ${this.recording === 'transcribing' ? 'codicon-loading codicon-modifier-spin' : 'codicon-mic'}`} />
-                    </Btn>
-                    {this.streaming
-                        ? <Btn variant='secondary' onClick={() => this.stop()}>Stop</Btn>
-                        : <Btn onClick={() => this.submitFromInput()}>Send</Btn>}
+                        Show {this.conversation.length - DEFAULT_RENDER_WINDOW} earlier message{this.conversation.length - DEFAULT_RENDER_WINDOW === 1 ? '' : 's'}
+                    </button>}
+                    {messages.map(m => m.role === 'user'
+                        ? this.renderUser(m, viewingPast)
+                        : this.renderAssistantBlock(m, m === lastTurn))}
                 </div>
+            </div>
+            <div className='sk-chat-foot'>
+                {streamingTurn && !paused && !this.shouldShowApproval(streamingTurn) && this.renderRunBar(streamingTurn)}
+                <Composer
+                    inputRef={this.inputRef}
+                    fileInputRef={this.fileInputRef}
+                    placeholder={placeholderFor(this.mode, viewingPast)}
+                    hasText={this.draftHasText}
+                    sending={this.streaming}
+                    attachments={this.pendingImages.map(a => ({ id: a.id, src: `data:${a.mimeType};base64,${a.base64}`, name: a.name }))}
+                    onRemoveAttachment={id => this.removeImage(id)}
+                    onAttachClick={() => this.fileInputRef.current?.click()}
+                    onFileInput={e => this.onFileInputChange(e)}
+                    onPaste={e => this.onInputPaste(e)}
+                    onInput={() => this.onComposerInput()}
+                    onSend={() => this.submitFromInput()}
+                    mode={this.mode}
+                    onMode={m => this.setMode(m)}
+                    model={this.modelSel}
+                    onModelTab={k => this.setModelTab(k)}
+                    onRouting={r => this.setRouting(r)}
+                    onPickModel={id => this.pickModel(id)}
+                    models={this.modelRows()}
+                    popMenu={this.popMenu}
+                    onPop={m => { this.popMenu = m; this.update(); }}
+                    onManageModels={() => this.fire(this.commands.executeCommand('soriku.models.open'))}
+                />
             </div>
         </div>;
     }
 
-    protected renderMessage(message: ChatMessage): React.ReactNode {
-        if (message.role === 'user') {
-            return <div key={message.id} className='soriku-msg soriku-msg-user'>
-                {message.images && message.images.length > 0 && <div className='soriku-msg-images'>
-                    {message.images.map((img, i) => <img key={i} src={`data:${img.mimeType};base64,${img.base64}`} alt='attached' />)}
-                </div>}
-                <div className='soriku-msg-text'>{message.text}</div>
-                {message.fileMentions && message.fileMentions.length > 0 && <div className='soriku-msg-file-chips'>
-                    {message.fileMentions.map(f => <Pill key={f}>{f}</Pill>)}
-                </div>}
-            </div>;
+    protected chipFor(turn: AssistantTurn | undefined): { label: string; cls: string } {
+        if (!turn) {
+            return { label: '', cls: '' };
         }
-        return this.renderAssistant(message);
+        const state: RunState = deriveRunState(turn, { paused: this.isPaused(turn) });
+        switch (state) {
+            case 'plan_ready': return { label: 'Plan ready', cls: '' };
+            case 'running': return { label: 'Running', cls: 'sk-chip-running' };
+            case 'needs_you': return { label: 'Needs you', cls: 'sk-chip-needs' };
+            case 'paused': return { label: 'Paused', cls: 'sk-chip-paused' };
+            case 'done': return { label: 'Done', cls: 'sk-chip-done' };
+            case 'failed': return { label: 'Failed', cls: 'sk-chip-failed' };
+            default: return { label: 'Ready', cls: '' };
+        }
     }
 
-    protected renderAssistant(turn: AssistantTurn): React.ReactNode {
-        return <div key={turn.id} className='soriku-msg soriku-msg-assistant'>
-            <div className='soriku-msg-meta'>
-                {turn.respondedBy && <span className='soriku-msg-agent'>{turn.respondedBy}</span>}
-                {turn.model && <span className='soriku-msg-model' title='Model that produced this answer'>{turn.model}</span>}
-                {turn.workers.length > 0 && <span className='soriku-msg-workers' title='Models that collaborated on this answer'>
-                    {turn.workers.length} workers: {turn.workers.join(', ')}
-                </span>}
-                {turn.escalation && <span
-                    className='soriku-msg-escalation'
-                    title={`Escalated${turn.escalation.from ? ` from ${turn.escalation.from}` : ''}${turn.escalation.reason ? ` (${turn.escalation.reason})` : ''}`}
-                >⤴ escalated → {turn.escalation.to ?? 'another model'}</span>}
-                {typeof turn.ttftMs === 'number' && <span className='soriku-msg-timing' title='Time to first token'>
-                    {turn.ttftMs < 1000 ? `${turn.ttftMs}ms` : `${(turn.ttftMs / 1000).toFixed(1)}s`} TTFT
-                </span>}
-            </div>
-            {turn.text && <ChatMarkdown text={turn.text} streaming={turn.status === 'streaming'} />}
-            {this.shouldShowApproval(turn) && this.renderPlanApproval(turn)}
-            {turn.agents.length > 0 && this.renderFleet(turn)}
-            {turn.status === 'streaming' && !turn.text && !this.shouldShowApproval(turn) && this.renderBusy(turn)}
-            {turn.toolCalls.map((call, i) => this.renderToolCall(turn.id, call, i))}
-            {turn.generatedFiles.length > 0 && this.renderGeneratedFiles(turn)}
-            {turn.status === 'error' && <div className='soriku-msg-error'>
+    protected renderRunBar(turn: AssistantTurn): React.ReactNode {
+        const steps = deriveSteps(turn).filter(st => st.id !== 'plan');
+        const waiting = steps.find(st => st.status === 'waiting') ?? undefined;
+        const current = [...steps].reverse().find(st => st.status === 'active');
+        const text = this.toolApproval.pending || waiting
+            ? 'Waiting for you to approve a command'
+            : current ? `${current.verbActive} ${current.target ?? ''}`.trim() : busyPhase(turn);
+        const todos = this.planTodos(turn);
+        const count = todos.length > 0 ? `${todos.filter(t => t.done).length} / ${todos.length}` : steps.length > 0 ? plural(steps.length, 'step') : '';
+        return <RunBar waiting={!!(this.toolApproval.pending || waiting)} text={text} count={count}
+            stopLabel='Stop' onStop={() => this.pauseRun()} />;
+    }
+
+    protected renderUser(m: UserMessage, viewingPast: boolean): React.ReactNode {
+        const editing = this.editingId === m.id;
+        const pending = this.pendingEdit?.id === m.id;
+        const turn = this.followingTurn(m.id);
+        const lastUser = this.isLastUser(m.id);
+        const cp = turn ? this.checkpoints.get(this.runKey(turn.id)) : undefined;
+        const changed = cp ? Object.keys(cp.files).length : 0;
+        const finished = !!turn && turn.status !== 'streaming';
+        const worked = changed > 0 || !!turn?.toolCalls.length;
+        const editHint = !lastUser ? 'Replies after this message will be regenerated.'
+            : this.editWasRunning ? 'Run paused while you edit · ⌘⏎ to save'
+                : worked ? '⌘⏎ to save · you\'ll choose to revert or continue' : '⌘⏎ to save';
+        const decision = pending ? {
+            sub: changed > 0
+                ? `${changed} ${changed === 1 ? 'file was' : 'files were'} changed after this message${finished ? ' and the run finished.' : '.'}`
+                : 'The run is still in progress.',
+            revertDesc: changed > 0
+                ? `Undo those changes, restore the checkpoint${cp ? ` from ${clockTime(Date.parse(cp.createdAt))}` : ''} and re-plan from your edited message.`
+                : 'Stop the run and start again from your edited message.',
+            onRevert: () => this.resolveEdit('revert'),
+            onContinue: () => this.resolveEdit('continue'),
+            onDiscard: () => this.cancelEdit(),
+        } : undefined;
+        return <UserBubble
+            key={m.id}
+            message={pending ? { ...m, text: this.pendingEdit!.text } : m}
+            time={clockTime(m.at)}
+            edited={!!m.edited || pending}
+            editing={editing}
+            draft={this.editDraft}
+            editHint={editHint}
+            canEdit={!viewingPast && !this.pendingEdit && !this.editingId && (!this.streaming || lastUser)}
+            pending={pending}
+            decision={decision}
+            onStartEdit={() => this.startEdit(m.id)}
+            onDraft={v => { this.editDraft = v; this.update(); }}
+            onCancel={() => this.cancelEdit()}
+            onSave={() => this.saveEdit()}
+        />;
+    }
+
+    /** Plan tasks as to-dos: done when their worker finished, active = first unfinished while the run is live. */
+    protected planTodos(turn: AssistantTurn): PlanTodoView[] {
+        const plan = turn.pendingPlan;
+        if (!plan) {
+            return [];
+        }
+        const live = turn.status === 'streaming' && !this.shouldShowApproval(turn) && !this.isPaused(turn);
+        let activeSet = false;
+        return plan.tasks.map(t => {
+            const done = turn.status === 'done' || turn.agents.some(a => a.taskId === t.id && a.status === 'done');
+            const active = !done && live && !activeSet;
+            if (active) {
+                activeSet = true;
+            }
+            return { id: t.id, goal: this.getPlanTaskGoal(plan.planId, t.id, t.goal), done, active };
+        });
+    }
+
+    protected stepDetails(turn: AssistantTurn): Record<string, StepDetail> {
+        const out: Record<string, StepDetail> = {};
+        turn.toolCalls.forEach((call: ChatToolCall, i) => {
+            const id = call.callId ?? `call-${i}`;
+            const kind = toolKind(call.tool);
+            if (kind === 'shell' && typeof call.result === 'string' && call.result) {
+                out[id] = { body: call.result };
+            } else if (kind === 'edit') {
+                const summary = formatToolCallSummary(call);
+                if (summary.preview) {
+                    out[id] = { body: summary.preview, openPath: summary.subtitle };
+                } else if (summary.subtitle) {
+                    out[id] = { body: summary.subtitle, openPath: summary.subtitle };
+                }
+            }
+        });
+        return out;
+    }
+
+    protected renderAssistantBlock(turn: AssistantTurn, isLast: boolean): React.ReactNode {
+        const steps = deriveSteps(turn).filter(st => st.id !== 'plan');
+        const stats = runStats(turn, steps);
+        const todos = this.planTodos(turn);
+        const awaiting = this.shouldShowApproval(turn);
+        const paused = this.isPaused(turn);
+        const pending = isLast ? this.toolApproval.pending : undefined;
+        const waitingStep = [...steps].reverse().find(st => st.status === 'waiting');
+        const approval: ApprovalView | undefined = pending ? (() => {
+            const isShell = waitingStep?.kind === 'shell';
+            return {
+                stepId: waitingStep?.id,
+                command: isShell ? (waitingStep?.command ?? pending.view.message) : pending.view.message,
+                prompt: isShell ? '$' : '',
+                askText: isShell ? `${waitingStep?.agent ?? 'Agent'} wants to run this` : pending.view.title,
+                onSkip: () => this.respondToolApproval(false),
+                onAlways: () => this.respondToolApproval(true, true),
+                onRun: () => this.respondToolApproval(true),
+            };
+        })() : undefined;
+        const plan = turn.pendingPlan;
+        const local = turn.model ? this.isLocalModel(turn.model) : undefined;
+        const line = modelLine(turn.model, !!turn.auto, local);
+        const cp = this.checkpoints.get(this.runKey(turn.id));
+        const hasCheckpoint = !!cp && Object.keys(cp.files).length > 0;
+        const vote = this.feedbackByTurn.get(turn.id);
+        const reported = new Set(turn.generatedFiles.map(f => f.path));
+        const files = [
+            ...turn.generatedFiles.map(f => {
+                const diff = this.generatedFilesTracker.get(f.path);
+                return { path: f.path, name: f.filename ?? shortPath(f.path), add: diff?.added ?? f.added, del: diff?.removed ?? f.removed };
+            }),
+            // Delegated writes are not echoed back as generated_files; the checkpoint knows every file the agent wrote.
+            ...(cp ? Object.keys(cp.files).map(key => new URI(key).path.toString()).filter(path => !reported.has(path)).map(path => {
+                const diff = this.generatedFilesTracker.get(path);
+                return { path, name: shortPath(path), add: diff?.added, del: diff?.removed };
+            }) : []),
+        ];
+        const worked = turn.status === 'done' && (files.length > 0 || steps.some(st => st.kind === 'edit' || st.kind === 'shell'));
+        const failed = stats.verified === 'failed' || steps.some(st => st.tone === 'danger');
+        const summaryStats = [
+            ...(stats.agents > 0 ? [plural(stats.agents, 'agent')] : []),
+            plural(stats.steps, 'step'),
+            ...(stats.verified === 'verified' ? ['verified'] : stats.verified === 'failed' ? ['verification failed'] : []),
+            ...(typeof plan?.costEur === 'number' ? [`est. €${plan.costEur.toFixed(2)}`] : []),
+        ];
+        const compare = !!turn.workers.length && turn.workers.length > 1;
+        return <div key={turn.id} className='sk-stack-block' style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {(turn.text || line) && <div className='sk-assistant'>
+                {turn.text && <div className='sk-assistant-text'><ChatMarkdown text={turn.text} streaming={turn.status === 'streaming'} /></div>}
+                {line && <div className='sk-model-line'><span className={`sk-model-dot${local === false ? ' sk-model-dot-cloud' : ''}`} />{line}</div>}
+            </div>}
+            {plan && <PlanCard
+                todos={todos}
+                open={this.planOpen}
+                onToggle={() => { this.planOpen = !this.planOpen; this.update(); }}
+                onOpenPlan={() => { this.expandedPlanId = plan.planId; this.update(); }}
+                approve={awaiting ? {
+                    costLabel: typeof plan.costEur === 'number'
+                        ? (plan.costEur === 0 ? 'Runs locally · €0.00' : `est. €${plan.costEur.toFixed(2)}`)
+                        : 'Review before it runs',
+                    resolving: this.resolvingPlans.has(plan.planId),
+                    onReview: () => { this.expandedPlanId = plan.planId; this.update(); },
+                    onApprove: () => this.approvePlan(plan.planId, plan.tasks),
+                } : undefined}
+            />}
+            {turn.agents.length > 0 && !this.commandRegistry.getCommand('soriku.agentsPanel.toggle') && this.renderFleet(turn)}
+            {steps.length > 0 && <RunTimeline
+                steps={steps}
+                details={this.stepDetails(turn)}
+                expanded={this.expandedStep}
+                onToggle={id => { this.expandedStep = this.expandedStep === id ? undefined : id; this.update(); }}
+                onOpenFile={path => this.fire(this.openFilePath(path))}
+                approval={approval}
+            />}
+            {approval && steps.length === 0 && <RunTimeline steps={[]} details={{}} expanded={undefined} onToggle={() => undefined}
+                onOpenFile={() => undefined} approval={approval} />}
+            {turn.status === 'streaming' && !turn.text && steps.length === 0 && !awaiting && !approval && !plan && <div className='sk-thinking'>
+                <span className='sk-spin' />{compare ? `${turn.workers.length} models are answering…` : busyPhase(turn) || 'Thinking…'}
+            </div>}
+            {paused && <PausedBanner onResume={() => this.resumeRun()} />}
+            {worked && <RunSummary
+                title={files.length > 0 ? `${plural(files.length, 'file')} changed` : 'Done'}
+                warn={failed}
+                time={formatDuration(turn.totalMs)}
+                stats={summaryStats}
+                files={files}
+                onOpenFile={path => this.fire(this.openFilePath(path))}
+                vote={vote}
+                onVote={v => this.fire(this.submitFeedback(turn, v))}
+                checkpoint={hasCheckpoint ? {
+                    kept: cp!.state === 'kept',
+                    undone: cp!.state === 'undone',
+                    onUndo: () => this.fire(this.undoRun(turn.id)),
+                    onKeep: () => this.fire(this.checkpoints.keep(this.runKey(turn.id))),
+                    onRestore: () => this.fire(this.undoRun(turn.id)),
+                } : undefined}
+            />}
+            {turn.status === 'done' && !worked && turn.text && <div className='sk-meta' style={{ gap: 2 }}>
+                <button className={`sk-vote${vote === 'positive' ? ' on' : ''}`} title='Good response'
+                    onClick={() => this.fire(this.submitFeedback(turn, 'positive'))}><ThumbUpIcon /></button>
+                <button className={`sk-vote${vote === 'negative' ? ' on' : ''}`} title='Bad response'
+                    onClick={() => this.fire(this.submitFeedback(turn, 'negative'))}><ThumbDownIcon /></button>
+            </div>}
+            {turn.status === 'error' && <div className='sk-notice sk-notice-error'>
                 {turn.error}
-                {turn.authRequired && <span className='soriku-msg-error-actions'>
-                    <Btn variant='secondary' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</Btn>
-                    <Btn variant='secondary' onClick={() => this.retryTurn(turn.id)}>Retry</Btn>
+                {turn.authRequired && <span>
+                    <button className='sk-btn' onClick={() => this.commands.executeCommand('soriku.auth.connect')}>Sign in…</button>
+                    <button className='sk-btn' onClick={() => this.retryTurn(turn.id)}>Retry</button>
                 </span>}
             </div>}
-            {turn.status === 'interrupted' && <div className='soriku-msg-interrupted'>
-                <span>Connection interrupted — partial answer kept.</span>
-                <Btn variant='secondary' onClick={() => this.retryTurn(turn.id)}>Retry</Btn>
+            {turn.status === 'interrupted' && <div className='sk-notice sk-notice-info'>
+                Connection interrupted — partial answer kept.
+                <button className='sk-btn' onClick={() => this.retryTurn(turn.id)}>Retry</button>
             </div>}
             {turn.status === 'done' && !turn.text && turn.phase === 'stopped' &&
-                <div className='soriku-msg-stopped'>Stopped — no answer was generated.</div>}
-            {turn.status === 'done' && turn.text && this.renderFeedback(turn)}
-        </div>;
-    }
-
-    protected renderFeedback(turn: AssistantTurn): React.ReactNode {
-        const current = this.feedbackByTurn.get(turn.id);
-        return <div className='soriku-msg-feedback'>
-            <button
-                className={`soriku-feedback-btn${current === 'positive' ? ' active' : ''}`}
-                title='Good response'
-                onClick={() => this.submitFeedback(turn, 'positive')}
-            ><span className='codicon codicon-thumbsup' /></button>
-            <button
-                className={`soriku-feedback-btn${current === 'negative' ? ' active' : ''}`}
-                title='Bad response'
-                onClick={() => this.submitFeedback(turn, 'negative')}
-            ><span className='codicon codicon-thumbsdown' /></button>
+                <div className='sk-notice sk-notice-info'>Stopped — no answer was generated.</div>}
+            {turn.status === 'done' && !turn.text && turn.phase !== 'stopped' && !worked && !plan &&
+                <div className='sk-notice sk-notice-info'>
+                    The agent finished without an answer{steps.some(st => st.status === 'error') ? ' — some of its actions were refused or failed.' : '.'}
+                    <button className='sk-btn' onClick={() => this.retryTurn(turn.id)}>Retry</button>
+                </div>}
         </div>;
     }
 
     protected shouldShowApproval(turn: AssistantTurn): boolean {
         return !!turn.planNeedsApproval && !!turn.awaitingApproval && !!turn.pendingPlan && turn.status === 'streaming';
-    }
-
-    /** Plan card with the proposed tasks + Approve/Cancel (Plan mode). */
-    protected renderPlanApproval(turn: AssistantTurn): React.ReactNode {
-        const plan = turn.pendingPlan!;
-        const resolving = this.resolvingPlans.has(plan.planId);
-        return <div className='soriku-plan-approval'>
-            <div className='soriku-plan-title'>
-                <span className='codicon codicon-checklist' /> Plan — review before it runs
-                {typeof plan.costEur === 'number' && <span className='soriku-plan-cost'>est. €{plan.costEur.toFixed(2)}</span>}
-                <button className='soriku-plan-expand' title='Expand plan detail'
-                    onClick={() => { this.expandedPlanId = plan.planId; this.update(); }}>
-                    <span className='codicon codicon-screen-full' />
-                </button>
-            </div>
-            {this.renderPlanDocumentSection(plan)}
-            {this.renderPlanTasksSection(plan, resolving)}
-            {this.renderPlanActions(plan, resolving)}
-        </div>;
     }
 
     /** The engine-rendered markdown plan document — reads first, Claude-Code style. Undefined for a plan loaded before this feature shipped (back-compat). */
@@ -1663,165 +2041,6 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
-    /** Animated busy indicator shown while a turn streams (spinner + current phase). */
-    protected renderBusy(turn: AssistantTurn): React.ReactNode {
-        return <div className='soriku-msg-busy'>
-            <span className='codicon codicon-loading codicon-modifier-spin' />
-            <span className='soriku-busy-label'>{busyPhase(turn)}</span>
-            <span className='soriku-busy-dots'><span>.</span><span>.</span><span>.</span></span>
-        </div>;
-    }
-
-    /** Controls: a Mode picker (behaviour) + a Models picker (orchestration), Cursor-style. */
-    protected renderControls(): React.ReactNode {
-        const behavior = BEHAVIOR_OPTIONS.find(o => o.value === this.behavior) ?? BEHAVIOR_OPTIONS[0];
-        const orchestration = ORCHESTRATION_OPTIONS.find(o => o.value === this.orchestration) ?? ORCHESTRATION_OPTIONS[0];
-        const routing = ROUTING_OPTIONS.find(o => o.value === this.routingStrategy) ?? ROUTING_OPTIONS[0];
-        return <div className='soriku-chat-orchestration'>
-            <div className='soriku-control-row'>
-                <SegmentedPicker
-                    label='Do'
-                    title={behavior.hint}
-                    options={BEHAVIOR_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-                    value={this.behavior}
-                    disabled={this.streaming}
-                    onChange={next => { this.behavior = next; this.update(); }}
-                />
-                <SegmentedPicker
-                    label='Model'
-                    title={orchestration.hint}
-                    options={ORCHESTRATION_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-                    value={this.orchestration}
-                    disabled={this.streaming}
-                    onChange={next => { this.orchestration = next; this.warmSelectedModel(); this.update(); }}
-                />
-                <SegmentedPicker
-                    label='Route'
-                    title={`Where compute runs · ${routing.hint}`}
-                    options={ROUTING_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-                    value={this.routingStrategy}
-                    disabled={this.streaming}
-                    onChange={next => { this.routingStrategy = next; this.update(); }}
-                />
-                <button
-                    className='soriku-manage-models'
-                    title='Add or manage models'
-                    onClick={() => this.commands.executeCommand('soriku.models.open')}
-                >
-                    <span className='codicon codicon-gear' />
-                </button>
-            </div>
-            {this.orchestration === 'single' && <select
-                className='theia-select soriku-model-select'
-                title='Model to use for the answer'
-                value={this.modelId}
-                disabled={this.streaming}
-                onChange={e => { this.modelId = e.target.value; this.warmSelectedModel(); this.update(); }}
-            >
-                <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
-                {this.models.map(m => {
-                    const avail = this.modelAvailability(m.id);
-                    return <option key={m.id} value={m.id} disabled={!avail.ok}>
-                        {m.id}{avail.ok ? '' : ` — ${avail.reason}`}
-                    </option>;
-                })}
-            </select>}
-            {this.behavior === 'plan' && this.renderPlanModelControls()}
-        </div>;
-    }
-
-    /** Which model(s) author the plan itself — separate from the answer-model pickers above (behaviour === 'plan' only). */
-    protected renderPlanModelControls(): React.ReactNode {
-        const planMode = PLAN_MODEL_MODE_OPTIONS.find(o => o.value === this.planModelMode) ?? PLAN_MODEL_MODE_OPTIONS[0];
-        return <div className='soriku-control-row soriku-plan-model-row'>
-            <SegmentedPicker
-                label='Plan by'
-                title={planMode.hint}
-                options={PLAN_MODEL_MODE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
-                value={this.planModelMode}
-                disabled={this.streaming}
-                onChange={next => { this.planModelMode = next; this.update(); }}
-            />
-            {this.planModelMode === 'single' && <select
-                className='theia-select soriku-model-select'
-                title='Model that writes the plan'
-                value={this.planModelId}
-                disabled={this.streaming}
-                onChange={e => { this.planModelId = e.target.value; this.update(); }}
-            >
-                <option value=''>{this.models.length ? 'Pick a model…' : 'No models available'}</option>
-                {this.models.map(m => {
-                    const avail = this.modelAvailability(m.id);
-                    return <option key={m.id} value={m.id} disabled={!avail.ok}>
-                        {m.id}{avail.ok ? '' : ` — ${avail.reason}`}
-                    </option>;
-                })}
-            </select>}
-            {this.planModelMode === 'multi' && <div className='soriku-worker-models'>
-                <div className='soriku-worker-models-hint'>
-                    {this.planModels.length >= 2
-                        ? `${this.planModels.length} models will draft competing plans — slower`
-                        : 'Tick 2-3 models to draft competing plans'}
-                </div>
-                <div className='soriku-model-checklist'>
-                    {this.models.length === 0
-                        ? <div className='soriku-worker-models-hint'>No models available</div>
-                        : this.models.map(m => {
-                            const avail = this.modelAvailability(m.id);
-                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
-                                <input
-                                    type='checkbox'
-                                    checked={this.planModels.includes(m.id)}
-                                    disabled={this.streaming || !avail.ok}
-                                    onChange={() => this.togglePlanModel(m.id)}
-                                />
-                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
-                            </label>;
-                        })}
-                </div>
-            </div>}
-            {this.planModelMode === 'compare' && <div className='soriku-worker-models'>
-                <div className='soriku-worker-models-hint'>
-                    {this.workerModels.length >= 2
-                        ? `${this.workerModels.length} workers — one per model, same prompt, answers merged`
-                        : 'Tick 2+ models to compare (fewer = Soriku plans normally)'}
-                </div>
-                <div className='soriku-model-checklist'>
-                    {this.models.length === 0
-                        ? <div className='soriku-worker-models-hint'>No models available</div>
-                        : this.models.map(m => {
-                            const avail = this.modelAvailability(m.id);
-                            return <label key={m.id} className={`soriku-model-checkitem${avail.ok ? '' : ' unavailable'}`} title={avail.ok ? m.id : `${m.id} — ${avail.reason}`}>
-                                <input
-                                    type='checkbox'
-                                    checked={this.workerModels.includes(m.id)}
-                                    disabled={this.streaming || !avail.ok}
-                                    onChange={() => this.toggleWorkerModel(m.id)}
-                                />
-                                <span className='soriku-model-checklabel'>{m.id}{avail.ok ? '' : ` — ${avail.reason}`}</span>
-                            </label>;
-                        })}
-                </div>
-            </div>}
-        </div>;
-    }
-
-    /** Toggle a model in the plan-drafting collaboration set. */
-    protected togglePlanModel(modelId: string): void {
-        this.planModels = this.planModels.includes(modelId)
-            ? this.planModels.filter(id => id !== modelId)
-            : [...this.planModels, modelId];
-        this.update();
-    }
-
-    /** Toggle a model in the compare set — one worker per ticked model. */
-    protected toggleWorkerModel(modelId: string): void {
-        this.workerModels = this.workerModels.includes(modelId)
-            ? this.workerModels.filter(id => id !== modelId)
-            : [...this.workerModels, modelId];
-        this.update();
-    }
-
     /** The user-configurable term for a head agent's spawned sub-agents (Fase F). */
     protected getSubagentLabel(): string {
         const raw = this.preferences.get<string>(SUBAGENT_LABEL_PREF, 'minions');
@@ -1902,25 +2121,6 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
-    protected renderGeneratedFiles(turn: AssistantTurn): React.ReactNode {
-        return <ul className='soriku-generated-files'>
-            {turn.generatedFiles.map(file => {
-                const diff = this.generatedFilesTracker.get(file.path);
-                return <li key={file.path}>
-                    <button className='soriku-generated-file' title={file.path}
-                        onClick={() => this.openGeneratedFile(file.path)}>
-                        <span className='codicon codicon-file' />
-                        {file.filename ?? file.path.split('/').pop() ?? file.path}
-                    </button>
-                    {diff && <span className='soriku-generated-file-stats'>
-                        <DiffBar added={diff.added} removed={diff.removed} />
-                        <span className='soriku-generated-file-counts'>+{diff.added} −{diff.removed}</span>
-                    </span>}
-                </li>;
-            })}
-        </ul>;
-    }
-
     protected async openGeneratedFile(path: string): Promise<void> {
         try {
             const uri = new URI(path);
@@ -1962,65 +2162,4 @@ export class SorikuChatWidget extends ReactWidget {
         }
     }
 
-    protected renderInlineToolApproval(): React.ReactNode {
-        const pending = this.toolApproval.pending;
-        if (!pending) {
-            return undefined;
-        }
-        return <div className={`soriku-inline-approval${pending.view.destructive ? ' destructive' : ''}`}>
-            <div className='soriku-inline-approval-head'>
-                <span className='codicon codicon-shield' />
-                <span className='soriku-inline-approval-title'>{pending.view.title}</span>
-            </div>
-            <pre className='soriku-inline-approval-msg'>{pending.view.message}</pre>
-            <label className='soriku-inline-approval-remember'>
-                <input
-                    type='checkbox'
-                    checked={this.approvalRememberSession}
-                    onChange={e => { this.approvalRememberSession = e.target.checked; this.scheduleUpdate(true); }}
-                />
-                Allow always this session
-            </label>
-            <div className='soriku-inline-approval-actions'>
-                <Btn variant='secondary' onClick={() => this.respondToolApproval(false)}>Deny</Btn>
-                <Btn onClick={() => this.respondToolApproval(true)}>Allow</Btn>
-            </div>
-        </div>;
-    }
-
-    protected respondToolApproval(approved: boolean): void {
-        const remember = approved && this.approvalRememberSession;
-        this.toolApproval.respond(approved, remember);
-        if (remember) {
-            this.toast.show('Allowed for this session');
-        }
-        this.approvalRememberSession = false;
-        this.scheduleUpdate(true);
-    }
-
-    protected renderToolCall(turnId: string, call: ChatToolCall, index: number): React.ReactNode {
-        const summary = formatToolCallSummary(call);
-        const path = summary.subtitle;
-        const outcome = call.outcome && call.outcome !== 'ok' ? call.outcome : undefined;
-        return <div key={`${turnId}-tool-${index}`} className={`soriku-tool-call${summary.isWrite ? ' soriku-tool-write' : ''}${outcome ? ` soriku-tool-${outcome}` : ''}`}>
-            <div className='soriku-tool-call-head'>
-                <span className={`codicon ${summary.isWrite ? 'codicon-file-code' : 'codicon-tools'}`} />
-                <span className='soriku-tool-title'>{summary.title}</span>
-                <span className={`soriku-tool-status ${call.status}`}>{call.status}</span>
-                {outcome && <span className={`soriku-tool-outcome soriku-tool-outcome-${outcome}`} title={call.outcomeReason ?? ''}>{OUTCOME_LABELS[outcome]}</span>}
-                {path && summary.isWrite && <button
-                    className='soriku-tool-open'
-                    title='Open in editor'
-                    onClick={() => this.openGeneratedFile(path)}
-                >Open</button>}
-            </div>
-            {outcome && call.outcomeReason && <div className='soriku-tool-outcome-reason'>{call.outcomeReason}</div>}
-            {summary.subtitle && <div className='soriku-tool-path'>{summary.subtitle}</div>}
-            {summary.preview && <pre className='soriku-tool-preview'>{summary.preview}</pre>}
-            {!summary.isWrite && <details className='soriku-tool-details'>
-                <summary>Details</summary>
-                <pre className='soriku-tool-detail'>{JSON.stringify({ args: call.args, result: call.result }, undefined, 2)}</pre>
-            </details>}
-        </div>;
-    }
 }
