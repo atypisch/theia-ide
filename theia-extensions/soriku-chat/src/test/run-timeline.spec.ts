@@ -1,0 +1,138 @@
+/********************************************************************************
+ * Soriku IDE — run-timeline spec
+ *
+ * SPDX-License-Identifier: MIT
+ ********************************************************************************/
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { createAssistantTurn, AssistantTurn, ChatToolCall } from '../common/chat-model';
+import { deriveRunState, deriveSteps, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
+
+function turnWith(calls: ChatToolCall[], patch: Partial<AssistantTurn> = {}): AssistantTurn {
+    return { ...createAssistantTurn('t1'), toolCalls: calls, ...patch };
+}
+
+describe('shortPath / stepTarget', () => {
+    it('keeps the last two segments', () => {
+        assert.equal(shortPath('/Users/m/Sites/app/agents/router.py'), 'agents/router.py');
+        assert.equal(shortPath('router.py'), 'router.py');
+    });
+    it('reads path, command and query from args (object or JSON string)', () => {
+        assert.equal(stepTarget({ tool: 'file_read', status: 'done', args: { path: '/a/b/c.py' } }), 'b/c.py');
+        assert.equal(stepTarget({ tool: 'shell_exec', status: 'done', args: JSON.stringify({ command: 'pytest -q' }) }), 'pytest -q');
+        assert.equal(stepTarget({ tool: 'project_search', status: 'done', args: { query: 'route(' } }), 'route(');
+        assert.equal(stepTarget({ tool: 'file_read', status: 'done', args: 'not json' }), undefined);
+    });
+    it('finds the file in an apply_patch diff header', () => {
+        const patch = '--- a/src/x.php\n+++ b/src/x.php\n@@ -1 +1 @@\n-a\n+b\n';
+        assert.equal(stepTarget({ tool: 'apply_patch', status: 'done', args: { patch } }), 'src/x.php');
+    });
+});
+
+describe('summarizeResult', () => {
+    it('takes the first non-empty line and caps it', () => {
+        assert.equal(summarizeResult('\n\nhello\nworld'), 'hello');
+        assert.equal(summarizeResult('x'.repeat(200), 10), 'xxxxxxxxx…');
+        assert.equal(summarizeResult(undefined), undefined);
+    });
+});
+
+describe('deriveSteps', () => {
+    it('maps tools to step kinds with verbs and status', () => {
+        const steps = deriveSteps(turnWith([
+            { callId: '1', tool: 'file_read', status: 'done', args: { path: 'a/router.py' }, result: 'def route()' },
+            { callId: '2', tool: 'file_write', status: 'running', args: { path: 'a/router.py' } },
+            { callId: '3', tool: 'shell_exec', status: 'requested', args: { command: 'pytest -q' } },
+        ]));
+        assert.deepEqual(steps.map(s => [s.kind, s.status]), [['read', 'done'], ['edit', 'active'], ['shell', 'waiting']]);
+        assert.equal(steps[0].verbDone, 'Read');
+        assert.equal(steps[1].verbActive, 'Editing');
+        assert.equal(steps[2].command, 'pytest -q');
+    });
+
+    it('uses engine diff stats only when present', () => {
+        const withStats = deriveSteps(turnWith(
+            [{ callId: '1', tool: 'file_write', status: 'done', args: { path: '/p/agents/router.py' } }],
+            { generatedFiles: [{ path: '/p/agents/router.py', added: 18, removed: 2 }] }));
+        assert.equal(withStats[0].add, 18);
+        assert.equal(withStats[0].del, 2);
+        const without = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', args: { path: 'x.py' } }]));
+        assert.equal(without[0].add, undefined);
+    });
+
+    it('adds a check row after a verified write and flags verify failures', () => {
+        const ok = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome: 'verified', args: { path: 'a.py' } }]));
+        assert.deepEqual(ok.map(s => s.kind), ['edit', 'check']);
+        assert.equal(ok[1].tone, 'ok');
+        const bad = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome: 'verify_failed', args: { path: 'a.py' } }]));
+        assert.equal(bad[1].tone, 'warn');
+        assert.equal(bad[1].result, 'needs a fix');
+    });
+
+    it('marks blocked / denied / errored calls as danger', () => {
+        for (const outcome of ['blocked', 'denied', 'error'] as const) {
+            const s = deriveSteps(turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome, outcomeReason: 'nope', args: { path: 'a' } }]))[0];
+            assert.equal(s.status, 'error');
+            assert.equal(s.tone, 'danger');
+            assert.equal(s.result, 'nope');
+        }
+    });
+
+    it('reads the shell exit code from the result trailer', () => {
+        const fail = deriveSteps(turnWith([{ callId: '1', tool: 'shell_exec', status: 'done', args: { command: 'pytest' }, result: '1 failed\n[exit code: 1]' }]))[0];
+        assert.equal(fail.status, 'error');
+        assert.equal(fail.result, 'exit 1');
+        const ok = deriveSteps(turnWith([{ callId: '1', tool: 'shell_exec', status: 'done', args: { command: 'pytest' }, result: '12 passed' }]))[0];
+        assert.equal(ok.result, 'exit 0');
+        assert.equal(ok.output, '12 passed');
+    });
+
+    it('attributes steps to the owning worker', () => {
+        const t = turnWith([{ callId: '1', tool: 'file_read', status: 'done', workerId: 'w1', args: { path: 'a' } }],
+            { agents: [{ workerId: 'w1', agentName: 'Koda', status: 'running', files: [], corrections: 0 }] });
+        assert.equal(deriveSteps(t)[0].agent, 'Koda');
+    });
+
+    it('emits a planning row and review rows', () => {
+        const t = turnWith([], {
+            pendingPlan: { planId: 'p', tasks: [{ id: '1', role: 'dev', goal: 'g' }, { id: '2', role: 'dev', goal: 'h' }] },
+            agents: [{ workerId: 'w', role: 'code-reviewer', status: 'done', files: [], corrections: 0, verdict: { status: 'approved', notes: 'lgtm' } }],
+        });
+        const steps = deriveSteps(t);
+        assert.equal(steps[0].target, '2 tasks');
+        assert.equal(steps[1].kind, 'review');
+        assert.equal(steps[1].verbDone, 'Approved');
+        assert.equal(steps[1].output, 'lgtm');
+    });
+});
+
+describe('deriveRunState', () => {
+    it('covers every chip state', () => {
+        assert.equal(deriveRunState(turnWith([], { status: 'done' })), 'done');
+        assert.equal(deriveRunState(turnWith([], { status: 'error' })), 'failed');
+        assert.equal(deriveRunState(turnWith([], { status: 'interrupted' })), 'failed');
+        assert.equal(deriveRunState(turnWith([]), { paused: true }), 'paused');
+        assert.equal(deriveRunState(turnWith([], { awaitingApproval: true })), 'plan_ready');
+        assert.equal(deriveRunState(turnWith([{ tool: 'shell_exec', status: 'requested' }])), 'needs_you');
+        assert.equal(deriveRunState(turnWith([{ tool: 'file_read', status: 'running' }])), 'running');
+    });
+    it('a finished turn wins over paused', () => {
+        assert.equal(deriveRunState(turnWith([], { status: 'done' }), { paused: true }), 'done');
+    });
+});
+
+describe('runStats', () => {
+    it('summarises agents, steps, files and verification', () => {
+        const t = turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome: 'verified', args: { path: 'a.py' } }], {
+            generatedFiles: [{ path: 'a.py', added: 3, removed: 1 }],
+            agents: [{ workerId: 'w', status: 'done', files: [], corrections: 0 }],
+        });
+        const s = runStats(t);
+        assert.equal(s.agents, 1);
+        assert.equal(s.steps, 2);
+        assert.equal(s.verified, 'verified');
+        assert.deepEqual(s.files, [{ path: 'a.py', add: 3, del: 1 }]);
+        assert.equal(runStats(turnWith([])).verified, 'none');
+    });
+});
