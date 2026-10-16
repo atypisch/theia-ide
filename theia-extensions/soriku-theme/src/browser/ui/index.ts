@@ -13,3 +13,5 @@ export * from './SettingsRow';
 export * from './SorikuMark';
 export * from './SorikuLogo';
 export * from './PageHeader';
+export * from './icons';
+export * from './file-icon';

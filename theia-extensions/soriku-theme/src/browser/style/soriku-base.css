@@ -28,6 +28,16 @@
     font-weight: 500;
 }
 
+/* Section label: mono, tiny, tracked uppercase (v2 uses this on every panel header). */
+.sk-eyebrow {
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink3);
+}
+
 @keyframes sk-pulse {
     0%, 100% { box-shadow: 0 0 0 0 var(--ok-line); }
     50% { box-shadow: 0 0 0 5px transparent; }
