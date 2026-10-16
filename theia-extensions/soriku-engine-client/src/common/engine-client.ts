@@ -97,6 +97,11 @@ export interface EngineClient {
     executePlan(planId: string, body?: ExecutePlanRequest): Promise<PlanSignalResponse>;
     /** Cancel a plan parked after `plan_awaiting_execution` before any worker runs. */
     cancelPlan(planId: string): Promise<PlanSignalResponse>;
+    /** Pause a running plan; workers stop after their current step. */
+    pausePlan(planId: string): Promise<PlanSignalResponse>;
+    resumePlan(planId: string): Promise<PlanSignalResponse>;
+    /** Stop a running plan for good (unlike pause, it cannot be resumed). */
+    stopPlan(planId: string): Promise<PlanSignalResponse>;
 
     // ── Subagents (minions) — Fase F5 ──
     /** Durable insight for a subagent (role stats + its own feedback history); `parentAgentId` is required once the originating plan run has ended. */

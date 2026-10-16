@@ -29,6 +29,7 @@ import { SorikuEditorRevealService } from './soriku-editor-reveal-service';
 import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
 import { SorikuDiffReviewService } from './soriku-diff-review-service';
 import { SorikuGeneratedFilesTracker } from './soriku-generated-files-tracker';
+import { SorikuCheckpointService } from './soriku-checkpoint-service';
 
 /** Session-scoped auto-approve for destructive tools (Allow always). */
 const SESSION_ALLOW = new Set<string>();
@@ -56,6 +57,9 @@ export class SorikuToolConfirmationService {
 
     @inject(SorikuGeneratedFilesTracker)
     protected readonly generatedFiles: SorikuGeneratedFilesTracker;
+
+    @inject(SorikuCheckpointService)
+    protected readonly checkpoints: SorikuCheckpointService;
 
     @inject(SorikuShellService)
     protected readonly shellService: SorikuShellService;
@@ -229,6 +233,7 @@ export class SorikuToolConfirmationService {
             } catch {
                 before = '';
             }
+            await this.checkpoints.recordBeforeWrite(uri);
             await this.fileService.write(uri, text);
             const result = okResult(formatWriteResult(uri.path.toString(), uri.path.base, text.length));
             // Keyed by the tool call's own raw `path` arg — the same string
@@ -243,6 +248,7 @@ export class SorikuToolConfirmationService {
             const patch = getStringArg(request.args, 'patch') ?? getStringArg(request.args, 'content') ?? '';
             const existing = await this.fileService.read(uri);
             const updated = applyUnifiedPatch(existing.value, patch);
+            await this.checkpoints.recordBeforeWrite(uri);
             await this.fileService.write(uri, updated);
             const result = okResult(formatWriteResult(uri.path.toString(), uri.path.base, updated.length));
             this.recordDiffStats(getStringArg(request.args, 'path') ?? uri.path.toString(), existing.value, updated);

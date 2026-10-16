@@ -185,6 +185,18 @@ export class EngineClientImpl implements EngineClient {
         return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/cancel`, {});
     }
 
+    async pausePlan(planId: string): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/pause`, {});
+    }
+
+    async resumePlan(planId: string): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/resume`, {});
+    }
+
+    async stopPlan(planId: string): Promise<PlanSignalResponse> {
+        return this.createTransport().postJson<PlanSignalResponse>(`/api/plan/${encodeURIComponent(planId)}/stop`, {});
+    }
+
     async getSubagentInsight(planId: string, minionId: string, parentAgentId?: string): Promise<SubagentInsight> {
         const query = parentAgentId ? `?parent_agent_id=${encodeURIComponent(parentAgentId)}` : '';
         return this.createTransport().getJson<SubagentInsight>(
