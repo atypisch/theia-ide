@@ -38,6 +38,7 @@ export const TITLEBAR_MENUS: ReadonlyArray<TitlebarMenuDef> = [
         items: [
             { label: 'New File…', commandId: 'soriku.overlay.newFile' },
             { label: 'New Window', commandId: 'soriku.overlay.newWindow' },
+            { label: 'New Agent…', commandId: 'soriku.agents.new' },
             { label: 'Open Folder…', commandId: 'workspace:openFolder' },
             { separator: true },
             { label: 'Save', commandId: 'core.save' },
@@ -97,6 +98,7 @@ export const TITLEBAR_MENUS: ReadonlyArray<TitlebarMenuDef> = [
         label: 'Agents',
         items: [
             { label: 'Open Agents', commandId: 'soriku.agents.toggle' },
+            { label: 'New Agent…', commandId: 'soriku.agents.new' },
             { separator: true },
             { label: 'Manage Models', commandId: 'soriku.models.open' },
             { label: 'Capability Map', commandId: 'soriku.capabilityMap.open' },

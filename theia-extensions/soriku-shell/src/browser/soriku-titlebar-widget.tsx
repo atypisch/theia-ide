@@ -10,7 +10,7 @@
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import * as React from '@theia/core/shared/react';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { CommandService } from '@theia/core/lib/common/command';
+import { CommandRegistry, CommandService } from '@theia/core/lib/common/command';
 import { CommonCommands } from '@theia/core/lib/browser/common-frontend-contribution';
 import { ApplicationShell } from '@theia/core/lib/browser/shell/application-shell';
 import { ThemeService } from '@theia/core/lib/browser/theming';
@@ -24,6 +24,12 @@ import { SorikuSidebarWidget } from './soriku-sidebar-widget';
 import { SorikuSidebarCommands } from './soriku-sidebar-contribution';
 
 const COMMAND_PALETTE_COMMAND_ID = 'workbench.action.showCommands';
+
+/**
+ * Registered by the Agents panel (soriku-agents). The titlebar button is only
+ * drawn while the command exists, so it never dangles without its panel.
+ */
+const TOGGLE_AGENTS_PANEL_COMMAND_ID = 'soriku.agentsPanel.toggle';
 
 /** Kept in sync with SorikuTitlebarCommands.TOGGLE_THEME in soriku-titlebar-contribution.ts. */
 const TOGGLE_THEME_COMMAND_ID = 'soriku.theme.toggle';
@@ -68,6 +74,9 @@ export class SorikuTitlebarWidget extends ReactWidget {
     @inject(CommandService)
     protected readonly commandService: CommandService;
 
+    @inject(CommandRegistry)
+    protected readonly commandRegistry: CommandRegistry;
+
     @inject(SorikuEngineStatusService)
     protected readonly engineStatus: SorikuEngineStatusService;
 
@@ -97,7 +106,8 @@ export class SorikuTitlebarWidget extends ReactWidget {
         // active state, so both these buttons and their keybindings/menu
         // items keep the icons in sync regardless of trigger source.
         this.toDispose.push(this.commandService.onDidExecuteCommand(e => {
-            if (e.commandId === SorikuSidebarCommands.TOGGLE.id || e.commandId === CommonCommands.TOGGLE_RIGHT_PANEL.id) {
+            if (e.commandId === SorikuSidebarCommands.TOGGLE.id || e.commandId === CommonCommands.TOGGLE_RIGHT_PANEL.id
+                || e.commandId === TOGGLE_AGENTS_PANEL_COMMAND_ID) {
                 this.update();
             }
         }));
@@ -109,6 +119,10 @@ export class SorikuTitlebarWidget extends ReactWidget {
 
     protected toggleRightPanel = (): void => {
         this.commandService.executeCommand(CommonCommands.TOGGLE_RIGHT_PANEL.id);
+    };
+
+    protected toggleAgentsPanel = (): void => {
+        this.commandService.executeCommand(TOGGLE_AGENTS_PANEL_COMMAND_ID);
     };
 
     protected toggleSidebar = (): void => {
@@ -132,6 +146,8 @@ export class SorikuTitlebarWidget extends ReactWidget {
         const tone = engineTone(state.status);
         const sidebarVisible = !this.sidebar.isHidden;
         const chatVisible = this.shell.isExpanded('right');
+        const hasAgentsPanel = !!this.commandRegistry.getCommand(TOGGLE_AGENTS_PANEL_COMMAND_ID);
+        const agentsPanelVisible = hasAgentsPanel && this.shell.getWidgets('right').some(w => w.id === 'soriku-agents-panel' && w.isVisible);
         return (
             <div className="soriku-titlebar-row">
                 <div className="soriku-titlebar-traffic-spacer">
@@ -175,6 +191,16 @@ export class SorikuTitlebarWidget extends ReactWidget {
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                 </button>
+                {hasAgentsPanel && <button
+                    className={`soriku-titlebar-icon-btn2${agentsPanelVisible ? ' active' : ''}`}
+                    title="Toggle agents"
+                    onClick={this.toggleAgentsPanel}
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="15" y1="3" x2="15" y2="21" />
+                    </svg>
+                </button>}
                 <button className="soriku-titlebar-icon-btn2" title="Toggle theme" onClick={this.toggleTheme}>
                     <span className="soriku-titlebar-theme-glyph" />
                 </button>
