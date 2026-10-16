@@ -1,5 +1,5 @@
 /*
- * Soriku IDE — design tokens (1:1 from the Claude Design mockup, "Soriku IDE.dc.html").
+ * Soriku IDE — design tokens (1:1 from the Claude Design mockup, "Soriku IDE v2.dc.html").
  * Dark is the default (:root); .soriku-light / body.soriku-light overrides to light.
  * Do not hand-edit values here without checking the mockup — this file is the source
  * of truth other stylesheets (soriku-ui, soriku-chat, soriku-shell, …) build on.
@@ -50,6 +50,13 @@
 
     --r: 10px;
     --rs: 6px;
+    --r-bubble: 12px;
+    --r-pop: 11px;
+    --r-modal: 14px;
+
+    --shadow-pop: 0 20px 50px -18px rgba(0, 0, 0, .55);
+    --shadow-modal: 0 40px 90px -30px rgba(0, 0, 0, .7);
+    --shadow-menu: 0 24px 60px -24px rgba(0, 0, 0, .6);
 }
 
 :root.soriku-light,
