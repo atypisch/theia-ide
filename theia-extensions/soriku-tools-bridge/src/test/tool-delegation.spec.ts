@@ -235,7 +235,7 @@ describe('coerceToolArgs', () => {
         assert.deepEqual(coerceToolArgs({ path: 'a' }), { path: 'a' });
         assert.deepEqual(coerceToolArgs('{"path":"a"}'), { path: 'a' });
         assert.deepEqual(coerceToolArgs('"{\\"path\\":\\"a\\"}"'), { path: 'a' });
-        for (const bad of [undefined, null, 5, 'not json', '[1]', [1, 2], true]) {
+        for (const bad of [undefined, 5, 'not json', '[1]', [1, 2], true, JSON.parse('null')]) {
             assert.deepEqual(coerceToolArgs(bad), {}, String(bad));
         }
     });
