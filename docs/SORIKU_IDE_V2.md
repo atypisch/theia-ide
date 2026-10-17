@@ -49,7 +49,7 @@ Tool output is redacted for secrets before it goes back to the model. Stops are 
 ## Test it
 
 ```bash
-yarn --cwd theia-extensions/<ext> test                       # unit tests per extension (671 in total)
+yarn --cwd theia-extensions/<ext> test                       # unit tests per extension (674 in total)
 node scripts/mock-engine.mjs --port 8799 --script guard      # scripted engine: IDE guard/approvals without a model
 ```
 

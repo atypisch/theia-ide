@@ -9,6 +9,7 @@
 
 import * as React from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
+import { CommandService } from '@theia/core/lib/common/command';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common';
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
@@ -38,6 +39,9 @@ export class SorikuMcpWidget extends ReactWidget {
 
     @inject(MessageService)
     protected readonly messages: MessageService;
+
+    @inject(CommandService)
+    protected readonly commands: CommandService;
 
     protected state: McpState = { status: 'loading', servers: [], health: {} };
     protected draft: ServerDraft = emptyDraft();
@@ -171,6 +175,11 @@ export class SorikuMcpWidget extends ReactWidget {
         }, 0);
     };
 
+    protected readonly installGuard = async (): Promise<void> => {
+        await this.commands.executeCommand('soriku.guard.install');
+        await this.refresh();
+    };
+
     protected render(): React.ReactNode {
         return <div className='sk-page soriku-mcp'>
             <PageHeader
@@ -179,6 +188,9 @@ export class SorikuMcpWidget extends ReactWidget {
                 emphasis='servers'
                 subhead='External servers whose tools flow to agents and workers. Connect once, every agent can call them.'
                 actions={<>
+                    <Btn variant='secondary' onClick={this.installGuard}>
+                        {this.state.servers.some(s => s.name === 'soriku-guard') ? 'Reinstall guard' : 'Install guard'}
+                    </Btn>
                     <Btn variant='primary' onClick={this.focusAddForm}>Add server</Btn>
                     <Btn variant='secondary' onClick={() => this.refresh()}>
                         <span className='codicon codicon-refresh' />
@@ -275,7 +287,8 @@ export class SorikuMcpWidget extends ReactWidget {
             return <div className='soriku-mcp-message'>No MCP servers configured. Add one above.</div>;
         }
         return <div className='soriku-mcp-list'>
-            {servers.map(s => this.renderServer(s, health))}
+            {[...servers].sort((a, b) => Number(b.name === 'soriku-guard') - Number(a.name === 'soriku-guard'))
+                .map(s => this.renderServer(s, health))}
         </div>;
     }
 
