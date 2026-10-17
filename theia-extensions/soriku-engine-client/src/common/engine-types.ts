@@ -100,7 +100,8 @@ export interface AgentUpdateRequest {
 }
 
 export interface ChatContextItem {
-    type: 'file' | 'text' | 'embedding_query';
+    /** `instructions` = the project's soriku.md as read (and approved) by the IDE. */
+    type: 'file' | 'text' | 'instructions' | 'embedding_query';
     value: string;
 }
 

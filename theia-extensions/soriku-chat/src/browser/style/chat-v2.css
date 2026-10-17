@@ -819,3 +819,56 @@
     border-radius: var(--r);
 }
 .sk-dropzone.hot { background: var(--acc-glow); border-color: var(--acc); }
+
+.sk-notice-warn { color: var(--ink); background: var(--warn-soft); border: 1px solid var(--warn-soft); }
+.sk-notice-warn b { font-family: var(--font-m); font-weight: 500; }
+.sk-notice-warn .sk-btn { margin-left: 0; margin-right: 8px; }
+
+/* ── Plan tab (v2 l.372-472) ────────────────────────────────────────────── */
+.soriku-plan-doc-widget { background: var(--bg-el); }
+.sk-plandoc { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-el); color: var(--ink); font-family: var(--font-s); }
+.sk-plandoc-empty { margin: 48px auto; color: var(--ink3); font-size: 13px; }
+.sk-plandoc-head {
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--line);
+}
+.sk-plandoc-path { font-family: var(--font-m); font-size: 11.5px; color: var(--ink3); }
+.sk-plandoc-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.sk-plandoc-body { max-width: 760px; margin: 0 auto; padding: 32px 28px 64px; }
+.sk-plandoc-title {
+    font-family: var(--font-d);
+    font-weight: 500;
+    font-size: clamp(24px, 3.2vw, 34px);
+    line-height: 1.15;
+    margin: 8px 0 10px;
+    color: var(--ink);
+}
+.sk-plandoc-meta { font-family: var(--font-m); font-size: 11px; color: var(--ink3); margin-bottom: 22px; }
+.sk-plandoc-md { font-size: 13.5px; line-height: 1.65; color: var(--ink2); }
+.sk-plandoc-card { border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); padding: 12px 14px; margin-top: 10px; }
+.sk-plandoc-card.active { border-color: var(--acc-line); }
+.sk-plandoc-card-head { display: flex; align-items: flex-start; gap: 12px; }
+.sk-plandoc-num { font-family: var(--font-m); font-size: 11px; color: var(--ink3); margin-top: 2px; flex-shrink: 0; width: 14px; }
+.sk-plandoc-goal {
+    flex: 1;
+    min-width: 0;
+    resize: vertical;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: var(--font-s);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 0 4px;
+}
+.sk-plandoc-goal:focus { outline: none; border-color: var(--acc-line); background: var(--bg-el); }
+.sk-plandoc-goal-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; }
+.sk-plandoc-goal-text.done { color: var(--ink3); text-decoration: line-through; text-decoration-color: var(--line2); }
+.sk-plandoc-state { display: flex; margin-top: 2px; }
+.sk-plandoc-card-meta { font-family: var(--font-m); font-size: 10.5px; color: var(--ink3); margin: 6px 0 0 26px; }

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
+import { conversationTitle } from 'soriku-engine-client-ext/lib/common/conversation-title';
+
 /** "just now", "5m", "3h", "2d", else a short date — the compact time in the v2 history list. */
 export function relativeTime(iso: string | undefined, now: Date = new Date()): string {
     if (!iso) { return ''; }
@@ -52,6 +54,5 @@ export function clockTime(ms: number | undefined): string {
 
 /** A stored title that is only the workspace line carries no information — show a neutral label. */
 export function historyTitle(title: string | undefined): string {
-    const t = (title ?? '').trim();
-    return !t || /^workspace:/i.test(t) ? 'Untitled chat' : t;
+    return conversationTitle(title);
 }

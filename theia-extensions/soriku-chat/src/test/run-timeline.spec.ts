@@ -7,7 +7,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAssistantTurn, AssistantTurn, ChatToolCall } from '../common/chat-model';
-import { deriveRunState, deriveSteps, resultFailed, runStateSnapshot, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
+import {
+    deriveRunState, deriveSteps, resultFailed, runStateSnapshot, runStats, shortPath, stepTarget, summarizeResult,
+} from '../common/run-timeline';
 
 function turnWith(calls: ChatToolCall[], patch: Partial<AssistantTurn> = {}): AssistantTurn {
     return { ...createAssistantTurn('t1'), toolCalls: calls, ...patch };
@@ -184,7 +186,7 @@ describe('runStats', () => {
 
 describe('runStateSnapshot', () => {
     it('is idle without a turn', () => {
-        assert.deepEqual(runStateSnapshot(undefined), { running: false, verified: 'none', workers: 0, minions: 0 });
+        assert.deepEqual(runStateSnapshot(undefined), { running: false, agents: [], verified: 'none', workers: 0, minions: 0 });
     });
     it('splits head agents from minions and carries verification', () => {
         const t = turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome: 'verified', args: { path: 'a.py' } }], {
@@ -194,7 +196,31 @@ describe('runStateSnapshot', () => {
                 { workerId: 'w3', status: 'running', files: [], corrections: 0, parentAgentId: 'p1' },
             ],
         });
-        assert.deepEqual(runStateSnapshot(t), { running: true, verified: 'verified', workers: 1, minions: 2 });
+        const snap = runStateSnapshot(t);
+        assert.deepEqual(
+            { running: snap.running, verified: snap.verified, workers: snap.workers, minions: snap.minions },
+            { running: true, verified: 'verified', workers: 1, minions: 2 });
+        assert.deepEqual(snap.agents.map(a => a.minion), [false, true, true]);
         assert.equal(runStateSnapshot({ ...t, status: 'done' }).running, false);
+    });
+});
+
+describe('runStateSnapshot agents', () => {
+    it('names agents and shows the live activity of a running one', () => {
+        const t = turnWith([{ callId: 'c1', tool: 'file_write', status: 'running', workerId: 'w1', args: { path: '/p/router.py' } }], {
+            planId: 'plan-1',
+            agents: [
+                { workerId: 'w1', agentName: 'Koda', model: 'qwen2.5-coder:7b', status: 'running', files: ['a'], corrections: 0 },
+                { workerId: 'w2', role: 'code-reviewer', status: 'done', files: [], corrections: 0 },
+            ],
+        });
+        const snap = runStateSnapshot(t);
+        assert.equal(snap.planId, 'plan-1');
+        assert.deepEqual(snap.agents[0], {
+            workerId: 'w1', name: 'Koda', role: undefined, model: 'qwen2.5-coder:7b', status: 'running', files: 1, minion: false,
+            personaId: undefined, parentAgentId: undefined, activity: 'Editing router.py',
+        });
+        assert.equal(snap.agents[1].name, 'Code Reviewer');
+        assert.equal(snap.agents[1].activity, undefined);
     });
 });

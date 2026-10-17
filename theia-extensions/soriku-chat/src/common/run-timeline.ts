@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import { RunStateSnapshot } from 'soriku-engine-client-ext/lib/common/run-state';
+import { IDLE_RUN_STATE, RunAgentView, RunStateSnapshot } from 'soriku-engine-client-ext/lib/common/run-state';
 import { AssistantTurn, ChatToolCall } from './chat-model';
 
 export type StepKind = 'think' | 'read' | 'edit' | 'shell' | 'check' | 'review';
@@ -242,14 +242,38 @@ export function runStats(turn: AssistantTurn, steps: RunStep[] = deriveSteps(tur
     };
 }
 
-/** What the status bar shows about this turn: live/finished, verification, and head vs sub-agent counts. */
+/** What the status bar and the Agents panel show about this turn. */
 export function runStateSnapshot(turn: AssistantTurn | undefined): RunStateSnapshot {
-    if (!turn) { return { running: false, verified: 'none', workers: 0, minions: 0 }; }
-    const minions = turn.agents.filter(a => !!a.parentAgentId).length;
+    if (!turn) { return { ...IDLE_RUN_STATE }; }
+    const steps = deriveSteps(turn);
+    const agents: RunAgentView[] = turn.agents.map(a => {
+        const own = turn.toolCalls.map((c, i) => ({ c, i })).filter(({ c }) => c.workerId === a.workerId);
+        const last = own.length > 0 ? own[own.length - 1] : undefined;
+        const step = last ? steps.find(st => st.id === (last.c.callId ?? `call-${last.i}`)) : undefined;
+        return {
+            workerId: a.workerId,
+            name: a.agentName ?? roleName(a.role) ?? a.workerId.slice(0, 8),
+            role: a.role,
+            model: a.model,
+            status: a.status,
+            files: a.files.length,
+            minion: !!a.parentAgentId,
+            personaId: a.personaId,
+            parentAgentId: a.parentAgentId,
+            activity: a.status === 'running' && step ? `${step.verbActive} ${step.target ?? ''}`.trim() : undefined,
+        };
+    });
+    const minions = agents.filter(a => a.minion).length;
     return {
         running: turn.status === 'streaming',
-        verified: runStats(turn).verified,
-        workers: turn.agents.length - minions,
+        planId: turn.planId,
+        agents,
+        verified: runStats(turn, steps).verified,
+        workers: agents.length - minions,
         minions,
     };
+}
+
+function roleName(role: string | undefined): string | undefined {
+    return role ? role.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : undefined;
 }

@@ -15,6 +15,8 @@ export const SORIKU_AUTO_APPLY_EDITS = 'soriku.tools.autoApplyEdits';
 export const SORIKU_AUTO_APPROVE = 'soriku.tools.autoApprove';
 export const SORIKU_APPROVAL_TIMEOUT_SECONDS = 'soriku.tools.approvalTimeoutSeconds';
 export const SORIKU_PLAN_MCP = 'soriku.tools.planMcp';
+export const SORIKU_CREATE_DEFAULT_INSTRUCTIONS = 'soriku.project.createDefaultInstructions';
+export const DEFAULT_CREATE_DEFAULT_INSTRUCTIONS = true;
 
 /** 'off' asks for every destructive tool call; 'safe' auto-approves everything except
  *  dangerous shell commands; 'all' auto-approves everything (YOLO). */
@@ -29,6 +31,13 @@ export const DEFAULT_PLAN_MCP = false;
 
 export const sorikuToolsPreferenceSchema: PreferenceSchema = {
     properties: {
+        [SORIKU_CREATE_DEFAULT_INSTRUCTIONS]: {
+            type: 'boolean',
+            description: 'Create a default soriku.md (project instructions for Soriku agents) when a folder is opened '
+                + 'that has none of soriku.md, AGENTS.md or CLAUDE.md.',
+            default: DEFAULT_CREATE_DEFAULT_INSTRUCTIONS,
+            scope: PreferenceScope.User,
+        },
         [SORIKU_AUTO_APPLY_EDITS]: {
             type: 'boolean',
             description: 'Apply agent-proposed file edits immediately. The diff still opens for '

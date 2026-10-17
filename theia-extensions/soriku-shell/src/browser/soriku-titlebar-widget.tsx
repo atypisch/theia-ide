@@ -147,7 +147,7 @@ export class SorikuTitlebarWidget extends ReactWidget {
         const sidebarVisible = !this.sidebar.isHidden;
         const chatVisible = this.shell.isExpanded('right');
         const hasAgentsPanel = !!this.commandRegistry.getCommand(TOGGLE_AGENTS_PANEL_COMMAND_ID);
-        const agentsPanelVisible = hasAgentsPanel && this.shell.getWidgets('right').some(w => w.id === 'soriku-agents-panel' && w.isVisible);
+        const agentsPanelVisible = hasAgentsPanel && this.shell.getWidgets('main').some(w => w.id === 'soriku-agents-panel' && w.isVisible);
         return (
             <div className="soriku-titlebar-row">
                 <div className="soriku-titlebar-traffic-spacer">

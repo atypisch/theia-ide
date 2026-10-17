@@ -31,6 +31,10 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
 import { SorikuCheckpointService } from 'soriku-tools-bridge-ext/lib/browser/soriku-checkpoint-service';
+import { SorikuPlanDocService } from './soriku-plan-doc-service';
+import { planMeta, planSlug, planTitle } from '../common/plan-doc';
+import { SorikuProjectInstructionsService } from 'soriku-tools-bridge-ext/lib/browser/soriku-project-instructions-service';
+import { SorikuInstructionsCommands } from 'soriku-tools-bridge-ext/lib/browser/soriku-project-instructions-contribution';
 import { SorikuRunStateService } from 'soriku-engine-client-ext/lib/browser/soriku-run-state-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { SorikuShellService, formatTree } from 'soriku-tools-bridge-ext/lib/common/shell-service';
@@ -50,7 +54,6 @@ import {
     ChatMessage,
     ChatToolCall,
     DEFAULT_RENDER_WINDOW,
-    PendingPlan,
     PlanTaskView,
     UserMessage,
     roleLabel,
@@ -72,6 +75,7 @@ import {
 } from '../common/mode-model';
 import { RunState, deriveRunState, deriveSteps, runStateSnapshot, runStats, shortPath, toolKind } from '../common/run-timeline';
 import { ChatHeader, HistoryEntry } from './components/ChatHeader';
+import { InstructionsBanner } from './components/InstructionsBanner';
 import { rightEdgeRect, showChatDropZone } from './chat-drop-zone';
 import { UserBubble } from './components/UserBubble';
 import { PlanCard, PlanTodoView } from './components/PlanCard';
@@ -152,6 +156,12 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(SorikuRunStateService)
     protected readonly runState: SorikuRunStateService;
+
+    @inject(SorikuProjectInstructionsService)
+    protected readonly projectInstructions: SorikuProjectInstructionsService;
+
+    @inject(SorikuPlanDocService)
+    protected readonly planDoc: SorikuPlanDocService;
 
     @inject(SorikuToastService)
     protected readonly toast: SorikuToastService;
@@ -259,8 +269,6 @@ export class SorikuChatWidget extends ReactWidget {
     protected resolvingPlans = new Set<string>();
     /** User-edited task goals keyed by plan id, then task id. */
     protected planTaskEdits = new Map<string, Map<string, string>>();
-    /** Plan id currently expanded into the full-size "Plan detail" overlay, if any. */
-    protected expandedPlanId: string | undefined;
     /** Root-level mount for the Plan detail overlay (needs a full-viewport backdrop, not the docked chat panel's own box). */
     protected planDetailHost: HTMLDivElement | undefined;
     protected planDetailRoot: Root | undefined;
@@ -333,6 +341,7 @@ export class SorikuChatWidget extends ReactWidget {
         this.toDispose.push({ dispose: this.toolApproval.onPendingChange(() => this.scheduleUpdate()) });
         this.toDispose.push(this.generatedFilesTracker.onDidChange(() => this.scheduleUpdate()));
         this.toDispose.push(this.checkpoints.onDidChange(() => this.scheduleUpdate()));
+        this.toDispose.push(this.projectInstructions.onDidChange(() => this.scheduleUpdate()));
         // Closing the panel mid-stream must stop everything: abort the SSE loop (so it
         // no longer mutates state / executes delegated tools / writes files) and flush
         // any pending approvals so the engine stream isn't left blocked (#2/#1).
@@ -743,6 +752,13 @@ export class SorikuChatWidget extends ReactWidget {
             if (tree) {
                 items.push(tree);
             }
+        }
+        // Project instructions (soriku.md): only text the user approved, re-read right now so an edit
+        // made a second ago is included. The engine does not read it from its own disk.
+        await this.projectInstructions.refresh();
+        const instructions = this.projectInstructions.getTextForRequest();
+        if (instructions) {
+            items.push({ type: 'instructions', value: instructions });
         }
         for (const rel of parseFileMentions(prompt)) {
             items.push({ type: 'file', value: rel });
@@ -1354,6 +1370,7 @@ export class SorikuChatWidget extends ReactWidget {
         const streamingTurn = lastTurn && lastTurn.status === 'streaming' ? lastTurn : undefined;
         // The status bar mirrors the latest run (publish de-duplicates, so doing it per render is cheap).
         this.runState.publish(runStateSnapshot(lastTurn));
+        this.syncPlanDoc(lastTurn);
         // As an editor tab the chat is labelled with its conversation (v2), not a generic name.
         const label = chatTitle(this.conversationTitle, this.conversation);
         const tabLabel = this.conversation.length > 0 ? label : SorikuChatWidget.LABEL;
@@ -1390,6 +1407,13 @@ export class SorikuChatWidget extends ReactWidget {
             <div className='sk-chat-scroll sk-scroll' ref={el => { this.scrollEl = el ?? undefined; }}>
                 <div className='sk-chat-stack'>
                     {viewingPast && <PastBanner when={this.pastWhen} onBack={() => this.backToLive()} />}
+                    {this.projectInstructions.getState().status === 'review' && <InstructionsBanner
+                        files={this.projectInstructions.getState().files}
+                        hasApprovedVersion={!!this.projectInstructions.getTextForRequest()}
+                        signals={this.projectInstructions.getState().signals}
+                        onOpen={() => this.fire(this.commands.executeCommand(SorikuInstructionsCommands.OPEN.id))}
+                        onApprove={() => this.fire(this.commands.executeCommand(SorikuInstructionsCommands.APPROVE.id))}
+                    />}
                     {this.conversation.length === 0 && <div className='sk-empty'>
                         {agentId ? 'Ask the agent a question to start.' : 'No agent selected — pick one in the Agents panel.'}
                     </div>}
@@ -1597,13 +1621,13 @@ export class SorikuChatWidget extends ReactWidget {
                 todos={todos}
                 open={this.planOpen}
                 onToggle={() => { this.planOpen = !this.planOpen; this.update(); }}
-                onOpenPlan={() => { this.expandedPlanId = plan.planId; this.update(); }}
+                onOpenPlan={() => this.openPlanTab()}
                 approve={awaiting ? {
                     costLabel: typeof plan.costEur === 'number'
                         ? (plan.costEur === 0 ? 'Runs locally · €0.00' : `est. €${plan.costEur.toFixed(2)}`)
                         : 'Review before it runs',
                     resolving: this.resolvingPlans.has(plan.planId),
-                    onReview: () => { this.expandedPlanId = plan.planId; this.update(); },
+                    onReview: () => this.openPlanTab(),
                     onApprove: () => this.approvePlan(plan.planId, plan.tasks),
                 } : undefined}
             />}
@@ -1666,90 +1690,42 @@ export class SorikuChatWidget extends ReactWidget {
         </div>;
     }
 
+    /** Opens the plan as a document tab next to the code (v2 "Open plan ↗" / "Review full plan"). */
+    protected openPlanTab(): void {
+        this.fire(this.planDoc.open());
+    }
+
+    /** Keeps the plan tab in step with the newest turn's plan; undefined clears it. */
+    protected syncPlanDoc(turn: AssistantTurn | undefined): void {
+        const plan = turn?.pendingPlan;
+        if (!turn || !plan) {
+            if (this.planDoc.get()) {
+                this.planDoc.set(undefined);
+            }
+            return;
+        }
+        const state = deriveRunState(turn, { paused: this.isPaused(turn) });
+        const userIdx = this.conversation.findIndex(m => m === turn) - 1;
+        const user = userIdx >= 0 ? this.conversation[userIdx] : undefined;
+        const title = planTitle(plan.document, user?.role === 'user' ? user.text : undefined);
+        const todos = this.planTodos(turn);
+        this.planDoc.set({
+            planId: plan.planId,
+            title,
+            slug: planSlug(title),
+            meta: planMeta({ createdAt: user?.role === 'user' ? user.at : undefined, tasks: plan.tasks.length, costEur: plan.costEur, clock: clockTime }),
+            document: plan.document,
+            todos: todos.map(t => ({ ...t, role: plan.tasks.find(x => x.id === t.id)?.role, model: plan.tasks.find(x => x.id === t.id)?.model })),
+            state: state === 'plan_ready' ? 'review' : state === 'paused' ? 'paused' : state === 'done' ? 'done' : state === 'failed' ? 'failed' : 'running',
+            resolving: this.resolvingPlans.has(plan.planId),
+            onEditGoal: (taskId, goal) => { this.setPlanTaskGoal(plan.planId, taskId, goal); this.scheduleUpdate(true); },
+            onApprove: () => this.approvePlan(plan.planId, plan.tasks),
+            onCancel: () => this.cancelPlan(plan.planId),
+        });
+    }
+
     protected shouldShowApproval(turn: AssistantTurn): boolean {
         return !!turn.planNeedsApproval && !!turn.awaitingApproval && !!turn.pendingPlan && turn.status === 'streaming';
-    }
-
-    /** The engine-rendered markdown plan document — reads first, Claude-Code style. Undefined for a plan loaded before this feature shipped (back-compat). */
-    protected renderPlanDocumentSection(plan: PendingPlan): React.ReactNode {
-        if (!plan.document) {
-            return undefined;
-        }
-        return <div className='soriku-plan-document sk-scroll'>
-            <ChatMarkdown text={plan.document} />
-        </div>;
-    }
-
-    /** Once a document is shown, the editable task list moves into a collapsible section beneath it. */
-    protected renderPlanTasksSection(plan: PendingPlan, resolving: boolean): React.ReactNode {
-        if (!plan.document) {
-            return this.renderPlanTaskList(plan, resolving);
-        }
-        return <details className='soriku-plan-tasks-details'>
-            <summary>Tasks (editable)</summary>
-            {this.renderPlanTaskList(plan, resolving)}
-        </details>;
-    }
-
-    /** Shared with the full-size Plan detail overlay — same real data, same edit affordance. */
-    protected renderPlanTaskList(plan: PendingPlan, resolving: boolean): React.ReactNode {
-        return <ol className='soriku-plan-tasks'>
-            {plan.tasks.map(t => <li key={t.id}>
-                <div className='soriku-plan-task-head'>
-                    <span className='soriku-plan-role'>{t.role}</span>
-                    {t.model && <span className='soriku-plan-model'>{t.model}</span>}
-                </div>
-                <textarea
-                    className='theia-input soriku-plan-goal-edit'
-                    rows={2}
-                    disabled={resolving}
-                    value={this.getPlanTaskGoal(plan.planId, t.id, t.goal)}
-                    onChange={e => {
-                        this.setPlanTaskGoal(plan.planId, t.id, e.target.value);
-                        this.scheduleUpdate(true);
-                    }}
-                />
-            </li>)}
-        </ol>;
-    }
-
-    protected renderPlanActions(plan: PendingPlan, resolving: boolean): React.ReactNode {
-        return <div className='soriku-plan-actions'>
-            <Btn disabled={resolving} onClick={() => this.approvePlan(plan.planId, plan.tasks)}>
-                {resolving ? 'Starting…' : 'Approve & run'}
-            </Btn>
-            <Btn variant='secondary' disabled={resolving} onClick={() => this.cancelPlan(plan.planId)}>
-                Cancel
-            </Btn>
-        </div>;
-    }
-
-    /**
-     * Footer of the Plan Detail overlay — 1:1 from the mockup: a caption, then either
-     * Approve/Cancel or a running-spinner state (no separate "Edit plan" button — every
-     * task's goal is already directly editable inline in the task list above, so there's
-     * no distinct edit mode to toggle into).
-     */
-    protected renderPlanDetailFooter(plan: PendingPlan, resolving: boolean): React.ReactNode {
-        return <div className='soriku-plan-detail-footer'>
-            <span className='soriku-plan-detail-footer-caption'>Local-first · nothing leaves this machine on Auto</span>
-            <div className='soriku-plan-detail-footer-spacer' />
-            {resolving
-                ? <span className='soriku-plan-detail-running'>
-                    <span className='soriku-plan-detail-spinner' />Running the full plan…
-                </span>
-                : this.renderPlanActions(plan, resolving)}
-        </div>;
-    }
-
-    /** The turn (if any) still carrying the plan the user chose to expand. */
-    protected findExpandedPlan(): AssistantTurn | undefined {
-        if (!this.expandedPlanId) {
-            return undefined;
-        }
-        return this.conversation.find(
-            (m): m is AssistantTurn => m.role === 'assistant' && (m as AssistantTurn).pendingPlan?.planId === this.expandedPlanId,
-        );
     }
 
     /**
@@ -1762,49 +1738,8 @@ export class SorikuChatWidget extends ReactWidget {
             this.planDetailRoot?.render(this.renderSubagentOverlay());
             return;
         }
-        const turn = this.findExpandedPlan();
-        if (!turn?.pendingPlan) {
-            this.expandedPlanId = undefined;
-            // eslint-disable-next-line no-null/no-null
-            this.planDetailRoot?.render(null);
-            return;
-        }
-        const plan = turn.pendingPlan;
-        const resolving = this.resolvingPlans.has(plan.planId);
-        const close = (): void => { this.expandedPlanId = undefined; this.update(); };
-        this.planDetailRoot?.render(
-            <Overlay onClose={close} frameStyle={{ width: 680, maxWidth: '92vw', maxHeight: 'calc(100vh - 140px)' }}>
-                <div className='soriku-plan-detail'>
-                    <div className='soriku-plan-detail-header'>
-                        <div className='soriku-plan-detail-header-row'>
-                            <span className='soriku-plan-detail-title sk-em'>Execution plan</span>
-                            <span className={`soriku-plan-detail-pill${resolving ? ' running' : ''}`}>{resolving ? 'Running' : 'Review'}</span>
-                            <div className='soriku-plan-detail-header-spacer' />
-                            <button className='soriku-plan-detail-close' onClick={close} title='Close'>
-                                <span className='codicon codicon-close' />
-                            </button>
-                        </div>
-                        <div className='soriku-plan-detail-meta'>
-                            <span className='soriku-plan-detail-meta-mp'>
-                                <span className='soriku-plan-detail-mp-badge'>MP</span>Generated by Master Planner
-                            </span>
-                            <span>·</span><span>{plan.tasks.length} task{plan.tasks.length === 1 ? '' : 's'}</span>
-                            {typeof plan.costEur === 'number' && <><span>·</span><span>est. €{plan.costEur.toFixed(2)}</span></>}
-                        </div>
-                    </div>
-                    <div className='soriku-plan-detail-banner'>
-                        <b>How this was generated:</b> the Master Planner classified your prompt, pulled the capability map, and decomposed
-                        the work into ordered, independently-verifiable tasks — each assigned to the cheapest capable model, local-first.
-                        Review it, then run the whole plan or step through it.
-                    </div>
-                    <div className='soriku-plan-detail-body sk-scroll'>
-                        {this.renderPlanDocumentSection(plan)}
-                        {this.renderPlanTasksSection(plan, resolving)}
-                    </div>
-                    {this.renderPlanDetailFooter(plan, resolving)}
-                </div>
-            </Overlay>,
-        );
+        // eslint-disable-next-line no-null/no-null
+        this.planDetailRoot?.render(null);
     }
 
     // ── Subagents (minions) — Fase F5: Insight / Promote / Spawn ────────────
@@ -1823,6 +1758,19 @@ export class SorikuChatWidget extends ReactWidget {
         this.subagentOverlayError = undefined;
         this.update();
         void this.loadSubagentInsight();
+    }
+
+    /** Public entry for the Agents panel: open the Insight overlay for a minion of the latest run. */
+    openSubagentInsightFor(planId: string, workerId: string): void {
+        const agent = this.lastAssistant()?.agents.find(a => a.workerId === workerId);
+        if (agent) {
+            this.openSubagentInsight(agent, planId);
+        }
+    }
+
+    /** Public entry for the Agents panel: open the Spawn overlay under a head agent. */
+    openSpawnSubagentFor(planId: string, parentAgentId: string): void {
+        this.openSpawnSubagent(planId, parentAgentId);
     }
 
     /** Opens the Spawn overlay for the given head agent's live plan run. */

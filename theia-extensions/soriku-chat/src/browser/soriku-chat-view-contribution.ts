@@ -20,6 +20,10 @@ export namespace SorikuChatCommands {
     export const TOGGLE = 'soriku.chat.toggle';
     /** Open the chat for a given agent id (invoked by the agents panel's "Open chat"). */
     export const OPEN: Command = { id: 'soriku.chat.open', category: 'Soriku', label: 'Open Chat' };
+    /** Invoked by the Agents panel (args: {planId, workerId}). */
+    export const SUBAGENT_INSIGHT: Command = { id: 'soriku.chat.subagent.insight' };
+    /** Invoked by the Agents panel (args: {planId, parentAgentId}). */
+    export const SUBAGENT_SPAWN: Command = { id: 'soriku.chat.subagent.spawn' };
 }
 
 @injectable()
@@ -56,6 +60,16 @@ export class SorikuChatViewContribution
                     this.selection.setActive(agentId);
                 }
                 return this.openView({ activate: true, reveal: true });
+            },
+        });
+        commands.registerCommand(SorikuChatCommands.SUBAGENT_INSIGHT, {
+            execute: (arg?: { planId?: string; workerId?: string }) => {
+                if (arg?.planId && arg.workerId) { this.tryGetWidget()?.openSubagentInsightFor(arg.planId, arg.workerId); }
+            },
+        });
+        commands.registerCommand(SorikuChatCommands.SUBAGENT_SPAWN, {
+            execute: (arg?: { planId?: string; parentAgentId?: string }) => {
+                if (arg?.planId && arg.parentAgentId) { this.tryGetWidget()?.openSpawnSubagentFor(arg.planId, arg.parentAgentId); }
             },
         });
     }

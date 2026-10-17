@@ -18,6 +18,8 @@ import { sorikuAgentsPreferenceSchema } from './soriku-agents-preferences';
 import { SorikuAgentsWidget } from './soriku-agents-widget';
 import { SorikuAgentsViewContribution } from './soriku-agents-view-contribution';
 import { SorikuNewAgentContribution } from './soriku-new-agent-contribution';
+import { SorikuAgentsPanelWidget } from './soriku-agents-panel-widget';
+import { SorikuAgentsPanelContribution } from './soriku-agents-panel-contribution';
 
 export default new ContainerModule(bind => {
     bind(SorikuAgentSelectionService).toSelf().inSingletonScope();
@@ -35,6 +37,14 @@ export default new ContainerModule(bind => {
 
     bindViewContribution(bind, SorikuAgentsViewContribution);
     bind(FrontendApplicationContribution).toService(SorikuAgentsViewContribution);
+
+    bind(SorikuAgentsPanelWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: SorikuAgentsPanelWidget.ID,
+        createWidget: () => ctx.container.get<SorikuAgentsPanelWidget>(SorikuAgentsPanelWidget),
+    })).inSingletonScope();
+    bind(SorikuAgentsPanelContribution).toSelf().inSingletonScope();
+    bind(CommandContribution).toService(SorikuAgentsPanelContribution);
 
     bind(SorikuNewAgentContribution).toSelf().inSingletonScope();
     bind(CommandContribution).toService(SorikuNewAgentContribution);
