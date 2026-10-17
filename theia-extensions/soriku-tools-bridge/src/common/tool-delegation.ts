@@ -33,6 +33,22 @@ export const DELEGATED_TOOLS: readonly string[] = [
     'shell_job_status', 'shell_job_stop',
 ];
 
+/**
+ * Tool arguments as an object. The engine sends an object; a JSON string is accepted too (other producers
+ * do that). Anything else becomes `{}` — the guard then refuses file tools that have no path, so malformed
+ * arguments can never turn into a quiet no-op "success" or a write to the workspace root.
+ */
+export function coerceToolArgs(raw: unknown): Record<string, unknown> {
+    if (typeof raw === 'string') {
+        try {
+            return coerceToolArgs(JSON.parse(raw));
+        } catch {
+            return {};
+        }
+    }
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+}
+
 /** Extract a delegated tool request from a `tool_request` SSE event, or undefined if malformed. */
 export function parseToolRequestEvent(event: SorikuSseEvent): ToolRequest | undefined {
     if (event.type !== 'tool_request') {
@@ -43,8 +59,7 @@ export function parseToolRequestEvent(event: SorikuSseEvent): ToolRequest | unde
     if (!requestId || !tool) {
         return undefined;
     }
-    const args = event.args && typeof event.args === 'object' ? event.args as Record<string, unknown> : {};
-    return { requestId, tool, args, iteration: typeof event.iteration === 'number' ? event.iteration : undefined };
+    return { requestId, tool, args: coerceToolArgs(event.args), iteration: typeof event.iteration === 'number' ? event.iteration : undefined };
 }
 
 export function getStringArg(args: Record<string, unknown>, key: string): string | undefined {

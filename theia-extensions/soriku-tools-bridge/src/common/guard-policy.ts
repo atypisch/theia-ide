@@ -265,6 +265,9 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 export function evaluateToolCall(input: GuardInput): GuardDecision {
     const { tool, args, workspaceRoot: root } = input;
     const path = str(args.path) || str(args.file_path) || str(args.file);
+    // Fail closed: a file tool without a target is malformed, never "the workspace root".
+    const needsPath = tool === 'file_read' || tool === 'file_write' || (tool === 'apply_patch' && !/^\+\+\+ /m.test(str(args.patch) || str(args.diff) || str(args.content)));
+    if (needsPath && !path) { return deny('missing-path', `${tool} was called without a file path.`); }
     switch (tool) {
         case 'file_write': {
             return stricter(checkPath({ path, root, op: 'write', resolved: input.resolvedPath }), checkWriteContent(path, str(args.content)));

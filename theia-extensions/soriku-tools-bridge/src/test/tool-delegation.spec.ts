@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    applyUnifiedPatch, computeLineDiffStats,
+    applyUnifiedPatch, coerceToolArgs, computeLineDiffStats,
     DELEGATED_TOOLS, formatDirectoryListing, formatWriteResult, parseToolRequestEvent, pathKind,
     progressiveRevealFrames, truncateToMaxLines, normalizePosixPath, isPathWithinRoot, sessionAllowKey,
 } from '../common/tool-delegation';
@@ -227,5 +227,21 @@ describe('computeLineDiffStats (chat DiffBar)', () => {
         const huge = new Array(4001).fill('line').join('\n');
         assert.equal(computeLineDiffStats(huge, 'a'), undefined);
         assert.equal(computeLineDiffStats('a', huge), undefined);
+    });
+});
+
+describe('coerceToolArgs', () => {
+    it('accepts an object, a JSON string, and turns everything else into {}', () => {
+        assert.deepEqual(coerceToolArgs({ path: 'a' }), { path: 'a' });
+        assert.deepEqual(coerceToolArgs('{"path":"a"}'), { path: 'a' });
+        assert.deepEqual(coerceToolArgs('"{\\"path\\":\\"a\\"}"'), { path: 'a' });
+        for (const bad of [undefined, null, 5, 'not json', '[1]', [1, 2], true]) {
+            assert.deepEqual(coerceToolArgs(bad), {}, String(bad));
+        }
+    });
+    it('parseToolRequestEvent uses it', () => {
+        const req = parseToolRequestEvent({ type: 'tool_request', request_id: 'r', tool: 'file_write', args: '{"path":"x","content":"y"}' });
+        assert.deepEqual(req?.args, { path: 'x', content: 'y' });
+        assert.deepEqual(parseToolRequestEvent({ type: 'tool_request', request_id: 'r', tool: 'file_write', args: 7 })?.args, {});
     });
 });

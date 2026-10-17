@@ -177,6 +177,23 @@ describe('shell: allow', () => {
     });
 });
 
+describe('fail closed on malformed calls', () => {
+    it('file tools without a path are denied, not treated as the workspace root', () => {
+        assert.equal(verdict('file_write', {}), 'deny');
+        assert.equal(verdict('file_write', { content: 'x' }), 'deny');
+        assert.equal(verdict('file_read', {}), 'deny');
+        assert.equal(verdict('apply_patch', { patch: '@@ -1 +1 @@\n-a\n+b' }), 'deny');
+        assert.equal(evaluateToolCall({ tool: 'file_write', args: {}, workspaceRoot: ROOT }).rule, 'missing-path');
+    });
+    it('a patch that names its file in the header is fine without a path argument', () => {
+        assert.equal(verdict('apply_patch', { patch: '--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n' }), 'allow');
+    });
+    it('list_directory and project_search may omit the path (they mean the workspace)', () => {
+        assert.equal(verdict('list_directory', {}), 'allow');
+        assert.equal(verdict('project_search', { query: 'x' }), 'allow');
+    });
+});
+
 describe('evaluateToolCall routes by tool', () => {
     it('reads and listings check the path', () => {
         assert.equal(verdict('file_read', { path: 'src/a.ts' }), 'allow');
