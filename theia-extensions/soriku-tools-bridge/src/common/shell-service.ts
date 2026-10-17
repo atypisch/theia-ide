@@ -60,6 +60,13 @@ export interface SorikuShellService {
     stopJob(jobId: string): Promise<boolean>;
     search(pattern: string, baseDir: string, maxHits?: number): Promise<RipgrepHit[]>;
     listTree(baseDir: string, maxEntries?: number): Promise<TreeEntry[]>;
+    /**
+     * The real path of `path` after resolving symlinks. For a path that does not exist yet (a file about to be
+     * created) the nearest existing ancestor is resolved and the rest appended. undefined = nothing resolvable.
+     */
+    realpath(path: string): Promise<string | undefined>;
+    /** How to start the soriku-guard MCP server (node entry + the interpreter/env to run it). */
+    guardMcpLaunch(): Promise<{ command: string; args: string[]; env: Record<string, string> }>;
 }
 
 export function clampTimeoutMs(timeoutMs: number | undefined): number {

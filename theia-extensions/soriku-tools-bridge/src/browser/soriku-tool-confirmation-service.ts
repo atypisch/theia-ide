@@ -16,6 +16,7 @@ import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service
 import { EngineClient } from 'soriku-engine-client-ext/lib/common/engine-client';
 import { SorikuSseEvent, ToolExecResult } from 'soriku-engine-client-ext/lib/common/engine-types';
 import { describeToolConfirmation, parseConfirmToolEvent } from '../common/tool-confirmation';
+import { GuardDecision } from '../common/guard-policy';
 import {
     DELEGATED_TOOLS, ToolRequest, applyUnifiedPatch, computeLineDiffStats, errorResult, formatDirectoryListing,
     formatSearchResults, formatWriteResult, getBooleanArg, getNumberArg, getStringArg, isDangerousShellCommand,
@@ -30,6 +31,7 @@ import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
 import { SorikuDiffReviewService } from './soriku-diff-review-service';
 import { SorikuGeneratedFilesTracker } from './soriku-generated-files-tracker';
 import { SorikuCheckpointService } from './soriku-checkpoint-service';
+import { SorikuGuardService } from './soriku-guard-service';
 
 /** Session-scoped auto-approve for destructive tools (Allow always). */
 const SESSION_ALLOW = new Set<string>();
@@ -60,6 +62,9 @@ export class SorikuToolConfirmationService {
 
     @inject(SorikuCheckpointService)
     protected readonly checkpoints: SorikuCheckpointService;
+
+    @inject(SorikuGuardService)
+    protected readonly guard: SorikuGuardService;
 
     @inject(SorikuShellService)
     protected readonly shellService: SorikuShellService;
@@ -118,12 +123,23 @@ export class SorikuToolConfirmationService {
         try {
             if (!DELEGATED_TOOLS.includes(request.tool)) {
                 result = errorResult(`Tool ${request.tool} cannot be executed in the IDE.`);
-            } else if ((request.tool === 'file_write' || request.tool === 'apply_patch' || request.tool === 'shell_exec')
-                && !(await this.confirmDestructive(request))) {
-                approved = false;
-                result = errorResult('Tool call denied by user.');
             } else {
-                result = await this.runTool(request);
+                // Mandatory guard, before anything else: a deny is final (no "Always allow", no preference, no
+                // soriku.md overrides it); a confirm is asked every time, even with auto-approve "all".
+                const decision = await this.guard.evaluate(request.tool, request.args as Record<string, unknown>);
+                if (decision.verdict === 'deny') {
+                    // approved:true + an error result, so the agent reads WHY instead of a bare "denied by user".
+                    result = errorResult(`Refused by Soriku guard (${decision.rule}): ${decision.reasons.join(' ')}`);
+                } else if (this.needsConfirmation(request, decision.verdict === 'confirm') && !(await this.confirmDestructive(request, decision))) {
+                    approved = false;
+                    result = errorResult('Tool call denied by user.');
+                } else {
+                    result = await this.runTool(request);
+                    if (result.result) {
+                        // Secrets never go back to the model — not from a file, a command or a search.
+                        result = { ...result, result: this.guard.redact(result.result).text };
+                    }
+                }
             }
         } catch (e) {
             result = errorResult((e as Error).message);
@@ -136,30 +152,37 @@ export class SorikuToolConfirmationService {
         });
     }
 
-    protected async confirmDestructive(request: ToolRequest): Promise<boolean> {
-        if (SESSION_ALLOW.has(sessionAllowKey(request.tool, request.args))) {
+    /** Destructive tools always ask (subject to the user's settings); a guard `confirm` asks regardless of settings. */
+    protected needsConfirmation(request: ToolRequest, guardConfirm: boolean): boolean {
+        return guardConfirm || request.tool === 'file_write' || request.tool === 'apply_patch' || request.tool === 'shell_exec';
+    }
+
+    protected async confirmDestructive(request: ToolRequest, decision?: GuardDecision): Promise<boolean> {
+        const forced = decision?.verdict === 'confirm';
+        if (!forced && SESSION_ALLOW.has(sessionAllowKey(request.tool, request.args))) {
             return true;
         }
         // File writes get a diff review (see proposed changes, then accept/reject)
         // instead of a plain banner. shell_exec keeps the banner — there's no diff.
         if (request.tool === 'file_write' || request.tool === 'apply_patch') {
-            return this.reviewWrite(request);
+            return this.reviewWrite(request, forced);
         }
         const autoApprove = this.preferences.get<AutoApproveLevel>(SORIKU_AUTO_APPROVE, DEFAULT_AUTO_APPROVE);
-        if (autoApprove === 'all') {
+        if (!forced && autoApprove === 'all') {
             return true;
         }
-        if (autoApprove === 'safe' && !this.isDangerousShellRequest(request)) {
+        if (!forced && autoApprove === 'safe' && !this.isDangerousShellRequest(request)) {
             return true;
         }
-        const view = describeToolConfirmation({
+        const base = describeToolConfirmation({
             confirmationId: request.requestId,
             tool: request.tool,
             args: request.args,
             iteration: request.iteration,
         });
+        const view = forced && decision ? { ...base, message: `${base.message}\n\nGuard: ${decision.reasons.join(' ')}`, destructive: true } : base;
         const { approved, rememberSession } = await this.promptUser(request.tool, view, request.requestId);
-        if (approved && rememberSession) {
+        if (approved && rememberSession && !forced) {
             SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
         }
         return approved;
@@ -186,7 +209,7 @@ export class SorikuToolConfirmationService {
      * Compute the full proposed content for a file_write / apply_patch and show it
      * as a diff for the user to accept or reject — before anything is written.
      */
-    protected async reviewWrite(request: ToolRequest): Promise<boolean> {
+    protected async reviewWrite(request: ToolRequest, forceBlocking = false): Promise<boolean> {
         const uri = await this.resolveUri(getStringArg(request.args, 'path') ?? '');
         let proposed: string;
         if (request.tool === 'apply_patch') {
@@ -203,9 +226,9 @@ export class SorikuToolConfirmationService {
         }
         const autoApply = this.preferences.get<boolean>(SORIKU_AUTO_APPLY_EDITS, DEFAULT_AUTO_APPLY_EDITS);
         const { approved, rememberSession } = await this.diffReview.reviewProposedWrite(
-            uri, proposed, request.tool, { blocking: !autoApply },
+            uri, proposed, request.tool, { blocking: forceBlocking || !autoApply },
         );
-        if (approved && rememberSession) {
+        if (approved && rememberSession && !forceBlocking) {
             SESSION_ALLOW.add(sessionAllowKey(request.tool, request.args));
         }
         return approved;

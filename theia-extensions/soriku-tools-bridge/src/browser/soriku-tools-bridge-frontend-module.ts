@@ -13,6 +13,8 @@ import { SorikuToolApprovalBridge } from './soriku-tool-approval-bridge';
 import { SorikuDiffReviewService } from './soriku-diff-review-service';
 import { SorikuGeneratedFilesTracker } from './soriku-generated-files-tracker';
 import { SorikuCheckpointService } from './soriku-checkpoint-service';
+import { SorikuGuardService } from './soriku-guard-service';
+import { SorikuGuardContribution } from './soriku-guard-contribution';
 import { SorikuProjectInstructionsService } from './soriku-project-instructions-service';
 import { SorikuProjectInstructionsContribution } from './soriku-project-instructions-contribution';
 import { SORIKU_SHELL_SERVICE_PATH, SorikuShellService } from '../common/shell-service';
@@ -24,6 +26,9 @@ export default new ContainerModule(bind => {
     bind(SorikuDiffReviewService).toSelf().inSingletonScope();
     bind(SorikuGeneratedFilesTracker).toSelf().inSingletonScope();
     bind(SorikuCheckpointService).toSelf().inSingletonScope();
+    bind(SorikuGuardService).toSelf().inSingletonScope();
+    bind(SorikuGuardContribution).toSelf().inSingletonScope();
+    bind(CommandContribution).toService(SorikuGuardContribution);
     bind(SorikuProjectInstructionsService).toSelf().inSingletonScope();
     bind(SorikuProjectInstructionsContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuProjectInstructionsContribution);

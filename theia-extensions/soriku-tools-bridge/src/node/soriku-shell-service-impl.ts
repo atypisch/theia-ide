@@ -175,6 +175,30 @@ export class SorikuShellServiceImpl implements SorikuShellService {
         }
     }
 
+    async guardMcpLaunch(): Promise<{ command: string; args: string[]; env: Record<string, string> }> {
+        // In the desktop app process.execPath is the Electron binary; ELECTRON_RUN_AS_NODE makes it behave as plain node.
+        const env: Record<string, string> = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {};
+        return { command: process.execPath, args: [path.join(__dirname, 'guard-mcp-main.js')], env };
+    }
+
+    async realpath(target: string): Promise<string | undefined> {
+        let current = path.resolve(target);
+        const tail: string[] = [];
+        for (;;) {
+            try {
+                const real = await fs.realpath(current);
+                return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
+            } catch {
+                const parent = path.dirname(current);
+                if (parent === current) {
+                    return undefined;
+                }
+                tail.push(path.basename(current));
+                current = parent;
+            }
+        }
+    }
+
     async listTree(baseDir: string, maxEntries = 200): Promise<TreeEntry[]> {
         const entries: TreeEntry[] = [];
         const queue: { dir: string; depth: number }[] = [{ dir: baseDir, depth: 0 }];

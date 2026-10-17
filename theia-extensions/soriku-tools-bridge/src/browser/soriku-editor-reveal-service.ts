@@ -8,7 +8,7 @@ import URI from '@theia/core/lib/common/uri';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { OpenerService } from '@theia/core/lib/browser/opener-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
-import { pathKind } from '../common/tool-delegation';
+import { isPathWithinRoot, pathKind } from '../common/tool-delegation';
 
 export interface RevealFileOptions {
     /** Scroll to this 1-based line after opening. */
@@ -54,16 +54,26 @@ export class SorikuEditorRevealService {
       this.lastRevealed = '';
   }
 
+  /**
+   * Resolves an engine-reported path for revealing. Contained to the workspace like every other path the
+   * agent can name: an absolute path outside it (or any path with no workspace open) is refused, so an
+   * event from the engine can never make the IDE open an arbitrary file.
+   */
   protected async resolveUri(path: string): Promise<URI> {
       const roots = await this.workspaceService.roots;
       const root = roots[0]?.resource;
       if (!root) {
-          return new URI(path.startsWith('/') ? `file://${path}` : path);
+          throw new Error('No workspace folder is open.');
       }
+      let candidate: URI;
       switch (pathKind(path)) {
           case 'root': return root;
-          case 'absolute': return new URI(`file://${path}`);
-          default: return root.resolve(path);
+          case 'absolute': candidate = root.withPath(path); break;
+          default: candidate = root.resolve(path); break;
       }
+      if (!isPathWithinRoot(root.path.toString(), candidate.path.toString())) {
+          throw new Error(`Refused: "${path}" is outside the workspace folder.`);
+      }
+      return candidate;
   }
 }
