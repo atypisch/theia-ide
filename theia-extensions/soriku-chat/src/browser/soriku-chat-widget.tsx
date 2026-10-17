@@ -31,6 +31,7 @@ import { SorikuToolApprovalBridge } from 'soriku-tools-bridge-ext/lib/browser/so
 import { SorikuEditorRevealService } from 'soriku-tools-bridge-ext/lib/browser/soriku-editor-reveal-service';
 import { SorikuGeneratedFilesTracker } from 'soriku-tools-bridge-ext/lib/browser/soriku-generated-files-tracker';
 import { SorikuCheckpointService } from 'soriku-tools-bridge-ext/lib/browser/soriku-checkpoint-service';
+import { SorikuRunStateService } from 'soriku-engine-client-ext/lib/browser/soriku-run-state-service';
 import { shouldRevealWrite } from 'soriku-tools-bridge-ext/lib/common/agent-activity';
 import { SorikuShellService, formatTree } from 'soriku-tools-bridge-ext/lib/common/shell-service';
 import { SORIKU_PLAN_MCP, DEFAULT_PLAN_MCP } from 'soriku-tools-bridge-ext/lib/browser/soriku-tools-preferences';
@@ -69,8 +70,9 @@ import { EditAction, EditChoice, editActions, needsDecision } from '../common/me
 import {
     ChatModeChoice, DEFAULT_MODE, DEFAULT_MODEL, ModelSelection, RoutingChoice, placeholderFor, resolveRun, toggleMultiple,
 } from '../common/mode-model';
-import { RunState, deriveRunState, deriveSteps, runStats, shortPath, toolKind } from '../common/run-timeline';
+import { RunState, deriveRunState, deriveSteps, runStateSnapshot, runStats, shortPath, toolKind } from '../common/run-timeline';
 import { ChatHeader, HistoryEntry } from './components/ChatHeader';
+import { rightEdgeRect, showChatDropZone } from './chat-drop-zone';
 import { UserBubble } from './components/UserBubble';
 import { PlanCard, PlanTodoView } from './components/PlanCard';
 import { ApprovalView, RunTimeline, StepDetail } from './components/RunTimeline';
@@ -147,6 +149,9 @@ export class SorikuChatWidget extends ReactWidget {
 
     @inject(CommandRegistry)
     protected readonly commandRegistry: CommandRegistry;
+
+    @inject(SorikuRunStateService)
+    protected readonly runState: SorikuRunStateService;
 
     @inject(SorikuToastService)
     protected readonly toast: SorikuToastService;
@@ -1044,6 +1049,32 @@ export class SorikuChatWidget extends ReactWidget {
         this.update();
     }
 
+    /** Header drag: offer the other placement as a drop zone (v2 "Drop to open chat as a tab" / "Dock chat to the side"). */
+    protected removeDropZone: (() => void) | undefined;
+
+    protected onHeaderDragStart(e: React.DragEvent<HTMLDivElement>): void {
+        e.dataTransfer.setData('text/plain', 'soriku-chat');
+        e.dataTransfer.effectAllowed = 'move';
+        const toTab = this.placement === 'dock';
+        const main = document.getElementById('theia-main-content-panel')?.getBoundingClientRect();
+        const top = main?.top ?? 42;
+        // Added on the next tick: showing it synchronously cancels the drag in some browsers.
+        window.setTimeout(() => {
+            this.removeDropZone?.();
+            this.removeDropZone = showChatDropZone({
+                rect: toTab && main ? { left: main.left, top: main.top, width: main.width, height: main.height }
+                    : rightEdgeRect(window.innerWidth, window.innerHeight, top),
+                label: toTab ? 'Drop to open chat as a tab' : 'Dock chat to the side',
+                onDrop: () => { this.onHeaderDragEnd(); this.fire(this.togglePlacement()); },
+            });
+        }, 0);
+    }
+
+    protected onHeaderDragEnd(): void {
+        this.removeDropZone?.();
+        this.removeDropZone = undefined;
+    }
+
     protected toggleMaximize(): void {
         if (this.placement === 'tab') {
             this.shell.toggleMaximized(this);
@@ -1321,6 +1352,8 @@ export class SorikuChatWidget extends ReactWidget {
         const messages = visibleMessages(this.conversation, this.showEarlierMessages);
         const chip = viewingPast ? { label: 'Past', cls: 'sk-chip-past' } : this.chipFor(lastTurn);
         const streamingTurn = lastTurn && lastTurn.status === 'streaming' ? lastTurn : undefined;
+        // The status bar mirrors the latest run (publish de-duplicates, so doing it per render is cheap).
+        this.runState.publish(runStateSnapshot(lastTurn));
         // As an editor tab the chat is labelled with its conversation (v2), not a generic name.
         const label = chatTitle(this.conversationTitle, this.conversation);
         const tabLabel = this.conversation.length > 0 ? label : SorikuChatWidget.LABEL;
@@ -1350,6 +1383,8 @@ export class SorikuChatWidget extends ReactWidget {
                 maxed={this.maximized}
                 onMax={() => this.toggleMaximize()}
                 onInsights={agentId ? () => this.fire(this.toggleInsights()) : undefined}
+                onDragStart={e => this.onHeaderDragStart(e)}
+                onDragEnd={() => this.onHeaderDragEnd()}
             />
             {agentId && this.insightsOpen && this.renderInsights()}
             <div className='sk-chat-scroll sk-scroll' ref={el => { this.scrollEl = el ?? undefined; }}>

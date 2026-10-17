@@ -21,6 +21,10 @@ export class SorikuPlanLiveBridge {
     protected readonly onDidReceivePlanEventEmitter = new Emitter<SorikuSseEvent>();
     readonly onDidReceivePlanEvent: Event<SorikuSseEvent> = this.onDidReceivePlanEventEmitter.event;
 
+    protected readonly onDidReceiveRawEventEmitter = new Emitter<Record<string, unknown>>();
+    /** Every event on /api/events, any channel — the engine log listens here. */
+    readonly onDidReceiveRawEvent: Event<Record<string, unknown>> = this.onDidReceiveRawEventEmitter.event;
+
     protected source?: EventSource;
     protected engineBase = DEFAULT_ENGINE_BASE_URL;
     // #19: reconnect with capped exponential backoff instead of a fixed 5s loop
@@ -52,6 +56,7 @@ export class SorikuPlanLiveBridge {
             this.source.onmessage = ev => {
                 try {
                     const data = JSON.parse(ev.data) as Record<string, unknown>;
+                    this.onDidReceiveRawEventEmitter.fire(data);
                     if (data.channel !== 'plan_sse' || typeof data.type !== 'string') {
                         return;
                     }
@@ -91,5 +96,6 @@ export class SorikuPlanLiveBridge {
         }
         this.source?.close();
         this.onDidReceivePlanEventEmitter.dispose();
+        this.onDidReceiveRawEventEmitter.dispose();
     }
 }

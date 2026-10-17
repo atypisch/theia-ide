@@ -31,11 +31,15 @@ export interface ChatHeaderProps {
     maxed: boolean;
     onMax: () => void;
     onInsights?: () => void;
+    /** Dragging the header offers a drop zone to move the chat between dock and tab. */
+    onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+    onDragEnd?: () => void;
 }
 
 export function ChatHeader(p: ChatHeaderProps): React.ReactElement {
     return (
-        <div className="sk-chat-head">
+        <div className="sk-chat-head" draggable={!!p.onDragStart} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}
+            title={p.onDragStart ? 'Drag to move chat' : undefined}>
             <span className="sk-chat-title" title={p.title}>{p.title}</span>
             {p.chipLabel && <span className={`sk-chip ${p.chipClass}`}>{p.chipLabel}</span>}
             <div className="sk-flex" />

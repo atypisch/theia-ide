@@ -76,3 +76,16 @@
 #theia-statusBar #status-bar-bottom-panel-toggle {
     display: none !important;
 }
+
+/* Run summary items (design status bar): "1 worker · 2 minions" and "✓ verified". */
+#theia-statusBar .soriku-statusbar-workers {
+    color: var(--ink3);
+}
+
+#theia-statusBar .soriku-statusbar-verified {
+    color: var(--ok);
+}
+
+#theia-statusBar .soriku-statusbar-verify-failed {
+    color: var(--warn);
+}

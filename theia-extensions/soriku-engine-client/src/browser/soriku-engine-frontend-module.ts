@@ -13,6 +13,7 @@ import { EngineAuthTokenHolder } from './engine-auth-token-holder';
 import { SorikuModelCatalog } from './soriku-model-catalog';
 import { SorikuConversationLink } from './soriku-conversation-link';
 import { SorikuPlanLiveBridge } from './soriku-plan-live-bridge';
+import { SorikuRunStateService } from './soriku-run-state-service';
 import { SorikuInlineCompletionContribution } from './soriku-inline-completion';
 import { SorikuEditorContextCollector } from './soriku-editor-context-collector';
 import { sorikuEnginePreferenceSchema } from './soriku-engine-preferences';
@@ -24,6 +25,7 @@ export default new ContainerModule(bind => {
     bind(SorikuModelCatalog).toSelf().inSingletonScope();
     bind(SorikuConversationLink).toSelf().inSingletonScope();
     bind(SorikuPlanLiveBridge).toSelf().inSingletonScope();
+    bind(SorikuRunStateService).toSelf().inSingletonScope();
     bind(SorikuInlineCompletionContribution).toSelf().inSingletonScope();
     bind(SorikuEditorContextCollector).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuInlineCompletionContribution);

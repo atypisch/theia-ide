@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
+import { RunStateSnapshot } from 'soriku-engine-client-ext/lib/common/run-state';
 import { AssistantTurn, ChatToolCall } from './chat-model';
 
 export type StepKind = 'think' | 'read' | 'edit' | 'shell' | 'check' | 'review';
@@ -238,5 +239,17 @@ export function runStats(turn: AssistantTurn, steps: RunStep[] = deriveSteps(tur
         steps: steps.length,
         files: turn.generatedFiles.map(f => ({ path: f.path, add: f.added, del: f.removed })),
         verified: checks.length === 0 ? 'none' : checks.every(c => c.tone === 'ok') ? 'verified' : 'failed',
+    };
+}
+
+/** What the status bar shows about this turn: live/finished, verification, and head vs sub-agent counts. */
+export function runStateSnapshot(turn: AssistantTurn | undefined): RunStateSnapshot {
+    if (!turn) { return { running: false, verified: 'none', workers: 0, minions: 0 }; }
+    const minions = turn.agents.filter(a => !!a.parentAgentId).length;
+    return {
+        running: turn.status === 'streaming',
+        verified: runStats(turn).verified,
+        workers: turn.agents.length - minions,
+        minions,
     };
 }

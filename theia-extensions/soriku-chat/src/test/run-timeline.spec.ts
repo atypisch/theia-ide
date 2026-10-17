@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAssistantTurn, AssistantTurn, ChatToolCall } from '../common/chat-model';
-import { deriveRunState, deriveSteps, resultFailed, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
+import { deriveRunState, deriveSteps, resultFailed, runStateSnapshot, runStats, shortPath, stepTarget, summarizeResult } from '../common/run-timeline';
 
 function turnWith(calls: ChatToolCall[], patch: Partial<AssistantTurn> = {}): AssistantTurn {
     return { ...createAssistantTurn('t1'), toolCalls: calls, ...patch };
@@ -179,5 +179,22 @@ describe('runStats', () => {
         assert.equal(s.verified, 'verified');
         assert.deepEqual(s.files, [{ path: 'a.py', add: 3, del: 1 }]);
         assert.equal(runStats(turnWith([])).verified, 'none');
+    });
+});
+
+describe('runStateSnapshot', () => {
+    it('is idle without a turn', () => {
+        assert.deepEqual(runStateSnapshot(undefined), { running: false, verified: 'none', workers: 0, minions: 0 });
+    });
+    it('splits head agents from minions and carries verification', () => {
+        const t = turnWith([{ callId: '1', tool: 'file_write', status: 'done', outcome: 'verified', args: { path: 'a.py' } }], {
+            agents: [
+                { workerId: 'w1', status: 'running', files: [], corrections: 0 },
+                { workerId: 'w2', status: 'running', files: [], corrections: 0, parentAgentId: 'p1' },
+                { workerId: 'w3', status: 'running', files: [], corrections: 0, parentAgentId: 'p1' },
+            ],
+        });
+        assert.deepEqual(runStateSnapshot(t), { running: true, verified: 'verified', workers: 1, minions: 2 });
+        assert.equal(runStateSnapshot({ ...t, status: 'done' }).running, false);
     });
 });

@@ -18,6 +18,8 @@ import { SorikuEngineStatusService } from './soriku-engine-status-service';
 import { SorikuEngineStatusContribution } from './soriku-engine-status-contribution';
 import { SorikuWarmModelStatusContribution } from './soriku-warm-model-status-contribution';
 import { SorikuTerminalToggleStatusContribution } from './soriku-terminal-toggle-status-contribution';
+import { SorikuRunStatusContribution } from './soriku-run-status-contribution';
+import { SorikuEngineLogContribution } from './soriku-engine-log-contribution';
 import { sorikuWorkbenchPreferenceSchema } from './soriku-workbench-preferences';
 import { SorikuSettingsWidget } from './soriku-settings-widget';
 import { SorikuSettingsViewContribution } from './soriku-settings-view-contribution';
@@ -38,6 +40,12 @@ export default new ContainerModule(bind => {
 
     bind(SorikuWarmModelStatusContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuWarmModelStatusContribution);
+
+    bind(SorikuEngineLogContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(SorikuEngineLogContribution);
+
+    bind(SorikuRunStatusContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(SorikuRunStatusContribution);
 
     bind(SorikuTerminalToggleStatusContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(SorikuTerminalToggleStatusContribution);
