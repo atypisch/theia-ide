@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAssistantTurn, AssistantTurn, ChatToolCall } from '../common/chat-model';
 import {
-    deriveRunState, deriveSteps, resultFailed, runStateSnapshot, runStats, shortPath, stepTarget, summarizeResult,
+    claimsUnwrittenFiles, deriveRunState, deriveSteps, resultFailed, runStateSnapshot, runStats, shortPath, stepTarget, summarizeResult,
 } from '../common/run-timeline';
 
 function turnWith(calls: ChatToolCall[], patch: Partial<AssistantTurn> = {}): AssistantTurn {
@@ -222,5 +222,23 @@ describe('runStateSnapshot agents', () => {
         });
         assert.equal(snap.agents[1].name, 'Code Reviewer');
         assert.equal(snap.agents[1].activity, undefined);
+    });
+});
+
+describe('claimsUnwrittenFiles', () => {
+    const reply = (text: string, patch: Partial<AssistantTurn> = {}): AssistantTurn => ({ ...turnWith([], { status: 'done', agentMode: true, text }), ...patch });
+    it('flags a claim of created files when nothing was written', () => {
+        assert.equal(claimsUnwrittenFiles(reply('Created `router.php` with the specified content.'), 0), true);
+        assert.equal(claimsUnwrittenFiles(reply('I have written the file src/app.ts for you.'), 0), true);
+        assert.equal(claimsUnwrittenFiles(reply('Ik heb bestand index.html aangemaakt.'), 0), true);
+    });
+    it('stays quiet when files really changed', () => {
+        assert.equal(claimsUnwrittenFiles(reply('Created `router.php`.'), 1), false);
+    });
+    it('stays quiet for ordinary answers, Ask mode and unfinished turns', () => {
+        assert.equal(claimsUnwrittenFiles(reply('The router picks a model by capability.'), 0), false);
+        assert.equal(claimsUnwrittenFiles(reply('You could create a router.php like this…'), 0), false);
+        assert.equal(claimsUnwrittenFiles(reply('Created `router.php`.', { agentMode: false }), 0), false);
+        assert.equal(claimsUnwrittenFiles(reply('Created `router.php`.', { status: 'streaming' }), 0), false);
     });
 });

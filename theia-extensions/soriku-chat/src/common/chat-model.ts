@@ -130,6 +130,8 @@ export interface AssistantTurn {
     escalation?: { from?: string; to?: string; reason?: string };
     /** The request let the router choose the model (Auto) — drives the "Auto → model" line. */
     auto?: boolean;
+    /** The run could write files (Agent mode): used to flag replies that claim changes nobody made. */
+    agentMode?: boolean;
     /** Time to first token (ms) — from SSE `timing` event. */
     ttftMs?: number;
     /** Total stream duration (ms) — from SSE `done` event. */

@@ -277,3 +277,21 @@ export function runStateSnapshot(turn: AssistantTurn | undefined): RunStateSnaps
 function roleName(role: string | undefined): string | undefined {
     return role ? role.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : undefined;
 }
+
+/** "Created `router.php` …", "I have written the file src/app.ts", "aangemaakt: index.html" — a claim that a named file was produced. */
+const CLAIM_VERBS = 'created|wrote|written|saved|generated|implemented|added|updated|aangemaakt|gemaakt|geschreven|opgeslagen|toegevoegd|bijgewerkt';
+const FILE_NAME = '[\\w./-]+\\.[A-Za-z][A-Za-z0-9]{0,5}';
+const QUOTE_BEFORE = '[\\x60\\x27"(]?';
+const QUOTE_AFTER = '[\\x60\\x27")]?';
+const FILE_CLAIM = new RegExp(
+    `\\b(?:${CLAIM_VERBS})\\b[^.\\n]{0,80}?${QUOTE_BEFORE}${FILE_NAME}\\b|\\b${FILE_NAME}${QUOTE_AFTER}\\s+(?:is |was |werd )?(?:${CLAIM_VERBS})\\b`, 'i');
+
+/**
+ * True when an Agent-mode reply says files were created or changed although nothing was written.
+ * Small local models do this ("Created `router.php` with the specified content.") without ever calling
+ * file_write; the IDE must say so instead of letting the claim stand next to a green "Done".
+ */
+export function claimsUnwrittenFiles(turn: AssistantTurn, filesChanged: number): boolean {
+    if (turn.status !== 'done' || !turn.agentMode || filesChanged > 0) { return false; }
+    return FILE_CLAIM.test(turn.text);
+}

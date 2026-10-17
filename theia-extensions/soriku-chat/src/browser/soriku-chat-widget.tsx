@@ -73,7 +73,7 @@ import { EditAction, EditChoice, editActions, needsDecision } from '../common/me
 import {
     ChatModeChoice, DEFAULT_MODE, DEFAULT_MODEL, ModelSelection, RoutingChoice, placeholderFor, resolveRun, toggleMultiple,
 } from '../common/mode-model';
-import { RunState, deriveRunState, deriveSteps, runStateSnapshot, runStats, shortPath, toolKind } from '../common/run-timeline';
+import { RunState, claimsUnwrittenFiles, deriveRunState, deriveSteps, runStateSnapshot, runStats, shortPath, toolKind } from '../common/run-timeline';
 import { ChatHeader, HistoryEntry } from './components/ChatHeader';
 import { InstructionsBanner } from './components/InstructionsBanner';
 import { rightEdgeRect, showChatDropZone } from './chat-drop-zone';
@@ -616,7 +616,9 @@ export class SorikuChatWidget extends ReactWidget {
                 images: images.length > 0 ? images.map(({ base64, mimeType }) => ({ base64, mimeType })) : undefined,
             });
         }
-        const initialTurn: AssistantTurn = { ...createAssistantTurn(this.nextId()), auto: this.modelSel.kind === 'auto' };
+        const initialTurn: AssistantTurn = {
+            ...createAssistantTurn(this.nextId()), auto: this.modelSel.kind === 'auto', agentMode: resolveRun(this.mode, this.modelSel).editsEnabled,
+        };
         const turnIndex = this.conversation.push(initialTurn) - 1;
         this.editorReveal.resetDedup();
         // Agent writes during this run are checkpointed so "Undo all" can restore them.
@@ -1668,6 +1670,10 @@ export class SorikuChatWidget extends ReactWidget {
                     onClick={() => this.fire(this.submitFeedback(turn, 'positive'))}><ThumbUpIcon /></button>
                 <button className={`sk-vote${vote === 'negative' ? ' on' : ''}`} title='Bad response'
                     onClick={() => this.fire(this.submitFeedback(turn, 'negative'))}><ThumbDownIcon /></button>
+            </div>}
+            {claimsUnwrittenFiles(turn, files.length) && <div className='sk-notice sk-notice-warn'>
+                The reply says files were created or changed, but nothing was written to your workspace. The model only described the work.
+                <div style={{ marginTop: 8 }}><button className='sk-btn' onClick={() => this.retryTurn(turn.id)}>Retry</button></div>
             </div>}
             {turn.status === 'error' && <div className='sk-notice sk-notice-error'>
                 {turn.error}

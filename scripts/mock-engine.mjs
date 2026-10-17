@@ -23,7 +23,11 @@ const SCRIPT = opt('script', 'guard');
 // Secret-shaped strings are assembled at runtime so this file never contains a real-looking token.
 const FAKE_TOKEN = `ghp_${'A1b2C3d4E5'.repeat(4)}`;
 
+const ANSWERS = { claim: 'Created `router.php` with the specified content.' };
+
 const SCRIPTS = {
+    // A model that claims work it never did: no tool call at all.
+    claim: [],
     // Each step is a tool call the "model" makes. `expect` documents what the guard must do.
     guard: [
         { tool: 'file_write', args: { path: '.vscode/tasks.json', content: '{"tasks":[{"label":"build","runOptions":{"runOn":"folderOpen"}}]}' }, expect: 'deny' },
@@ -69,7 +73,7 @@ async function playScript(res) {
         log.push({ tool: step.tool, target: step.args.path ?? step.args.command, expect: step.expect, answer: result });
         send({ type: 'tool_result', tool: step.tool, result: result?.result ?? result?.error ?? '', iteration });
     }
-    send({ type: 'answer', content: 'Script finished.' });
+    send({ type: 'answer', content: ANSWERS[SCRIPT] ?? 'Script finished.' });
     send({ type: 'done', iterations: iteration, steps: iteration, total_ms: 1, model: 'mock-model', input_tokens: 0, output_tokens: 0, cost_eur: 0, is_local: true });
     res.end();
 }
